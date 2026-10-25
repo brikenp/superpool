@@ -35,7 +35,15 @@ jobs:
           node-version: 22
       - run: npm ci --prefix functions
       - name: Kredencialet e Firebase
-        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Mungon sekreti FIREBASE_SERVICE_ACCOUNT (GitHub → Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          node -e "const k=require(process.argv[1]); if(k.project_id!=='superpool-system'){console.error('::error::Çelësi është i projektit '+k.project_id); process.exit(1)} console.log('Llogaria: '+k.client_email)" "$RUNNER_TEMP/sa.json"
       - name: Deploy Firestore + Functions
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
