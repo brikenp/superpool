@@ -39,16 +39,20 @@ jobs:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           if [ -z "$SA" ]; then
-            echo "::error::Mungon sekreti FIREBASE_SERVICE_ACCOUNT (GitHub → Settings → Secrets and variables → Actions)."
-            exit 1
+            echo "::notice::Pa sekretin FIREBASE_SERVICE_ACCOUNT deploy-i kapërcehet (përdorni scripts/deploy-cloudshell.sh)."
+            echo "HAS_SA=false" >> "$GITHUB_ENV"
+            exit 0
           fi
+          echo "HAS_SA=true" >> "$GITHUB_ENV"
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           node -e "const k=require(process.argv[1]); if(k.project_id!=='superpool-system'){console.error('::error::Çelësi është i projektit '+k.project_id); process.exit(1)} console.log('Llogaria: '+k.client_email)" "$RUNNER_TEMP/sa.json"
       - name: Deploy Firestore + Functions
+        if: env.HAS_SA == 'true'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
         run: npx --yes firebase-tools@15 deploy --only firestore,functions --project superpool-system --non-interactive --force
       - name: Deploy Storage rules
+        if: env.HAS_SA == 'true'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
         continue-on-error: true # dështon vetëm nëse Storage nuk është aktivizuar ende në Console

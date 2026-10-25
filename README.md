@@ -80,7 +80,10 @@ npm --prefix functions ci
 npm run deploy        # firestore (rregulla + indekse), functions, storage
 ```
 
-Ose automatikisht nga GitHub (`.github/workflows/firebase.yml`), në çdo push te `main`:
+Nga celulari ose pa kompjuter: hapni [Google Cloud Shell](https://shell.cloud.google.com) me llogarinë e projektit dhe ekzekutoni
+`git clone https://github.com/brikenp/superpool && cd superpool && bash scripts/deploy-cloudshell.sh`.
+
+Ose automatikisht nga GitHub (vetëm nëse organizata lejon çelësa service account) (`.github/workflows/firebase.yml`), në çdo push te `main`:
 Google Cloud Console → IAM → Service Accounts → krijoni një llogari me rolet **Firebase Admin**,
 **Cloud Functions Admin**, **Service Account User** dhe **Artifact Registry Administrator** → Keys → Add key (JSON).
 Ngjiteni përmbajtjen në GitHub → Settings → Secrets → Actions si `FIREBASE_SERVICE_ACCOUNT`.
