@@ -1,0 +1,75 @@
+// Llogaritjet e ofertës: materialet nga modeli i pishinës dhe totalet.
+
+import { evaluateFormula, poolVariables } from '@shared/formula.js';
+
+import { round2, round3, toNumber } from './format.js';
+
+export const newKey = () => Math.random().toString(36).slice(2, 10);
+
+export function offerVariables(offer) {
+  return poolVariables({
+    length: offer.length, width: offer.width, depthMin: offer.depthMin, depthMax: offer.depthMax, volume: offer.volumeManual ? offer.volume : null,
+  });
+}
+
+export const priceFromCost = (cost, markupPct) => round2(Number(cost || 0) * (1 + Number(markupPct || 0) / 100));
+
+/**
+ * Gjeneron rreshtat e ofertës nga modeli. Kthen { lines, errors }.
+ * costOf(productId) → kosto njësi aktuale (mesatare ose e fundit e blerjes)
+ */
+export function linesFromModel(model, offer, { productsById, costOf }) {
+  const vars = offerVariables(offer);
+  const errors = [];
+  const lines = (model.items || []).map((item) => {
+    let qty = 0;
+    try {
+      qty = evaluateFormula(item.formula, vars);
+    } catch (err) {
+      errors.push(`${item.description || productsById[item.productId]?.name || 'Rresht'}: ${err.message}`);
+    }
+    const product = item.productId ? productsById[item.productId] : null;
+    const unitCost = product ? costOf(item.productId) : toNumber(item.unitCost);
+    const markup = item.markupPct !== '' && item.markupPct !== undefined && item.markupPct !== null ? item.markupPct : model.markupPct;
+    const unitPrice = toNumber(item.unitPrice) > 0 ? toNumber(item.unitPrice) : priceFromCost(unitCost, markup);
+    return {
+      key: newKey(),
+      section: item.section || 'other',
+      productId: item.productId || null,
+      code: product?.code || '',
+      description: item.description || product?.name || '',
+      unit: product?.unit || item.unit || 'cope',
+      formula: item.formula || '',
+      autoQty: round3(qty),
+      qty: round3(qty),
+      unitCost: round2(unitCost),
+      unitPrice,
+      showOnClient: item.showOnClient !== false,
+    };
+  }).filter((l) => l.qty > 0 || !l.formula);
+  return { lines, errors };
+}
+
+/** Rillogarit sasitë automatike kur ndryshojnë përmasat, pa prekur rreshtat e ndryshuar me dorë. */
+export function recalcQuantities(lines, offer) {
+  const vars = offerVariables(offer);
+  return lines.map((l) => {
+    if (!l.formula) return l;
+    let auto;
+    try { auto = evaluateFormula(l.formula, vars); } catch { return l; }
+    const manual = l.autoQty !== undefined && round3(toNumber(l.qty)) !== round3(l.autoQty);
+    return { ...l, autoQty: round3(auto), qty: manual ? l.qty : round3(auto) };
+  });
+}
+
+export function offerTotals(offer) {
+  const lines = offer.lines || [];
+  const subtotal = round2(lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.unitPrice), 0));
+  const discount = round2(subtotal * toNumber(offer.discountPct) / 100);
+  const net = round2(subtotal - discount);
+  const vat = round2(net * toNumber(offer.vatPct) / 100);
+  const total = round2(net + vat);
+  const cost = round2(lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.unitCost), 0));
+  const margin = round2(net - cost);
+  return { subtotal, discount, net, vat, total, cost, margin, marginPct: net > 0 ? round2((margin / net) * 100) : 0 };
+}

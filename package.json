@@ -1,0 +1,13 @@
+{
+  "name": "superpool",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix functions install && npm --prefix web install",
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "test": "npm --prefix functions test",
+    "emulators": "firebase emulators:start --only auth,firestore,functions,storage --project demo-superpool",
+    "e2e": "node web/scripts/e2e.mjs",
+    "deploy": "npm run build && firebase deploy"
+  }
+}

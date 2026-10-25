@@ -1,0 +1,255 @@
+rules_version = '2';
+
+// Rregullat e sigurisë së SuperPool.
+// Roli i përdoruesit lexohet nga users/{uid} (jo nga token-i), që ndryshimet e roleve dhe çaktivizimet
+// të vlejnë menjëherë. Veprimet që prekin stokun bëhen vetëm nga Cloud Functions (Admin SDK).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function active() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().data.active == true;
+    }
+    function role() { return userDoc().data.role; }
+    function isRole(roles) { return active() && role() in roles; }
+    function changes(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function untouched(keys) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
+
+    // --- AFTËSITË (gjeneruar nga functions/src/shared/roles.js me `npm run sync-rules`) ---
+    // BEGIN CAPS
+    function can_inventory_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
+    function can_inventory_manage() { return isRole(['admin', 'magazine']); }
+    function can_movements_create() { return isRole(['admin', 'magazine', 'projekte', 'terren']); }
+    function can_movements_approve() { return isRole(['admin', 'magazine', 'projekte']); }
+    function can_fleet() { return isRole(['admin', 'magazine']); }
+    function can_suppliers() { return isRole(['admin', 'magazine']); }
+    function can_clients_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte', 'kimikate']); }
+    function can_clients_manage() { return isRole(['admin', 'oferta', 'kimikate']); }
+    function can_finance() { return isRole(['admin', 'projekte']); }
+    function can_chem_sales() { return isRole(['admin', 'magazine', 'kimikate']); }
+    function can_chem_sales_all() { return isRole(['admin', 'magazine']); }
+    function can_offers() { return isRole(['admin', 'oferta', 'projekte']); }
+    function can_pool_models() { return isRole(['admin', 'oferta']); }
+    function can_projects_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
+    function can_projects_manage() { return isRole(['admin', 'projekte']); }
+    function can_view_costs() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
+    function can_reports() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
+    function can_integration() { return isRole(['admin', 'magazine']); }
+    function can_audit() { return isRole(['admin']); }
+    function can_users() { return isRole(['admin']); }
+    function can_field() { return isRole(['admin', 'magazine', 'projekte', 'terren']); }
+    // END CAPS
+
+    // Fushat që mbahen vetëm nga Cloud Functions.
+    function productCounters() { return ['qtyTotal', 'qtyMain', 'qtyReserved']; }
+    function materialCounters() {
+      return ['reservedQty', 'purchased', 'issued', 'delivered', 'consumed', 'returned', 'loss'];
+    }
+
+    match /users/{uid} {
+      allow read: if active() || (signedIn() && request.auth.uid == uid);
+      allow write: if false; // createUser / updateUser
+    }
+
+    match /settings/{id} {
+      allow read: if active();
+      allow write: if can_users();
+    }
+
+    match /categories/{id} {
+      allow read: if active();
+      allow write: if can_inventory_manage();
+    }
+
+    match /products/{id} {
+      allow read: if active();
+      allow create: if can_inventory_manage()
+        && request.resource.data.qtyTotal == 0 && request.resource.data.qtyMain == 0
+        && request.resource.data.qtyReserved == 0;
+      allow update: if can_inventory_manage() && untouched(productCounters());
+      allow delete: if false; // artikujt çaktivizohen, nuk fshihen (ruhet historiku)
+    }
+
+    match /productCosts/{id} {
+      allow read: if can_view_costs();
+      allow create: if can_inventory_manage()
+        && request.resource.data.keys().hasOnly(['purchasePrice', 'avgCost']);
+      allow update: if can_inventory_manage() && changes(['purchasePrice']);
+    }
+
+    match /stock/{id} {
+      allow read: if active();
+      allow write: if false;
+    }
+
+    match /locations/{id} {
+      allow read: if active();
+      allow create, update: if can_inventory_manage()
+        && request.resource.data.kind in ['main', 'agent'];
+      allow delete: if false;
+    }
+
+    match /movements/{id} {
+      allow read: if can_inventory_view() || can_movements_approve()
+        || (active() && request.auth.uid in resource.data.participants);
+      allow write: if false; // submitMovement / approveMovement / cancelMovement
+    }
+
+    match /movementCosts/{id} {
+      allow read: if can_view_costs();
+      allow write: if false;
+    }
+
+    match /employees/{id} {
+      allow read: if active();
+      allow create, update: if can_fleet() && (resource == null || untouched(['userId']))
+        && (request.resource.data.get('userId', null) == null || resource != null);
+      allow delete: if false;
+    }
+
+    match /vehicles/{id} {
+      allow read: if active();
+      allow create, update: if can_fleet();
+      allow delete: if false;
+    }
+
+    match /suppliers/{id} {
+      allow read: if can_inventory_view() || can_suppliers();
+      allow create, update: if can_suppliers();
+      allow delete: if can_users();
+    }
+
+    match /supplierPrices/{id} {
+      allow read: if can_view_costs();
+      allow write: if can_suppliers();
+    }
+
+    match /purchaseOrders/{id} {
+      allow read: if can_suppliers() || can_projects_manage() || can_view_costs();
+      allow create: if can_suppliers() && request.resource.data.status in ['draft', 'sent'];
+      allow update: if can_suppliers()
+        && !(resource.data.status in ['received', 'cancelled'])
+        && untouched(['receiptIds'])
+        && request.resource.data.status in ['draft', 'sent', 'confirmed', 'partial', 'cancelled'];
+      allow delete: if can_suppliers() && resource.data.status == 'draft';
+    }
+
+    match /clients/{id} {
+      allow read: if can_clients_view();
+      allow create, update: if can_clients_manage() || can_finance();
+      allow delete: if can_users();
+
+      match /documents/{docId} {
+        allow read: if can_clients_view();
+        allow create: if can_clients_manage() || can_finance() || can_offers();
+        allow delete: if can_clients_manage();
+      }
+    }
+
+    match /invoices/{id} {
+      allow read: if can_reports() || can_finance()
+        || (can_chem_sales() && resource.data.createdBy == request.auth.uid);
+      allow create: if can_finance() && request.resource.data.source == 'superpool';
+      allow update: if can_finance() && untouched(['saleId', 'kind']);
+      allow delete: if false;
+    }
+
+    match /payments/{id} {
+      allow read: if can_reports() || can_finance()
+        || (can_chem_sales() && resource.data.createdBy == request.auth.uid);
+      allow create, update: if can_finance() && request.resource.data.get('saleId', null) == null;
+      allow delete: if false;
+    }
+
+    match /sales/{id} {
+      allow read: if can_chem_sales_all() || can_reports()
+        || (can_chem_sales() && resource.data.sellerUid == request.auth.uid);
+      allow write: if false; // confirmSale / cancelSale
+    }
+
+    match /poolModels/{id} {
+      allow read: if can_offers() || can_pool_models();
+      allow write: if can_pool_models();
+    }
+
+    match /offers/{id} {
+      allow read: if can_offers();
+      allow create: if can_offers() && request.resource.data.status in ['draft', 'sent'];
+      allow update: if can_offers() && untouched(['projectId'])
+        && (resource.data.status != 'accepted' || changes(['notesInternal', 'updatedAt']));
+      allow delete: if can_offers() && resource.data.status == 'draft';
+    }
+
+    function canSeeProject(projectId) {
+      return can_projects_view()
+        || (active() && request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.teamUids);
+    }
+
+    match /projects/{projectId} {
+      allow read: if can_projects_view() || (active() && request.auth.uid in resource.data.teamUids);
+      allow create: if can_projects_manage();
+      allow update: if can_projects_manage() && untouched(['teamUids', 'shortages', 'offerId']);
+      allow delete: if false;
+
+      match /materials/{productId} {
+        allow read: if canSeeProject(projectId);
+        allow create: if can_projects_manage()
+          && request.resource.data.keys().hasOnly(['productId', 'code', 'name', 'unit', 'plannedQty', 'notes', 'reservedQty', 'updatedAt'])
+          && request.resource.data.get('reservedQty', 0) == 0;
+        allow update: if can_projects_manage() && changes(['plannedQty', 'notes', 'updatedAt']);
+        allow delete: if can_projects_manage() && resource.data.get('issued', 0) == 0
+          && resource.data.get('reservedQty', 0) == 0;
+      }
+
+      match /tasks/{taskId} {
+        allow read: if canSeeProject(projectId);
+        allow create, delete: if can_projects_manage();
+        allow update: if can_projects_manage()
+          || (canSeeProject(projectId) && changes(['done', 'doneAt', 'doneBy']));
+      }
+
+      match /documents/{docId} {
+        allow read: if canSeeProject(projectId);
+        allow create: if canSeeProject(projectId) && request.resource.data.uploadedBy == request.auth.uid;
+        allow delete: if can_projects_manage();
+      }
+    }
+
+    match /projectFinance/{projectId} {
+      allow read: if can_view_costs();
+      allow update: if can_projects_manage() && changes(['contractValue', 'notes', 'updatedAt']);
+      allow create, delete: if false;
+
+      match /expenses/{expenseId} {
+        allow read: if can_view_costs();
+        allow write: if can_projects_manage();
+      }
+    }
+
+    match /inventoryCounts/{id} {
+      allow read: if can_inventory_view();
+      allow create: if can_inventory_manage() && request.resource.data.status == 'draft';
+      allow update: if can_inventory_manage() && resource.data.status == 'draft'
+        && request.resource.data.status in ['draft', 'cancelled'];
+      allow delete: if can_inventory_manage() && resource.data.status == 'draft';
+    }
+
+    match /fiscalStock/{id} {
+      allow read: if can_view_costs();
+      allow write: if false; // importData
+    }
+
+    match /auditLog/{id} {
+      allow read: if can_audit();
+      allow write: if false;
+    }
+
+    match /counters/{id} {
+      allow read, write: if false;
+    }
+  }
+}
