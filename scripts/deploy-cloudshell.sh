@@ -25,6 +25,19 @@ fi
 echo "▶ Instalimi i varësive të funksioneve…"
 npm --prefix functions ci --no-audit --no-fund --loglevel=error
 
+# Në organizatat Google Workspace, llogaria e paracaktuar e Compute nuk merr automatikisht rolin Editor.
+# Funksionet ndërtohen dhe ekzekutohen me të, prandaj i japim vetëm rolet që i nevojiten.
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+RUNTIME_SA="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+echo "▶ Rolet e llogarisë së funksioneve…"
+for R in roles/cloudbuild.builds.builder roles/logging.logWriter roles/artifactregistry.writer roles/storage.objectAdmin \
+         roles/datastore.user roles/firebaseauth.admin roles/eventarc.eventReceiver roles/run.invoker; do
+  gcloud projects add-iam-policy-binding "$PROJECT" --member="$RUNTIME_SA" --role="$R" --condition=None -q >/dev/null 2>&1 \
+    && echo "  OK $R" || echo "  ⚠ $R nuk u vendos (nevojitet roli Owner)"
+done
+gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
+  --role=roles/iam.serviceAccountTokenCreator --condition=None -q >/dev/null 2>&1 || true
+
 FIREBASE="npx --yes firebase-tools@15"
 
 # Në Cloud Shell, firebase-tools përdor kredencialet e gcloud. Nëse nuk mjaftojnë, kërkon hyrje me kod.
