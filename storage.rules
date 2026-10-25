@@ -24,6 +24,14 @@ service firebase.storage {
       allow delete: if isRole(['admin', 'oferta', 'kimikate']);
     }
 
+    // Fotot e artikujve: i shohin të gjithë përdoruesit aktivë, i ndryshon magazina.
+    match /products/{productId}/{fileName} {
+      allow read: if active();
+      allow create, update: if isRole(['admin', 'magazine']) && smallFile()
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isRole(['admin', 'magazine']);
+    }
+
     match /settings/{fileName} {
       allow read: if active();
       allow write: if isRole(['admin']) && smallFile();

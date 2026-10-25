@@ -10,6 +10,7 @@ import { companyHeader } from '../../lib/docPdf.js';
 import { loadPdf } from '../../lib/export.js';
 import { call, db } from '../../lib/firebase.js';
 import { date, qty, round3, toNumber } from '../../lib/format.js';
+import { productOption } from '../../components/ProductImage.jsx';
 
 const STATUS = { draft: 'Në numërim', confirmed: 'Konfirmuar', cancelled: 'Anuluar' };
 
@@ -99,7 +100,7 @@ export default function CountDetail() {
         {editable && (
           <div style={{ maxWidth: 420, marginBottom: 12 }}>
             <SearchSelect
-              options={products.filter((p) => !lines.some((l) => l.productId === p.id)).map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` }))}
+              options={products.filter((p) => !lines.some((l) => l.productId === p.id)).map((p) => productOption(p))}
               value=""
               placeholder="+ Shto artikull të gjetur fizikisht…"
               onChange={addProduct}

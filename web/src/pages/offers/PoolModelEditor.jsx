@@ -10,6 +10,7 @@ import { unitCostOf, useData, useDocument } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { money, qty, toNumber } from '../../lib/format.js';
 import { newKey, priceFromCost } from '../../lib/offerCalc.js';
+import { productOption } from '../../components/ProductImage.jsx';
 
 const emptyItem = () => ({ key: newKey(), section: 'other', productId: '', description: '', unit: 'cope', formula: '1', unitCost: '', unitPrice: '', markupPct: '', showOnClient: true });
 
@@ -31,7 +32,7 @@ export default function PoolModelEditor() {
   }, [model, form]);
 
   const vars = useMemo(() => poolVariables(test), [test]);
-  const productOptions = useMemo(() => products.filter((p) => p.active !== false).map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` })), [products]);
+  const productOptions = useMemo(() => products.filter((p) => p.active !== false).map((p) => productOption(p)), [products]);
 
   if (loading || !form) return <Loading />;
   if (!model) return <div className="alert error">Modeli nuk u gjet.</div>;

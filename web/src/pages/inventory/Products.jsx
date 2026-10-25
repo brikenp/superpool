@@ -11,6 +11,8 @@ import { Badge, Field, Modal, PageHeader, SearchSelect, useAction } from '../../
 import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useData } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
+import { removeProductImage, uploadProductImage } from '../../lib/images.js';
+import { ProductThumb } from '../../components/ProductImage.jsx';
 import { round3, toNumber } from '../../lib/format.js';
 
 export const freeQty = (p) => round3(Number(p.qtyMain || 0) - Number(p.qtyReserved || 0));
@@ -26,6 +28,9 @@ export function ProductForm({ product, onClose, onSaved }) {
     purchasePrice: product ? costsById[product.id]?.purchasePrice ?? '' : '',
   }));
   const [error, setError] = useState('');
+  const [photo, setPhoto] = useState(null); // File e re, ose 'remove'
+  const photoPreview = useMemo(() => (photo && photo !== 'remove' ? URL.createObjectURL(photo) : null), [photo]);
+  const currentPhoto = photo === 'remove' ? null : photoPreview || product?.imageUrl;
   const [run, busy] = useAction();
   const set = (k, val) => setV((s) => ({ ...s, [k]: val }));
 
@@ -66,6 +71,11 @@ export function ProductForm({ product, onClose, onSaved }) {
         const price = toNumber(v.purchasePrice);
         await setDoc(doc(db, 'productCosts', id), costsById[id] ? { purchasePrice: price } : { purchasePrice: price, avgCost: price }, { merge: true });
       }
+      if (photo === 'remove' && product) await removeProductImage(product);
+      else if (photo) {
+        if (product?.imagePaths) await removeProductImage(product);
+        await uploadProductImage(id, photo);
+      }
       onSaved?.(id);
       onClose();
     }, 'Artikulli u ruajt.');
@@ -85,6 +95,18 @@ export function ProductForm({ product, onClose, onSaved }) {
     >
       {error && <div className="alert error">{error}</div>}
       <form id="product-form" className="form-grid" onSubmit={submit}>
+        <Field label="Fotoja" className="span-all" hint="Nga telefoni mund të bëni foto direkt me kamerën.">
+          <div className="photo-box">
+            {currentPhoto ? <img className="preview" src={currentPhoto} alt="" /> : <div className="preview empty">📷</div>}
+            <div className="stack">
+              <label className="btn">
+                {currentPhoto ? 'Ndrysho foton' : 'Shto foto'}
+                <input type="file" accept="image/*" hidden onChange={(e) => e.target.files[0] && setPhoto(e.target.files[0])} />
+              </label>
+              {currentPhoto && <button type="button" className="btn danger" onClick={() => setPhoto(product?.imageUrl ? 'remove' : null)}>Hiq foton</button>}
+            </div>
+          </div>
+        </Field>
         <Field label="Kodi unik" required><input value={v.code} onChange={(e) => set('code', e.target.value)} /></Field>
         <Field label="Emri" required className="span-2"><input value={v.name} onChange={(e) => set('name', e.target.value)} /></Field>
         <Field label="Marka"><input value={v.brand} onChange={(e) => set('brand', e.target.value)} /></Field>
@@ -137,6 +159,7 @@ export default function Products() {
     && (!onlyLow || freeQty(p) < Number(p.minStock || 0))), [products, category, onlyLow, showInactive]);
 
   const columns = [
+    { key: 'photo', label: '', sortable: false, export: false, render: (p) => <ProductThumb product={p} size={42} /> },
     { key: 'code', label: 'Kodi' },
     { key: 'name', label: 'Emri', render: (p) => <>{p.name}{p.active === false && <> <Badge>joaktiv</Badge></>}</> },
     { key: 'brand', label: 'Marka / modeli', value: (p) => [p.brand, p.model].filter(Boolean).join(' ') },

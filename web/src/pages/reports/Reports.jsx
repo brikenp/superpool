@@ -15,6 +15,7 @@ import { unitCostOf, useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { date, firstOfMonth, round2, todayISO } from '../../lib/format.js';
 import { StockTable } from '../inventory/Stock.jsx';
+import { productOption } from '../../components/ProductImage.jsx';
 
 const REPORTS = [
   { key: 'stock', label: 'Gjendja e magazinës', filters: [] },
@@ -51,7 +52,7 @@ function Filters({ report, f, setF }) {
             </select>
           </Field>
         )}
-        {has('product') && <Field label="Artikulli"><SearchSelect options={products.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` }))} value={f.product} onChange={(v) => setF({ ...f, product: v })} /></Field>}
+        {has('product') && <Field label="Artikulli"><SearchSelect options={products.map((p) => productOption(p))} value={f.product} onChange={(v) => setF({ ...f, product: v })} /></Field>}
         {has('project') && <Field label="Projekti"><SearchSelect options={projects.data.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` }))} value={f.project} onChange={(v) => setF({ ...f, project: v })} /></Field>}
         {has('vehicle') && (
           <Field label="Automjeti">

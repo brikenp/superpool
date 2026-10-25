@@ -12,6 +12,7 @@ import { useDocument, useQuery, useData, unitCostOf } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { date, money, qty } from '../../lib/format.js';
 import { ProductForm, freeQty } from './Products.jsx';
+import { ImageModal } from '../../components/ProductImage.jsx';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -56,6 +57,7 @@ export default function ProductDetail() {
       </div>
       <div className="grid grid-2">
         <Card title="Të dhënat">
+          {product.imageUrl && <ProductHero product={product} />}
           <dl className="props">
             <dt>Njësia</dt><dd>{unit}</dd>
             <dt>Furnitori</dt><dd>{product.supplierId ? <Link to={`/furnitoret/${product.supplierId}`}>{product.supplierName}</Link> : '—'}</dd>
@@ -120,6 +122,16 @@ export default function ProductDetail() {
         />
       </Card>
       {editing && <ProductForm product={product} onClose={() => setEditing(false)} />}
+    </>
+  );
+}
+
+function ProductHero({ product }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <img className="product-hero" src={product.imageUrl} alt={product.name} onClick={() => setOpen(true)} style={{ marginBottom: 12 }} />
+      {open && <ImageModal product={product} onClose={() => setOpen(false)} />}
     </>
   );
 }

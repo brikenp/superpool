@@ -11,6 +11,7 @@ import { useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { date, money, todayISO } from '../../lib/format.js';
 import { supplierFields } from './Suppliers.jsx';
+import { productOption } from '../../components/ProductImage.jsx';
 
 export default function SupplierDetail() {
   const { id } = useParams();
@@ -121,7 +122,7 @@ export default function SupplierDetail() {
           defaults={priceEdit}
           onClose={() => setPriceEdit(null)}
           fields={[
-            { key: 'productId', label: 'Artikulli', type: 'search', required: true, span: 2, options: products.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` })) },
+            { key: 'productId', label: 'Artikulli', type: 'search', required: true, span: 2, options: products.map((p) => productOption(p)) },
             { key: 'price', label: 'Çmimi (L, pa TVSH)', type: 'number', required: true },
             { key: 'leadDays', label: 'Afati i dorëzimit (ditë)', type: 'number' },
             { key: 'date', label: 'Data e ofertës', type: 'date' },

@@ -159,9 +159,14 @@ export function SearchSelect({ options, value, onChange, placeholder = 'Kërko�
         <div className="ss-list">
           {allowEmpty && value && <div className="ss-item muted" onMouseDown={() => pick(null)}>— Pastro zgjedhjen —</div>}
           {filtered.map((o, i) => (
-            <div key={o.value} className={`ss-item ${i === hl ? 'hl' : ''}`} onMouseDown={() => pick(o)}>
-              {o.label}
-              {o.sub && <small className="muted">{o.sub}</small>}
+            <div key={o.value} className={`ss-item ${i === hl ? 'hl' : ''} ${o.image !== undefined ? 'with-img' : ''}`} onMouseDown={() => pick(o)}>
+              {o.image !== undefined && (o.image
+                ? <img className="thumb" src={o.image} alt="" loading="lazy" style={{ width: 40, height: 40 }} />
+                : <span className="thumb empty" style={{ width: 40, height: 40 }}>📦</span>)}
+              <span className="ss-text">
+                {o.label}
+                {o.sub && <small className="muted">{o.sub}</small>}
+              </span>
             </div>
           ))}
           {!filtered.length && <div className="ss-item muted">Asnjë rezultat</div>}

@@ -4,6 +4,7 @@ import { CONDITIONS, UNITS } from '@shared/constants.js';
 
 import { useData } from '../lib/data.jsx';
 import { money, qty as fmtQty, round2, toNumber } from '../lib/format.js';
+import { ProductThumb, productOption } from './ProductImage.jsx';
 import { SearchSelect } from './ui.jsx';
 
 export const emptyLine = () => ({ key: Math.random().toString(36).slice(2), productId: '', qty: '', condition: 'good', note: '' });
@@ -22,12 +23,8 @@ export function LinesEditor({ lines, onChange, available, priceField, priceLabel
   const { products, productsById } = useData();
   const options = useMemo(() => products
     .filter((p) => p.active !== false && (!productFilter || productFilter(p)))
-    .map((p) => ({
-      value: p.id,
-      label: `${p.code} · ${p.name}`,
-      sub: [p.brand, p.model, available ? `gjendje: ${fmtQty(available[p.id] || 0)} ${UNITS[p.unit] || ''}` : ''].filter(Boolean).join(' · '),
-      search: p.barcode,
-    })), [products, productFilter, available]);
+    .map((p) => productOption(p, [p.brand, p.model, available ? `gjendje: ${fmtQty(available[p.id] || 0)} ${UNITS[p.unit] || ''}` : ''].filter(Boolean).join(' · '))),
+  [products, productFilter, available]);
 
   const update = (i, patch) => onChange(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const remove = (i) => onChange(lines.filter((_, j) => j !== i));
@@ -60,8 +57,10 @@ export function LinesEditor({ lines, onChange, available, priceField, priceLabel
               return (
                 <tr key={l.key || i}>
                   <td data-label="Artikulli">
+                    <div className="product-cell">
+                    {p && <ProductThumb product={p} size={34} />}
                     {readOnly ? `${p?.code || ''} · ${p?.name || l.name || ''}` : (
-                      <SearchSelect
+                      <div style={{ flex: 1, minWidth: 0 }}><SearchSelect
                         options={options}
                         value={l.productId}
                         placeholder="Kërko artikull (kod, emër, barkod)…"
@@ -71,8 +70,9 @@ export function LinesEditor({ lines, onChange, available, priceField, priceLabel
                           if (priceField && prod && defaultPrice && !toNumber(l[priceField])) patch[priceField] = defaultPrice(prod);
                           update(i, patch);
                         }}
-                      />
+                      /></div>
                     )}
+                    </div>
                   </td>
                   {available && (
                     <td data-label="Gjendja" className={`r ${short ? 'text-danger bold' : ''}`}>

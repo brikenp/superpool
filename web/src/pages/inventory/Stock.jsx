@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { physicalLocations, unitCostOf, useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
+import { ProductThumb } from '../../components/ProductImage.jsx';
 
 /** Tabela e stokut për një ose disa vende magazinimi (përdoret edhe te automjetet dhe kantieret). */
 export function StockTable({ locationIds, title, showLocation }) {
@@ -37,6 +38,7 @@ export function StockTable({ locationIds, title, showLocation }) {
       columns={[
         { key: 'location', label: 'Vendi', hidden: !showLocation, value: (r) => r.location.name },
         { key: 'kind', label: 'Lloji', hidden: !showLocation, value: (r) => LOCATION_KINDS[r.locationKind] },
+        { key: 'photo', label: '', sortable: false, export: false, render: (r) => <ProductThumb product={r.product} size={36} /> },
         { key: 'code', label: 'Kodi', value: (r) => r.product.code },
         { key: 'name', label: 'Artikulli', value: (r) => r.product.name },
         { key: 'category', label: 'Kategoria', value: (r) => r.product.categoryName },

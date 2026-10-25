@@ -14,6 +14,7 @@ import { linesFromModel, newKey, offerTotals, offerVariables, priceFromCost, rec
 import { clientOfferPdf, internalEstimatePdf } from '../../lib/offerPdf.js';
 import { clientFields, normalizeClient } from '../partners/Clients.jsx';
 import { freeQty } from '../inventory/Products.jsx';
+import { productOption } from '../../components/ProductImage.jsx';
 
 const TEXT_FIELDS = [
   ['technicalText', 'Zgjidhja teknike (përshkrimi i punimeve)'],
@@ -61,7 +62,7 @@ export default function OfferEditor() {
 
   const totals = useMemo(() => (form ? offerTotals(form) : null), [form]);
   const vars = useMemo(() => (form ? offerVariables(form) : null), [form]);
-  const productOptions = useMemo(() => products.filter((p) => p.active !== false).map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` })), [products]);
+  const productOptions = useMemo(() => products.filter((p) => p.active !== false).map((p) => productOption(p)), [products]);
 
   if (!isNew && loading) return <Loading />;
   if (!isNew && !offer) return <div className="alert error">Oferta nuk u gjet.</div>;

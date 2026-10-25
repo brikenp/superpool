@@ -10,13 +10,14 @@ import { useData, useDocument } from '../../lib/data.jsx';
 import { movementPdf } from '../../lib/docPdf.js';
 import { call } from '../../lib/firebase.js';
 import { date, dateTime, money, qty } from '../../lib/format.js';
+import { ProductThumb } from '../../components/ProductImage.jsx';
 
 export default function MovementDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { uid, can } = useAuth();
   const { ask } = useUi();
-  const { employeesById, usersById, suppliersById, clientsById, vehiclesById, company } = useData();
+  const { employeesById, usersById, suppliersById, clientsById, vehiclesById, productsById, company } = useData();
   const showCosts = can(CAPS.VIEW_COSTS);
   const { data: m, loading } = useDocument(`movements/${id}`);
   const costs = useDocument(showCosts ? `movementCosts/${id}` : null);
@@ -122,7 +123,7 @@ export default function MovementDetail() {
             <tbody>
               {(m.lines || []).map((l, i) => (
                 <tr key={i}>
-                  <td data-label="Kodi"><Link to={`/artikuj/${l.productId}`}>{l.code}</Link></td>
+                  <td data-label="Kodi"><span className="product-cell"><ProductThumb product={productsById[l.productId] || l} size={34} /><Link to={`/artikuj/${l.productId}`}>{l.code}</Link></span></td>
                   <td data-label="Artikulli">{l.name}</td>
                   <td data-label="Sasia" className="r">{qty(l.qty)} {UNITS[l.unit] || l.unit}</td>
                   {m.kind === 'return' && (

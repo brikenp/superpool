@@ -8,6 +8,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { date, qty } from '../../lib/format.js';
+import { ProductThumb } from '../../components/ProductImage.jsx';
 
 /** Ndërfaqja e thjeshtë për telefon: automjeti im, projektet e mia, veprimet e shpejta. */
 export default function FieldHome() {
@@ -47,6 +48,7 @@ export default function FieldHome() {
               const p = productsById[s.productId] || {};
               return (
                 <li key={s.id}>
+                  <ProductThumb product={p} size={48} />
                   <span style={{ flex: 1 }}>{p.name}<br /><small className="muted">{p.code}</small></span>
                   <b>{qty(s.qty)} {UNITS[p.unit] || ''}</b>
                 </li>

@@ -92,31 +92,52 @@ export async function exportPdf({ title, columns, rows, filters = [], company = 
 
 /** Lexon CSV ose Excel dhe kthen rreshtat si objekte (çelësat = titujt e kolonave). */
 export async function readTable(file) {
+  return (await readTableWithImages(file)).rows;
+}
+
+/**
+ * Si readTable, por për Excel kthen edhe fotot e futura në fletë:
+ * images[i] = { buffer, extension } për rreshtin e të dhënave me indeks i.
+ */
+export async function readTableWithImages(file) {
   const name = file.name.toLowerCase();
   if (name.endsWith('.csv') || name.endsWith('.txt')) {
-    const text = await file.text();
-    return parseCsv(text);
+    return { rows: parseCsv(await file.text()), images: {} };
   }
   const { default: ExcelJS } = await import('exceljs');
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await file.arrayBuffer());
   const ws = wb.worksheets[0];
   const rows = [];
+  const rowIndexBySheetRow = {};
   let headers = null;
   ws.eachRow({ includeEmpty: false }, (row) => {
     const values = row.values.slice(1).map((v) => {
       if (v && typeof v === 'object') {
         if (v instanceof Date) return v.toISOString().slice(0, 10);
-        return v.result ?? v.text ?? v.richText?.map((t) => t.text).join('') ?? '';
+        return v.result ?? v.text ?? v.hyperlink ?? v.richText?.map((t) => t.text).join('') ?? '';
       }
       return v;
     });
     if (!headers) { headers = values.map((h) => String(h ?? '').trim()); return; }
     const obj = {};
     headers.forEach((h, i) => { if (h) obj[h] = values[i] ?? ''; });
-    if (Object.values(obj).some((v) => v !== '' && v !== null)) rows.push(obj);
+    rowIndexBySheetRow[row.number] = rows.length;
+    rows.push(obj);
   });
-  return rows;
+  // Fotot e ankoruara në fletë: rreshti përcaktohet nga cepi i sipërm-majtas (0-based).
+  const images = {};
+  for (const img of ws.getImages()) {
+    const sheetRow = Math.floor(img.range?.tl?.nativeRow ?? img.range?.tl?.row ?? -1) + 1;
+    const idx = rowIndexBySheetRow[sheetRow];
+    if (idx === undefined || images[idx]) continue;
+    const media = wb.getImage(Number(img.imageId));
+    if (media?.buffer) images[idx] = { buffer: media.buffer, extension: media.extension || 'png' };
+  }
+  const filled = rows.map((r, i) => ({ r, i })).filter(({ r, i }) => images[i] || Object.values(r).some((v) => v !== '' && v !== null));
+  const remap = {};
+  filled.forEach(({ i }, j) => { if (images[i]) remap[j] = images[i]; });
+  return { rows: filled.map(({ r }) => r), images: remap };
 }
 
 export function parseCsv(text) {

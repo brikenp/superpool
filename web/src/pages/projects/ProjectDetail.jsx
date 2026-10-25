@@ -17,6 +17,7 @@ import { call, db, storage } from '../../lib/firebase.js';
 import { date, dateTime, money, qty, round2, todayISO, toNumber } from '../../lib/format.js';
 import { movementColumns } from '../inventory/Movements.jsx';
 import { createPurchaseOrder } from '../partners/PurchaseOrders.jsx';
+import { productOption } from '../../components/ProductImage.jsx';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -210,7 +211,7 @@ function AddPlanned({ project, products, onClose }) {
     <Modal title="Material i planifikuar" onClose={onClose}
       footer={<><button type="button" className="btn" onClick={onClose}>Anulo</button><button type="button" className="btn primary" disabled={busy} onClick={save}>Shto</button></>}>
       <div className="form-grid">
-        <Field label="Artikulli" className="span-all"><SearchSelect options={products.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` }))} value={productId} onChange={setProductId} /></Field>
+        <Field label="Artikulli" className="span-all"><SearchSelect options={products.map((p) => productOption(p))} value={productId} onChange={setProductId} /></Field>
         <Field label="Sasia e planifikuar"><input className="num" type="number" step="any" value={plannedQty} onChange={(e) => setPlannedQty(e.target.value)} /></Field>
       </div>
     </Modal>
