@@ -54,6 +54,12 @@ export async function call(name, data) {
     const res = await httpsCallable(functions, name, { timeout: 300000 })(data);
     return res.data;
   } catch (err) {
+    // "internal [0]" = kërkesa nuk arriti fare te serveri (funksioni nuk është vendosur, ose nuk ka internet).
+    if (err?.code === 'functions/internal' && /\[0\]/.test(err.message || '')) {
+      throw new Error(navigator.onLine === false
+        ? 'Nuk ka lidhje me internetin.'
+        : 'Shërbimi i serverit (Cloud Functions) nuk është i arritshëm. Kontrolloni që funksionet janë vendosur me "npm run deploy".');
+    }
     const message = err?.message && !/^internal$/i.test(err.message)
       ? err.message
       : 'Ndodhi një gabim. Provoni përsëri ose kontaktoni administratorin.';
