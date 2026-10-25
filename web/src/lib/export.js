@@ -105,8 +105,10 @@ export async function readTableWithImages(file) {
     return { rows: parseCsv(await file.text()), images: {} };
   }
   const { default: ExcelJS } = await import('exceljs');
+  const { readInCellImages } = await import('./xlsxCellImages.js');
+  const buffer = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(await file.arrayBuffer());
+  await wb.xlsx.load(buffer);
   const ws = wb.worksheets[0];
   const rows = [];
   const rowIndexBySheetRow = {};
@@ -115,6 +117,7 @@ export async function readTableWithImages(file) {
     const values = row.values.slice(1).map((v) => {
       if (v && typeof v === 'object') {
         if (v instanceof Date) return v.toISOString().slice(0, 10);
+        if (v.error) return ''; // p.sh. qeliza me foto "Place in Cell" lexohet si #VALUE!
         return v.result ?? v.text ?? v.hyperlink ?? v.richText?.map((t) => t.text).join('') ?? '';
       }
       return v;
@@ -125,8 +128,18 @@ export async function readTableWithImages(file) {
     rowIndexBySheetRow[row.number] = rows.length;
     rows.push(obj);
   });
-  // Fotot e ankoruara në fletë: rreshti përcaktohet nga cepi i sipërm-majtas (0-based).
+  // Fotot brenda qelizave ("Place in Cell").
   const images = {};
+  try {
+    const inCell = await readInCellImages(buffer);
+    for (const [sheetRow, img] of Object.entries(inCell)) {
+      const idx = rowIndexBySheetRow[sheetRow];
+      if (idx !== undefined) images[idx] = img;
+    }
+  } catch (err) {
+    console.warn('Fotot brenda qelizave nuk u lexuan:', err);
+  }
+  // Fotot e ankoruara mbi fletë: rreshti përcaktohet nga cepi i sipërm-majtas (0-based).
   for (const img of ws.getImages()) {
     const sheetRow = Math.floor(img.range?.tl?.nativeRow ?? img.range?.tl?.row ?? -1) + 1;
     const idx = rowIndexBySheetRow[sheetRow];
@@ -172,4 +185,46 @@ export function downloadCsv(filename, columns, rows) {
   };
   const text = [columns.map((c) => esc(c.label)).join(';'), ...rows.map((r) => columns.map((c) => esc(c.value(r))).join(';'))].join('\r\n');
   download(new Blob([`﻿${text}`], { type: 'text/csv;charset=utf-8' }), filename);
+}
+
+/**
+ * Shkarkon një model Excel për import: fleta e të dhënave (titujt + shembuj) dhe fleta "Udhëzime".
+ * columns: [{ key, help, required, width, list? }]
+ */
+export async function downloadTemplate({ filename, sheetName, columns, rows, notes = [], photoColumn }) {
+  const { default: ExcelJS } = await import('exceljs');
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'SuperPool';
+  const ws = wb.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 1 }] });
+  ws.columns = columns.map((c) => ({ header: c.key, key: c.key, width: c.width || Math.max(14, c.key.length + 4) }));
+  const header = ws.getRow(1);
+  header.height = 22;
+  header.eachCell((cell, i) => {
+    const col = columns[i - 1];
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: col.required ? 'FF075985' : 'FF0284C7' } };
+    cell.alignment = { vertical: 'middle' };
+    cell.note = `${col.required ? '(e detyrueshme) ' : ''}${col.help || ''}`;
+  });
+  rows.forEach((r) => {
+    const row = ws.addRow(r);
+    if (photoColumn) row.height = 48;
+  });
+  columns.forEach((c, i) => {
+    if (c.list) {
+      for (let r = 2; r <= 500; r += 1) {
+        ws.getCell(r, i + 1).dataValidation = { type: 'list', allowBlank: true, formulae: [`"${c.list.join(',')}"`] };
+      }
+    }
+  });
+  const help = wb.addWorksheet('Udhëzime');
+  help.columns = [{ header: 'Kolona', key: 'k', width: 22 }, { header: 'E detyrueshme', key: 'r', width: 14 }, { header: 'Përshkrimi', key: 'h', width: 90 }];
+  help.getRow(1).font = { bold: true };
+  columns.forEach((c) => help.addRow({ k: c.key, r: c.required ? 'Po' : '', h: c.help || '' }));
+  if (notes.length) {
+    help.addRow({});
+    notes.forEach((n) => { const row = help.addRow({ k: '', r: '', h: n }); row.getCell(3).alignment = { wrapText: true }; });
+  }
+  const buffer = await wb.xlsx.writeBuffer();
+  download(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }

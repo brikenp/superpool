@@ -166,7 +166,7 @@ export function SearchSelect({ options, value, onChange, placeholder = 'KÃ«rkoâ€
             <div key={o.value} className={`ss-item ${i === hl ? 'hl' : ''} ${o.image !== undefined ? 'with-img' : ''}`} onMouseDown={() => pick(o)}>
               {o.image !== undefined && (o.image
                 ? <img className="thumb" src={o.image} alt="" loading="lazy" style={{ width: 40, height: 40 }} />
-                : <span className="thumb empty" style={{ width: 40, height: 40 }}><Package size={18} /></span>)}
+                : <span className="thumb placeholder" style={{ width: 40, height: 40 }}><Package size={18} /></span>)}
               <span className="ss-text">
                 {o.label}
                 {o.sub && <small className="muted">{o.sub}</small>}

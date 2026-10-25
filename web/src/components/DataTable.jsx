@@ -123,7 +123,7 @@ export function DataTable({
             {filtered.slice(0, limit).map((r) => (
               <tr key={r.id} className={onRowClick ? 'clickable' : ''} onClick={onRowClick ? () => onRowClick(r) : undefined}>
                 {cols.map((c) => (
-                  <td key={c.key} data-label={c.label} className={c.type === 'money' || c.type === 'number' || c.align === 'r' ? 'r' : ''}>
+                  <td key={c.key} data-label={c.label} className={`${c.type === 'money' || c.type === 'number' || c.align === 'r' ? 'r' : ''} ${c.nowrap || ['code', 'number', 'date'].includes(c.key) ? 'nowrap' : ''}`}>
                     {c.render ? c.render(r) : fmt(c, valueOf(c, r))}
                   </td>
                 ))}

@@ -1,51 +1,123 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import { FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 
 import { Card, Field, PageHeader, useAction } from '../../components/ui.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
-import { downloadCsv, readTableWithImages } from '../../lib/export.js';
+import { downloadCsv, downloadTemplate, readTableWithImages } from '../../lib/export.js';
 import { linkProductImage, uploadProductImage } from '../../lib/images.js';
 import { call, db } from '../../lib/firebase.js';
 import { date } from '../../lib/format.js';
 
 // Kolonat e pranuara për çdo lloj importi (titujt në rreshtin e parë të skedarit).
+// Pranohen edhe emrat shqip: kodi, emri, njesia, kategoria, furnitori, cmimi_blerjes, cmimi_shitjes, stoku_minimal, foto.
+const UNIT_LIST = ['cope', 'm', 'm2', 'm3', 'kg', 'l', 'pako', 'set', 'rrotull', 'ore'];
 const IMPORTS = {
   products: {
     label: 'Artikujt',
-    columns: ['code / kodi*', 'name / emri*', 'description', 'brand', 'model', 'unit (cope, m, m2, kg, l…)', 'category', 'supplier', 'purchasePrice', 'salePrice', 'minStock', 'image / foto (link)'],
-    sample: [{ code: 'PMP-001', name: 'Pompë 1HP', unit: 'cope', category: 'Pompa', supplier: 'Furnitori X', purchasePrice: 25000, salePrice: 38000, minStock: 2, image: 'https://…/pompe.jpg' }],
-    help: 'Fotot: mund t\'i vendosni direkt në qelizat e Excel-it (Insert → Picture → Place in cell / mbi rreshtin e artikullit), ose një link te kolona "image". Mund t\'i ngarkoni edhe më vonë te "Foto sipas kodit".',
+    sheet: 'Artikujt',
+    columns: [
+      { key: 'code', required: true, help: 'Kodi unik i artikullit (p.sh. TUB-50). Nëse ekziston, artikulli përditësohet.' },
+      { key: 'name', required: true, width: 34, help: 'Emri i artikullit.' },
+      { key: 'description', width: 34, help: 'Përshkrimi teknik.' },
+      { key: 'brand', help: 'Marka.' },
+      { key: 'model', help: 'Modeli.' },
+      { key: 'unit', list: UNIT_LIST, help: `Njësia: ${UNIT_LIST.join(', ')}.` },
+      { key: 'category', width: 18, help: 'Kategoria (krijohet nëse nuk ekziston). Kategoritë me "kimik" në emër shënohen si kimikate.' },
+      { key: 'supplier', width: 22, help: 'Emri i furnitorit kryesor (duhet të ekzistojë te Furnitorët).' },
+      { key: 'purchasePrice', help: 'Çmimi i blerjes (L, pa TVSH).' },
+      { key: 'salePrice', help: 'Çmimi i shitjes (L, me TVSH).' },
+      { key: 'minStock', help: 'Stoku minimal për listën e porosive.' },
+      { key: 'image', width: 16, help: 'Fotoja: ngjitni foton në këtë qelizë (Insert → Pictures → Place in Cell) ose shkruani një link https://…' },
+    ],
+    sample: [
+      { code: 'PMP-001', name: 'Pompë 1HP', unit: 'cope', category: 'Pompa', brand: 'Astral', purchasePrice: 25000, salePrice: 38000, minStock: 2 },
+      { code: 'RAK-90-50', name: 'Bërryl 90° PVC 50mm', unit: 'cope', category: 'Rakorderi', purchasePrice: 120, salePrice: 250, minStock: 50 },
+    ],
+    photoColumn: true,
+    notes: [
+      'Fotot: në Excel zgjidhni qelizën e kolonës "image" të artikullit → Insert → Pictures → Place in Cell (ose "Place over Cells" mbi rreshtin e artikullit).',
+      'Mund t\'i ngarkoni fotot edhe më vonë te "Foto sipas kodit", duke i emërtuar skedarët me kodin e artikullit.',
+      'Fshini rreshtat shembull para importit.',
+    ],
+    help: 'Fotot mund t\'i vendosni direkt në qelizat e kolonës "image" (Insert → Pictures → Place in Cell), ose një link. Mund t\'i ngarkoni edhe më vonë te "Foto sipas kodit".',
   },
   openingStock: {
     label: 'Stoku fillestar',
-    columns: ['code*', 'qty*', 'unitCost'],
+    sheet: 'Stoku',
+    columns: [
+      { key: 'code', required: true, help: 'Kodi i artikullit (duhet të ekzistojë).' },
+      { key: 'qty', required: true, help: 'Sasia në gjendje.' },
+      { key: 'unitCost', help: 'Kosto për njësi (L). Vendos koston mesatare fillestare.' },
+    ],
     sample: [{ code: 'PMP-001', qty: 5, unitCost: 25000 }],
     help: 'Krijon lëvizje rregullimi drejt magazinës së zgjedhur. Përdoret një herë në fillim.',
   },
   clients: {
     label: 'Klientët',
-    columns: ['name / emri*', 'nipt', 'phone', 'email', 'address', 'city', 'billingId'],
-    sample: [{ name: 'Hotel Riviera', nipt: 'L12345678A', phone: '069...', city: 'Durrës' }],
+    sheet: 'Klientët',
+    columns: [
+      { key: 'name', required: true, width: 30, help: 'Emri / subjekti.' },
+      { key: 'nipt', help: 'NIPT (për biznese). Përdoret për të gjetur klientët ekzistues.' },
+      { key: 'phone', help: 'Telefoni.' },
+      { key: 'email', width: 24, help: 'Email.' },
+      { key: 'address', width: 30, help: 'Adresa.' },
+      { key: 'city', help: 'Qyteti.' },
+      { key: 'billingId', help: 'ID e klientit në programin e faturimit.' },
+    ],
+    sample: [{ name: 'Hotel Riviera', nipt: 'L12345678A', phone: '0691234567', city: 'Durrës' }],
   },
   suppliers: {
     label: 'Furnitorët',
-    columns: ['name*', 'nipt', 'contactPerson', 'phone', 'email', 'address'],
-    sample: [{ name: 'Furnitori X', nipt: 'K00000000X', phone: '04...' }],
+    sheet: 'Furnitorët',
+    columns: [
+      { key: 'name', required: true, width: 30, help: 'Emri i furnitorit.' },
+      { key: 'nipt', help: 'NIPT.' },
+      { key: 'contactPerson', width: 20, help: 'Personi i kontaktit.' },
+      { key: 'phone', help: 'Telefoni.' },
+      { key: 'email', width: 24, help: 'Email.' },
+      { key: 'address', width: 30, help: 'Adresa.' },
+    ],
+    sample: [{ name: 'Furnitori X', nipt: 'K00000000X', phone: '042123456' }],
   },
   invoices: {
     label: 'Faturat (nga programi i faturimit)',
-    columns: ['number*', 'date*', 'nipt ose client*', 'amount*', 'dueDate', 'saleNumber (nr. i shitjes në SuperPool, p.sh. SHT-2026-0012)'],
+    sheet: 'Faturat',
+    columns: [
+      { key: 'number', required: true, help: 'Numri fiskal i faturës.' },
+      { key: 'date', required: true, help: 'Data (2026-10-01 ose 01.10.2026).' },
+      { key: 'nipt', help: 'NIPT i klientit (ose plotësoni kolonën client).' },
+      { key: 'client', width: 26, help: 'Emri i klientit, nëse nuk ka NIPT.' },
+      { key: 'amount', required: true, help: 'Vlera me TVSH.' },
+      { key: 'dueDate', help: 'Afati i pagesës.' },
+      { key: 'saleNumber', width: 18, help: 'Nr. i shitjes në SuperPool (p.sh. SHT-2026-0012) për ta lidhur faturën me shitjen.' },
+    ],
     sample: [{ number: 'ABC123/2026', date: '2026-10-01', nipt: 'L12345678A', amount: 12000, saleNumber: 'SHT-2026-0012' }],
     help: 'Nëse jepet saleNumber, numri fiskal lidhet automatikisht me shitjen përkatëse.',
   },
   payments: {
     label: 'Pagesat',
-    columns: ['date*', 'amount*', 'invoiceNumber ose nipt*', 'method (cash/bank/card)', 'reference'],
+    sheet: 'Pagesat',
+    columns: [
+      { key: 'date', required: true, help: 'Data e pagesës.' },
+      { key: 'amount', required: true, help: 'Shuma.' },
+      { key: 'invoiceNumber', help: 'Nr. fiskal i faturës (ose plotësoni nipt / client).' },
+      { key: 'nipt', help: 'NIPT i klientit.' },
+      { key: 'client', width: 26, help: 'Emri i klientit.' },
+      { key: 'method', list: ['cash', 'bank', 'card'], help: 'cash, bank ose card.' },
+      { key: 'reference', width: 20, help: 'Referenca e pagesës.' },
+    ],
     sample: [{ date: '2026-10-05', amount: 12000, invoiceNumber: 'ABC123/2026', method: 'bank' }],
   },
   fiscalStock: {
     label: 'Gjendja fiskale e magazinës',
-    columns: ['code*', 'quantity*', 'value', 'asOf'],
+    sheet: 'Gjendja fiskale',
+    columns: [
+      { key: 'code', required: true, help: 'Kodi i artikullit.' },
+      { key: 'quantity', required: true, help: 'Sasia sipas programit të faturimit.' },
+      { key: 'value', help: 'Vlera fiskale.' },
+      { key: 'asOf', help: 'Data e gjendjes.' },
+    ],
     sample: [{ code: 'PMP-001', quantity: 4, asOf: '2026-10-31' }],
     help: 'Përdoret te "Rakordimi fiskal" për krahasimin me stokun fizik.',
   },
@@ -116,10 +188,13 @@ export default function Integration() {
             </Field>
           </div>
           <p className="muted" style={{ fontSize: '0.85rem' }}>
-            Kolonat: {def.columns.map((c) => <code key={c} style={{ marginRight: 4 }}>{c}</code>)}
+            Kolonat: {def.columns.map((c) => <code key={c.key} style={{ marginRight: 4 }}>{c.key}{c.required ? '*' : ''}</code>)}
             {def.help && <><br />{def.help}</>}
           </p>
-          <button type="button" className="btn small" onClick={() => downloadCsv(`shembull_${type}.csv`, Object.keys(def.sample[0]).map((k) => ({ label: k, value: (r) => r[k] })), def.sample)}>Shkarko shembullin</button>
+          <button type="button" className="btn small" disabled={busy} onClick={() => run(() => downloadTemplate({
+            filename: `SuperPool_${def.sheet}.xlsx`, sheetName: def.sheet, columns: def.columns, rows: def.sample, notes: def.notes, photoColumn: def.photoColumn,
+          }))}
+          ><FileSpreadsheet size={15} /> Shkarko modelin Excel</button>
           {rows && (
             <div style={{ marginTop: 12 }}>
               <div className="alert info">

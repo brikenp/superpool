@@ -98,7 +98,7 @@ export function ProductForm({ product, onClose, onSaved }) {
       <form id="product-form" className="form-grid" onSubmit={submit}>
         <Field label="Fotoja" className="span-all" hint="Nga telefoni mund të bëni foto direkt me kamerën.">
           <div className="photo-box">
-            {currentPhoto ? <img className="preview" src={currentPhoto} alt="" /> : <div className="preview empty"><Camera size={36} /></div>}
+            {currentPhoto ? <img className="preview" src={currentPhoto} alt="" /> : <div className="preview placeholder"><Camera size={36} /></div>}
             <div className="stack">
               <label className="btn">
                 {currentPhoto ? 'Ndrysho foton' : 'Shto foto'}
