@@ -387,8 +387,9 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 /* ---------- Zgjedhja me kërkim ---------- */
 .ss { position: relative; }
 .ss-list {
-  position: absolute; z-index: 70; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; max-height: 300px; overflow-y: auto; box-shadow: var(--shadow-md); min-width: 280px; padding: 4px;
+  /* Pozicioni (fixed) llogaritet në SearchSelect; z-index mbi dritaret modale. */
+  position: fixed; z-index: 300; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; overflow-y: auto; box-shadow: var(--shadow-lg); padding: 4px; overscroll-behavior: contain;
 }
 .ss-item { padding: 8px 10px; cursor: pointer; font-size: 0.875rem; border-radius: 7px; }
 .ss-item small { display: block; font-size: 0.76rem; }

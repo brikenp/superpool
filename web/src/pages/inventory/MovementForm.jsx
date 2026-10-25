@@ -75,10 +75,12 @@ export default function MovementForm() {
     let destId = params.get('drejt') || pick(def.to);
     if (!params.get('drejt') && kind === 'delivery' && projectId) destId = `site_${projectId}`;
     if (kind === 'issue' && !params.get('drejt')) destId = myVehicle ? `veh_${myVehicle.id}` : '';
+    const sourceId = params.get('nga') || pick(def.from);
+    if (destId && destId === sourceId) destId = ''; // p.sh. transferimi: burimi dhe destinacioni s'mund të jenë i njëjti vend
     setForm({
       kind,
       date: todayISO(),
-      sourceId: params.get('nga') || pick(def.from),
+      sourceId,
       destId,
       projectId,
       employeeId: profile?.employeeId || '',
