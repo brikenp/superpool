@@ -89,7 +89,7 @@ Ngjiteni përmbajtjen në GitHub → Settings → Secrets → Actions si `FIREBA
 
 1. vercel.com → **Add New → Project** → importoni repository-n `superpool` nga GitHub.
 2. Lëreni **Root Directory** bosh (rrënja e repo-s). Cilësimet merren nga `vercel.json`
-   (build: `npm run build --prefix web`, output: `web/dist`). Nuk nevojiten variabla mjedisi.
+   (build: `cd web && npm run build`, output: `web/dist`). Nuk nevojiten variabla mjedisi.
 3. **Deploy**. Çdo push te `main` publikohet automatikisht; degët e tjera marrin adresë "preview".
 
 ### 4. Hyrja e parë
