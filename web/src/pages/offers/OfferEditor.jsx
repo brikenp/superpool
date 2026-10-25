@@ -1,5 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
+import { X, Plus } from 'lucide-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { OFFER_STATUS, POOL_SECTIONS, POOL_TYPES, UNITS } from '@shared/constants.js';
@@ -182,7 +183,7 @@ export default function OfferEditor() {
       {!isNew && !locked && (
         <div className="row" style={{ marginBottom: 12 }}>
           {form.status === 'draft' && <button type="button" className="btn" disabled={busy} onClick={() => save({ status: 'sent', sentAt: serverTimestamp() })}>Shëno si të dërguar</button>}
-          <button type="button" className="btn ok" disabled={busy} onClick={accept}>Klienti e pranoi → Krijo projektin</button>
+          <button type="button" className="btn ok" disabled={busy} onClick={accept}>Klienti e pranoi · Krijo projektin</button>
           <button type="button" className="btn danger" disabled={busy} onClick={() => save({ status: 'rejected' })}>Refuzuar nga klienti</button>
           {form.status === 'draft' && <button type="button" className="btn ghost" onClick={remove}>Fshi</button>}
         </div>
@@ -198,7 +199,7 @@ export default function OfferEditor() {
                   <div style={{ flex: 1 }}>
                     <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: [c.nipt, c.phone].filter(Boolean).join(' · ') }))} value={form.clientId} onChange={(v) => set('clientId', v)} />
                   </div>
-                  <button type="button" className="btn" onClick={() => setNewClient(true)}>+ I ri</button>
+                  <button type="button" className="btn" onClick={() => setNewClient(true)}><Plus size={16} /> I ri</button>
                 </div>
               </Field>
               <Field label="Emri i projektit"><input value={form.projectName} onChange={(e) => set('projectName', e.target.value)} placeholder="p.sh. Pishinë vile, Golem" /></Field>
@@ -294,7 +295,7 @@ export default function OfferEditor() {
                         <td className="r">{money(toNumber(l.qty) * toNumber(l.unitPrice))}</td>
                         <td className={`r ${p && free < toNumber(l.qty) ? 'text-danger' : ''}`}>{p ? qty(free) : ''}</td>
                         <td><input type="checkbox" checked={l.showOnClient !== false} onChange={(e) => setLine(i, { showOnClient: e.target.checked })} title="Shfaqet në ofertën për klientin" /></td>
-                        <td><button type="button" className="icon-btn" onClick={() => set('lines', form.lines.filter((_, j) => j !== i))}>✕</button></td>
+                        <td><button type="button" className="icon-btn" onClick={() => set('lines', form.lines.filter((_, j) => j !== i))}><X size={16} /></button></td>
                       </tr>
                     );
                   }))}
@@ -302,7 +303,7 @@ export default function OfferEditor() {
             </table>
             {!form.lines.length && <div className="empty">Zgjidhni një model pishine dhe shtypni "Llogarit materialet", ose shtoni rreshta me dorë.</div>}
           </div>
-          {!locked && <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => set('lines', [...form.lines, emptyLine()])}>+ Shto rresht</button>}
+          {!locked && <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => set('lines', [...form.lines, emptyLine()])}><Plus size={16} /> Shto rresht</button>}
           <p className="muted" style={{ fontSize: '0.83rem' }}>Sasitë me kornizë portokalli janë ndryshuar me dorë dhe nuk rillogariten kur ndryshojnë përmasat.</p>
         </Card>
 

@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -27,7 +28,7 @@ export default function Suppliers() {
       <PageHeader
         title="Furnitorët"
         subtitle="Kartela e furnitorëve me kontaktet, çmimet dhe historikun e blerjeve."
-        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}>+ Furnitor</button>}
+        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Furnitor</button>}
       />
       <DataTable
         title="Furnitorët"

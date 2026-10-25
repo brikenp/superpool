@@ -12,6 +12,7 @@
     "firebase": "^13.1.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
+    "lucide-react": "^1.61.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.4"

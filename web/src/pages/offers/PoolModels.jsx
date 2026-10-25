@@ -1,4 +1,5 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { POOL_TYPES } from '@shared/constants.js';
@@ -24,7 +25,7 @@ export default function PoolModels() {
       <PageHeader
         title="Modelet e pishinave"
         subtitle="Biblioteka e modeleve: rregullat e përllogaritjes së materialeve, pajisjet standarde dhe çmimet."
-        actions={<button type="button" className="btn primary" disabled={busy} onClick={create}>+ Model i ri</button>}
+        actions={<button type="button" className="btn primary" disabled={busy} onClick={create}><Plus size={16} /> Model i ri</button>}
       />
       <DataTable
         title="Modelet e pishinave"

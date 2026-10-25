@@ -1,6 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, query, serverTimestamp, where } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
+import { Paperclip, X, Plus } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { OFFER_STATUS, PAYMENT_METHODS, PROJECT_STATUS } from '@shared/constants.js';
@@ -63,8 +64,8 @@ export default function ClientCard() {
         actions={(
           <>
             {can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <button type="button" className="btn" onClick={() => setEditing(true)}>Ndrysho</button>}
-            {seeOffers && <Link className="btn" to={`/ofertat/re?klienti=${id}`}>+ Ofertë</Link>}
-            {can(CAPS.CHEM_SALES) && <Link className="btn primary" to={`/kimikate/shitje-e-re?klienti=${id}`}>+ Shitje</Link>}
+            {seeOffers && <Link className="btn" to={`/ofertat/re?klienti=${id}`}><Plus size={16} /> Ofertë</Link>}
+            {can(CAPS.CHEM_SALES) && <Link className="btn primary" to={`/kimikate/shitje-e-re?klienti=${id}`}><Plus size={16} /> Shitje</Link>}
           </>
         )}
       />
@@ -137,7 +138,7 @@ export default function ClientCard() {
       )}
       {tab === 'finance' && (
         <div className="grid grid-2">
-          <Card title="Faturat" actions={can(CAPS.FINANCE) && <button type="button" className="btn small" onClick={() => setInvoiceForm({ clientId: id })}>+ Faturë</button>}>
+          <Card title="Faturat" actions={can(CAPS.FINANCE) && <button type="button" className="btn small" onClick={() => setInvoiceForm({ clientId: id })}><Plus size={16} /> Faturë</button>}>
             <DataTable
               search={false}
               title={`Faturat · ${client.name}`}
@@ -152,7 +153,7 @@ export default function ClientCard() {
               ]}
             />
           </Card>
-          <Card title="Pagesat" actions={can(CAPS.FINANCE) && <button type="button" className="btn small" onClick={() => setPaymentForm({ clientId: id })}>+ Pagesë</button>}>
+          <Card title="Pagesat" actions={can(CAPS.FINANCE) && <button type="button" className="btn small" onClick={() => setPaymentForm({ clientId: id })}><Plus size={16} /> Pagesë</button>}>
             <DataTable
               search={false}
               title={`Pagesat · ${client.name}`}
@@ -215,10 +216,10 @@ function ClientDocuments({ clientId }) {
         {list.map((d) => (
           <li key={d.id}>
             <span style={{ flex: 1, whiteSpace: 'pre-line' }}>
-              {d.type === 'file' ? <a href={d.url} target="_blank" rel="noreferrer">📎 {d.title}</a> : d.text}
+              {d.type === 'file' ? <a href={d.url} target="_blank" rel="noreferrer"><Paperclip size={14} /> {d.title}</a> : d.text}
               <br /><small className="muted">{d.uploadedByName} · {dateTime(d.at)}</small>
             </span>
-            {can(CAPS.CLIENTS_MANAGE) && <button type="button" className="icon-btn" onClick={() => remove(d)}>✕</button>}
+            {can(CAPS.CLIENTS_MANAGE) && <button type="button" className="icon-btn" onClick={() => remove(d)}><X size={16} /></button>}
           </li>
         ))}
         {!list.length && <li className="muted">Nuk ka dokumente ose shënime.</li>}

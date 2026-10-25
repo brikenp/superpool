@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -26,7 +27,7 @@ export default function Offers() {
         actions={(
           <>
             <Link className="btn" to="/modelet">Modelet e pishinave</Link>
-            <Link className="btn primary" to="/ofertat/re">+ Ofertë e re</Link>
+            <Link className="btn primary" to="/ofertat/re"><Plus size={16} /> Ofertë e re</Link>
           </>
         )}
       />

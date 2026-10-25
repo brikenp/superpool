@@ -1,5 +1,6 @@
 import { collection, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { useState } from 'react';
+import { X, Plus } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { MOVEMENT_STATUS, PO_STATUS } from '@shared/constants.js';
@@ -38,7 +39,7 @@ export default function SupplierDetail() {
         actions={(
           <>
             <button type="button" className="btn" onClick={() => setEditing(true)}>Ndrysho</button>
-            <Link className="btn primary" to={`/porosite?furnitori=${id}`}>+ Porosi</Link>
+            <Link className="btn primary" to={`/porosite?furnitori=${id}`}><Plus size={16} /> Porosi</Link>
           </>
         )}
       />
@@ -50,7 +51,7 @@ export default function SupplierDetail() {
         { key: 'products', label: 'Artikujt' },
       ]} />
       {tab === 'prices' && (
-        <Card actions={<button type="button" className="btn small primary" onClick={() => setPriceEdit({ date: todayISO() })}>+ Çmim / ofertë</button>}>
+        <Card actions={<button type="button" className="btn small primary" onClick={() => setPriceEdit({ date: todayISO() })}><Plus size={16} /> Çmim / ofertë</button>}>
           <DataTable
             title={`Çmimet e ${supplier.name}`}
             rows={prices.data}
@@ -64,7 +65,7 @@ export default function SupplierDetail() {
               { key: 'notes', label: 'Shënime' },
               {
                 key: 'del', label: '', export: false, sortable: false,
-                render: (r) => <button type="button" className="icon-btn" title="Fshi" onClick={(e) => { e.stopPropagation(); run(() => deleteDoc(doc(db, 'supplierPrices', r.id)), 'U fshi.'); }}>✕</button>,
+                render: (r) => <button type="button" className="icon-btn" title="Fshi" onClick={(e) => { e.stopPropagation(); run(() => deleteDoc(doc(db, 'supplierPrices', r.id)), 'U fshi.'); }}><X size={16} /></button>,
               },
             ]}
           />

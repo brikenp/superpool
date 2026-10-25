@@ -1,3 +1,4 @@
+import { Package } from 'lucide-react';
 import { useState } from 'react';
 
 import { Modal } from './ui.jsx';
@@ -6,7 +7,7 @@ import { Modal } from './ui.jsx';
 export function ProductThumb({ product, size = 40, zoom = true }) {
   const [open, setOpen] = useState(false);
   const src = product?.thumbUrl || product?.imageUrl;
-  if (!src) return <span className="thumb empty" style={{ width: size, height: size }} aria-hidden="true">📦</span>;
+  if (!src) return <span className="thumb empty" style={{ width: size, height: size }} aria-hidden="true"><Package size={Math.round(size * 0.45)} /></span>;
   return (
     <>
       <img

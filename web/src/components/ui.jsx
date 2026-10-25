@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { CircleAlert, CircleCheck, Inbox, Package, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function PageHeader({ title, subtitle, breadcrumb, actions, children }) {
@@ -39,10 +40,13 @@ export function Field({ label, hint, required, className = '', children }) {
   );
 }
 
-export function Stat({ label, value, sub, tone, to }) {
+export function Stat({ label, value, sub, tone, to, icon: Icon }) {
   const body = (
     <>
-      <div className="label">{label}</div>
+      <div className="top">
+        <span className="label">{label}</span>
+        {Icon && <span className="ico"><Icon size={18} strokeWidth={2} /></span>}
+      </div>
       <div className="value">{value}</div>
       {sub && <div className="sub">{sub}</div>}
     </>
@@ -56,8 +60,8 @@ export function Loading({ text = 'Duke ngarkuar…' }) {
   return <div className="loading"><div className="spinner" />{text}</div>;
 }
 
-export function Empty({ children = 'Nuk ka të dhëna.' }) {
-  return <div className="empty">{children}</div>;
+export function Empty({ children = 'Nuk ka të dhëna.', icon: Icon = Inbox }) {
+  return <div className="empty"><span className="empty-ico"><Icon size={22} /></span><div>{children}</div></div>;
 }
 
 export function Badge({ tone = '', children }) {
@@ -97,7 +101,7 @@ export function Modal({ title, onClose, children, footer, wide }) {
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true">
         <div className="modal-header">
           <h2>{title}</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Mbyll">✕</button>
+          <button type="button" className="icon-btn neutral" onClick={onClose} aria-label="Mbyll"><X size={18} /></button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
@@ -162,7 +166,7 @@ export function SearchSelect({ options, value, onChange, placeholder = 'Kërko�
             <div key={o.value} className={`ss-item ${i === hl ? 'hl' : ''} ${o.image !== undefined ? 'with-img' : ''}`} onMouseDown={() => pick(o)}>
               {o.image !== undefined && (o.image
                 ? <img className="thumb" src={o.image} alt="" loading="lazy" style={{ width: 40, height: 40 }} />
-                : <span className="thumb empty" style={{ width: 40, height: 40 }}>📦</span>)}
+                : <span className="thumb empty" style={{ width: 40, height: 40 }}><Package size={18} /></span>)}
               <span className="ss-text">
                 {o.label}
                 {o.sub && <small className="muted">{o.sub}</small>}
@@ -201,7 +205,12 @@ export function UiProvider({ children }) {
     <UiContext.Provider value={value}>
       {children}
       <div className="toasts">
-        {toasts.map((t) => <div key={t.id} className={`toast ${t.tone}`}>{t.message}</div>)}
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast ${t.tone}`} role="status">
+            {t.tone === 'error' ? <CircleAlert size={18} /> : <CircleCheck size={18} />}
+            <span>{t.message}</span>
+          </div>
+        ))}
       </div>
       {prompt && <PromptDialog prompt={prompt} onDone={(v) => { prompt.resolve(v); setPrompt(null); }} />}
     </UiContext.Provider>

@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,7 +20,7 @@ export default function Locations() {
       <PageHeader
         title="Magazinat dhe nënmagazinat"
         subtitle="Nënmagazinat e automjeteve dhe të kantiereve krijohen automatikisht. Këtu shtoni magazina të tjera ose nënmagazinën e shitësit të kimikateve."
-        actions={<button type="button" className="btn primary" onClick={() => setEditing({ kind: 'agent' })}>+ Magazinë / nënmagazinë</button>}
+        actions={<button type="button" className="btn primary" onClick={() => setEditing({ kind: 'agent' })}><Plus size={16} /> Magazinë / nënmagazinë</button>}
       />
       <DataTable
         title="Vendet e magazinimit"

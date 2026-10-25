@@ -1,4 +1,5 @@
 import { collection, query, where } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -60,7 +61,7 @@ export default function Sales() {
       <PageHeader
         title="Shitjet e kimikateve"
         subtitle="Shitjet nga nënmagazina e shitësit ose nga magazina kryesore. Fatura fiskale lëshohet në programin e faturimit."
-        actions={<Link className="btn primary" to="/kimikate/shitje-e-re">+ Shitje e re</Link>}
+        actions={<Link className="btn primary" to="/kimikate/shitje-e-re"><Plus size={16} /> Shitje e re</Link>}
       />
       <Tabs active={tab} onChange={setTab} tabs={[
         { key: 'sales', label: 'Shitjet' },

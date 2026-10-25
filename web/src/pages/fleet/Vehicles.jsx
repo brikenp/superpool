@@ -1,4 +1,5 @@
 import { collection, query, where } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -28,7 +29,7 @@ export default function Vehicles() {
       <PageHeader
         title="Automjetet"
         subtitle="Çdo automjet ka nënmagazinën e vet: materialet që ndodhen në të, përgjegjësin dhe historikun."
-        actions={canManage && <button type="button" className="btn primary" onClick={() => setEditing({})}>+ Automjet</button>}
+        actions={canManage && <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Automjet</button>}
       />
       <DataTable
         title="Automjetet"

@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { DataTable } from '../../components/DataTable.jsx';
@@ -13,7 +14,7 @@ export default function Employees() {
       <PageHeader
         title="Punonjësit"
         subtitle="Punonjësit lidhen me automjetet, daljet e materialeve dhe ekipet e projekteve. Lidhja me llogarinë e përdoruesit bëhet te Përdoruesit."
-        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}>+ Punonjës</button>}
+        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Punonjës</button>}
       />
       <DataTable
         title="Punonjësit"

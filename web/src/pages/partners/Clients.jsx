@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -34,7 +35,7 @@ export default function Clients() {
       <PageHeader
         title="Klientët"
         subtitle="Kartela e vetme e klientit: oferta, projekte, shitje kimikatesh, fatura dhe pagesa."
-        actions={can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <button type="button" className="btn primary" onClick={() => setCreating(true)}>+ Klient</button>}
+        actions={can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <button type="button" className="btn primary" onClick={() => setCreating(true)}><Plus size={16} /> Klient</button>}
       />
       <DataTable
         title="Klientët"

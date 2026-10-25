@@ -1,4 +1,5 @@
 import { addDoc, collection, doc, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -158,8 +159,8 @@ export default function Finance() {
         subtitle="Faturat lëshohen në programin e faturimit; këtu ndiqen numrat fiskalë, pagesat dhe detyrimet e klientëve."
         actions={canEdit && (
           <>
-            <button type="button" className="btn" onClick={() => setInvoiceForm({})}>+ Faturë</button>
-            <button type="button" className="btn primary" onClick={() => setPaymentForm({})}>+ Pagesë</button>
+            <button type="button" className="btn" onClick={() => setInvoiceForm({})}><Plus size={16} /> Faturë</button>
+            <button type="button" className="btn primary" onClick={() => setPaymentForm({})}><Plus size={16} /> Pagesë</button>
           </>
         )}
       />

@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp, FileDown, FileSpreadsheet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { exportExcel, exportPdf } from '../lib/export.js';
@@ -100,8 +101,8 @@ export function DataTable({
           <span className="count">{filtered.length} rreshta</span>
           {exportable && (
             <span className="row right">
-              <button type="button" className="btn small" disabled={busy || !filtered.length} onClick={() => doExport('xlsx')}>Excel</button>
-              <button type="button" className="btn small" disabled={busy || !filtered.length} onClick={() => doExport('pdf')}>PDF</button>
+              <button type="button" className="btn small" disabled={busy || !filtered.length} onClick={() => doExport('xlsx')}><FileSpreadsheet size={15} /> Excel</button>
+              <button type="button" className="btn small" disabled={busy || !filtered.length} onClick={() => doExport('pdf')}><FileDown size={15} /> PDF</button>
             </span>
           )}
         </div>
@@ -113,7 +114,7 @@ export function DataTable({
               {cols.map((c) => (
                 <th key={c.key} className={`${c.type === 'money' || c.type === 'number' || c.align === 'r' ? 'r' : ''} ${c.sortable === false ? '' : 'sortable'}`} onClick={() => toggleSort(c)}>
                   {c.label}
-                  {sort?.key === c.key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  {sort?.key === c.key && <span className="sort">{sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}</span>}
                 </th>
               ))}
             </tr>

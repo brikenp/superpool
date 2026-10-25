@@ -1,4 +1,5 @@
 import { addDoc, collection, doc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { Camera, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -97,7 +98,7 @@ export function ProductForm({ product, onClose, onSaved }) {
       <form id="product-form" className="form-grid" onSubmit={submit}>
         <Field label="Fotoja" className="span-all" hint="Nga telefoni mund të bëni foto direkt me kamerën.">
           <div className="photo-box">
-            {currentPhoto ? <img className="preview" src={currentPhoto} alt="" /> : <div className="preview empty">📷</div>}
+            {currentPhoto ? <img className="preview" src={currentPhoto} alt="" /> : <div className="preview empty"><Camera size={36} /></div>}
             <div className="stack">
               <label className="btn">
                 {currentPhoto ? 'Ndrysho foton' : 'Shto foto'}
@@ -184,7 +185,7 @@ export default function Products() {
         actions={canManage && (
           <>
             <button type="button" className="btn" onClick={() => setCatModal({})}>Kategoritë</button>
-            <button type="button" className="btn primary" onClick={() => setEditing({})}>+ Artikull i ri</button>
+            <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Artikull i ri</button>
           </>
         )}
       />
@@ -234,7 +235,7 @@ function Categories({ onClose }) {
           </li>
         ))}
       </ul>
-      <button type="button" className="btn primary" onClick={() => setEditing({})}>+ Kategori e re</button>
+      <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Kategori e re</button>
       {editing && (
         <EntityForm
           title={editing.id ? 'Ndrysho kategorinë' : 'Kategori e re'}

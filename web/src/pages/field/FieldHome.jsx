@@ -1,4 +1,5 @@
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
+import { PackageMinus, PackagePlus, TriangleAlert, Undo2, Wrench } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { MOVEMENT_KINDS, MOVEMENT_STATUS, PROJECT_STATUS, UNITS } from '@shared/constants.js';
@@ -25,23 +26,26 @@ export default function FieldHome() {
   const from = veh ? `nga=veh_${veh.id}` : '';
 
   const actions = [
-    { kind: 'issue', icon: '📤', label: 'Merr materiale nga magazina', q: veh ? `drejt=veh_${veh.id}` : '' },
-    { kind: 'delivery', icon: '🏗️', label: 'Dorëzo në kantier', q: from },
-    { kind: 'consumption', icon: '🔧', label: 'Regjistro përdorimin', q: from },
-    { kind: 'return', icon: '↩️', label: 'Kthe materialet e mbetura', q: from },
+    { kind: 'issue', icon: PackagePlus, label: 'Merr materiale nga magazina', q: veh ? `drejt=veh_${veh.id}` : '' },
+    { kind: 'delivery', icon: PackageMinus, label: 'Dorëzo në kantier', q: from },
+    { kind: 'consumption', icon: Wrench, label: 'Regjistro përdorimin', q: from },
+    { kind: 'return', icon: Undo2, label: 'Kthe materialet e mbetura', q: from },
   ];
 
   return (
     <>
-      <PageHeader title={`Përshëndetje, ${profile?.name?.split(' ')[0] || ''}`} subtitle={veh ? `Automjeti: ${veh.plate}` : 'Nuk jeni caktuar përgjegjës i ndonjë automjeti.'} />
+      <div className="hero">
+        <h1>Përshëndetje, {profile?.name?.split(' ')[0] || ''}</h1>
+        <div className="muted">{veh ? `Automjeti juaj: ${veh.plate}` : 'Nuk jeni caktuar përgjegjës i ndonjë automjeti.'}</div>
+      </div>
       <div className="field-actions">
         {actions.map((a) => (
           <button key={a.kind} type="button" className="btn big" onClick={() => navigate(`/levizjet/re/${a.kind}${a.q ? `?${a.q}` : ''}`)}>
-            <span className="ico">{a.icon}</span>{a.label}
+            <span className="ico"><a.icon size={22} /></span>{a.label}
           </button>
         ))}
       </div>
-      <Card title={veh ? `Materialet në automjet (${veh.plate})` : 'Materialet në automjet'} actions={<Link className="btn small" to={`/levizjet/re/loss${from ? `?${from}` : ''}`}>⚠️ Dëmtim / humbje</Link>}>
+      <Card title={veh ? `Materialet në automjet (${veh.plate})` : 'Materialet në automjet'} actions={<Link className="btn small" to={`/levizjet/re/loss${from ? `?${from}` : ''}`}><TriangleAlert size={15} /> Dëmtim / humbje</Link>}>
         {stock.data.filter((s) => Number(s.qty) > 0).length ? (
           <ul className="list-plain">
             {stock.data.filter((s) => Number(s.qty) > 0).map((s) => {

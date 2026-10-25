@@ -1,4 +1,5 @@
 import { collection, query, where } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -59,7 +60,7 @@ export default function SaleForm() {
               <div style={{ flex: 1 }}>
                 <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: [c.nipt, c.phone, c.city].filter(Boolean).join(' · ') }))} value={form.clientId} onChange={(v) => set('clientId', v)} />
               </div>
-              {can(CAPS.CLIENTS_MANAGE) && <button type="button" className="btn" onClick={() => setNewClient(true)}>+ I ri</button>}
+              {can(CAPS.CLIENTS_MANAGE) && <button type="button" className="btn" onClick={() => setNewClient(true)}><Plus size={16} /> I ri</button>}
             </div>
           </Field>
           <Field label="Data"><input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} /></Field>

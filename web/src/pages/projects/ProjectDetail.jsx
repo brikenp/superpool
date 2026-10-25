@@ -3,6 +3,7 @@ import {
 } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useMemo, useState } from 'react';
+import { FileText, PackageMinus, PackagePlus, Paperclip, Plus, TriangleAlert, Undo2, Wrench, X } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { EXPENSE_CATEGORIES, POOL_TYPES, PROJECT_STATUS, UNITS } from '@shared/constants.js';
@@ -75,7 +76,7 @@ function ProjectHeader({ project }) {
             <StatusBadge status={project.status} labels={PROJECT_STATUS} />
             {' · '}<Link to={`/klientet/${project.clientId}`}>{project.clientName}</Link>
             {project.address ? ` · ${project.address}` : ''}
-            {project.offerId && <> · <Link to={`/ofertat/${project.offerId}`}>Oferta {project.offerNumber}</Link></>}
+            {project.offerId && <> · <Link to={`/ofertat/${project.offerId}`}><FileText size={13} style={{ verticalAlign: '-2px' }} /> Oferta {project.offerNumber}</Link></>}
           </>
         )}
         actions={can(CAPS.PROJECTS_MANAGE) && (
@@ -87,11 +88,11 @@ function ProjectHeader({ project }) {
       />
       {can(CAPS.MOVEMENTS_CREATE) && ['planned', 'active'].includes(project.status) && (
         <div className="row" style={{ marginBottom: 14 }}>
-          <Link className="btn" to={`/levizjet/re/issue?${q}`}>📤 Dalje materialesh</Link>
-          <Link className="btn" to={`/levizjet/re/delivery?${q}`}>🏗️ Dorëzim në kantier</Link>
-          <Link className="btn" to={`/levizjet/re/consumption?${q}`}>🔧 Regjistro përdorim</Link>
-          <Link className="btn" to={`/levizjet/re/return?${q}`}>↩️ Kthim materialesh</Link>
-          <Link className="btn" to={`/levizjet/re/loss?${q}`}>⚠️ Dëmtim / humbje</Link>
+          <Link className="btn" to={`/levizjet/re/issue?${q}`}><PackagePlus size={16} /> Dalje materialesh</Link>
+          <Link className="btn" to={`/levizjet/re/delivery?${q}`}><PackageMinus size={16} /> Dorëzim në kantier</Link>
+          <Link className="btn" to={`/levizjet/re/consumption?${q}`}><Wrench size={16} /> Regjistro përdorim</Link>
+          <Link className="btn" to={`/levizjet/re/return?${q}`}><Undo2 size={16} /> Kthim materialesh</Link>
+          <Link className="btn" to={`/levizjet/re/loss?${q}`}><TriangleAlert size={16} /> Dëmtim / humbje</Link>
         </div>
       )}
     </>
@@ -160,7 +161,7 @@ function Materials({ project }) {
         title="Pasqyra e materialeve"
         actions={(
           <>
-            {canManage && <button type="button" className="btn small" onClick={() => setAdding(true)}>+ Material i planifikuar</button>}
+            {canManage && <button type="button" className="btn small" onClick={() => setAdding(true)}><Plus size={16} /> Material i planifikuar</button>}
             {canReserve && <button type="button" className="btn small primary" disabled={busy} onClick={() => reserve(false)}>Rezervo nga stoku</button>}
             {canReserve && <button type="button" className="btn small" disabled={busy} onClick={() => reserve(true)}>Liro rezervimet</button>}
           </>
@@ -271,7 +272,7 @@ function Tasks({ project }) {
               <br /><small className="muted">{[employeesById[t.assignedTo]?.name, t.dueDate && `afati ${date(t.dueDate)}`, t.done && t.doneBy && `kryer nga ${t.doneBy}`].filter(Boolean).join(' · ')}</small>
             </span>
             {t.dueDate && !t.done && t.dueDate < todayISO() && <span className="badge danger">me vonesë</span>}
-            {canManage && <button type="button" className="icon-btn" onClick={() => run(() => deleteDoc(doc(db, 'projects', project.id, 'tasks', t.id)))}>✕</button>}
+            {canManage && <button type="button" className="icon-btn" onClick={() => run(() => deleteDoc(doc(db, 'projects', project.id, 'tasks', t.id)))}><X size={16} /></button>}
           </li>
         ))}
         {!list.length && <li className="muted">Nuk ka detyra.</li>}
@@ -303,9 +304,9 @@ function Documents({ project }) {
       <ul className="list-plain" style={{ marginTop: 12 }}>
         {list.map((d) => (
           <li key={d.id}>
-            <a href={d.url} target="_blank" rel="noreferrer" style={{ flex: 1 }}>📎 {d.title}</a>
+            <a href={d.url} target="_blank" rel="noreferrer" style={{ flex: 1 }}><Paperclip size={14} /> {d.title}</a>
             <small className="muted">{d.uploadedByName} · {dateTime(d.at)}</small>
-            {can(CAPS.PROJECTS_MANAGE) && <button type="button" className="icon-btn" onClick={() => remove(d)}>✕</button>}
+            {can(CAPS.PROJECTS_MANAGE) && <button type="button" className="icon-btn" onClick={() => remove(d)}><X size={16} /></button>}
           </li>
         ))}
         {!list.length && <li className="muted">Nuk ka dokumente.</li>}
@@ -373,7 +374,7 @@ function Expenses({ project }) {
           { key: 'amount', label: 'Shuma', type: 'money', total: true },
           {
             key: 'del', label: '', sortable: false, export: false, hidden: !canManage,
-            render: (e) => <button type="button" className="icon-btn" onClick={() => run(() => deleteDoc(doc(db, 'projectFinance', project.id, 'expenses', e.id)), 'U fshi.')}>✕</button>,
+            render: (e) => <button type="button" className="icon-btn" onClick={() => run(() => deleteDoc(doc(db, 'projectFinance', project.id, 'expenses', e.id)), 'U fshi.')}><X size={16} /></button>,
           },
         ]}
       />

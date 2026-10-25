@@ -1,4 +1,5 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -51,7 +52,7 @@ export default function PurchaseOrders() {
         actions={(
           <>
             <Link className="btn" to="/porosite/nevojat">Lista e nevojave</Link>
-            <button type="button" className="btn primary" onClick={() => setCreating(true)}>+ Porosi e re</button>
+            <button type="button" className="btn primary" onClick={() => setCreating(true)}><Plus size={16} /> Porosi e re</button>
           </>
         )}
       />

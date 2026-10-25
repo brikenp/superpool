@@ -1,4 +1,5 @@
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
+import { ClipboardCheck, FileText, FlaskConical, HardHat, PackageX, Wallet } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { MOVEMENT_KINDS, MOVEMENT_STATUS, OFFER_STATUS } from '@shared/constants.js';
@@ -48,14 +49,21 @@ function ManagementDashboard() {
 
   return (
     <>
-      <PageHeader title="Paneli" subtitle={`Mirë se vini, ${profile?.name || ''}. ${date(todayISO())}`} />
+      <div className="hero">
+        <h1>{greeting()}, {(profile?.name || '').split(/[\s@]/)[0]}</h1>
+        <div className="muted">{longDate()} · Pasqyra e magazinës, projekteve dhe aktivitetit tregtar.</div>
+        <svg className="waves" width="320" height="160" viewBox="0 0 320 160" aria-hidden="true">
+          <path d="M0 80 C40 50 80 110 120 80 S200 50 240 80 S300 110 320 80 V160 H0Z" fill="#22d3ee" />
+          <path d="M0 110 C50 85 90 135 140 110 S220 85 260 110 S310 130 320 115 V160 H0Z" fill="#0ea5e9" />
+        </svg>
+      </div>
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
-        {approve && <Stat label="Në pritje të miratimit" value={pending.data.length} tone={pending.data.length ? 'warn' : 'ok'} to="/levizjet" sub="dalje, kthime, humbje" />}
-        {inv && <Stat label="Artikuj nën stokun minimal" value={low.length} tone={low.length ? 'danger' : 'ok'} to="/porosite/nevojat" />}
-        {inv && can(CAPS.VIEW_COSTS) && <Stat label="Vlera e stokut" value={money(stockValue)} sub={`${active.length} artikuj aktivë`} to="/stoku?vendi=all" />}
-        {projectsCap && <Stat label="Projekte aktive" value={projects.data.length} sub={`${projects.data.filter((p) => (p.shortages || []).length).length} me mungesa materialesh`} to="/projektet" />}
-        {offersCap && <Stat label="Oferta të hapura" value={offers.data.length} sub={expiring.length ? `${expiring.length} të skaduara` : money(offers.data.reduce((s, o) => s + Number(o.totals?.total || 0), 0))} to="/ofertat" />}
-        {(salesAll || salesOwn) && <Stat label="Shitje kimikatesh këtë muaj" value={money(monthSales.reduce((s, x) => s + Number(x.total || 0), 0))} sub={`${monthSales.length} shitje`} to="/kimikate" />}
+        {approve && <Stat icon={ClipboardCheck} label="Në pritje të miratimit" value={pending.data.length} tone={pending.data.length ? 'warn' : 'ok'} to="/levizjet" sub="dalje, kthime, humbje" />}
+        {inv && <Stat icon={PackageX} label="Artikuj nën stokun minimal" value={low.length} tone={low.length ? 'danger' : 'ok'} to="/porosite/nevojat" />}
+        {inv && can(CAPS.VIEW_COSTS) && <Stat icon={Wallet} label="Vlera e stokut" value={money(stockValue)} sub={`${active.length} artikuj aktivë`} to="/stoku?vendi=all" />}
+        {projectsCap && <Stat icon={HardHat} label="Projekte aktive" value={projects.data.length} sub={`${projects.data.filter((p) => (p.shortages || []).length).length} me mungesa materialesh`} to="/projektet" />}
+        {offersCap && <Stat icon={FileText} label="Oferta të hapura" value={offers.data.length} sub={expiring.length ? `${expiring.length} të skaduara` : money(offers.data.reduce((s, o) => s + Number(o.totals?.total || 0), 0))} to="/ofertat" />}
+        {(salesAll || salesOwn) && <Stat icon={FlaskConical} label="Shitje kimikatesh këtë muaj" value={money(monthSales.reduce((s, x) => s + Number(x.total || 0), 0))} sub={`${monthSales.length} shitje`} to="/kimikate" />}
       </div>
 
       <div className="grid grid-2">
@@ -64,7 +72,7 @@ function ManagementDashboard() {
             <ul className="list-plain">
               {pending.data.slice(0, 10).map((m) => (
                 <li key={m.id}>
-                  <Link to={`/levizjet/${m.id}`} style={{ flex: 1 }}>{m.number} · {MOVEMENT_KINDS[m.kind]?.label}<br /><small className="muted">{m.createdByName} · {m.sourceName} → {m.destName}</small></Link>
+                  <Link to={`/levizjet/${m.id}`} style={{ flex: 1 }}>{m.number} · {MOVEMENT_KINDS[m.kind]?.label}<br /><small className="muted">{m.createdByName} · {m.sourceName} › {m.destName}</small></Link>
                   <span className="muted">{date(m.date)}</span>
                 </li>
               ))}
@@ -109,7 +117,7 @@ function ManagementDashboard() {
               { key: 'date', label: 'Data', render: (m) => date(m.date) },
               { key: 'number', label: 'Nr.' },
               { key: 'kind', label: 'Lloji', value: (m) => MOVEMENT_KINDS[m.kind]?.label },
-              { key: 'route', label: 'Lëvizja', value: (m) => `${m.sourceName} → ${m.destName}` },
+              { key: 'route', label: 'Lëvizja', value: (m) => `${m.sourceName} › ${m.destName}` },
               { key: 'status', label: 'Statusi', render: (m) => <StatusBadge status={m.status} labels={MOVEMENT_STATUS} /> },
             ]}
           />
@@ -118,4 +126,20 @@ function ManagementDashboard() {
       {!inv && !offersCap && !salesOwn && <Card><p>Zgjidhni një modul nga menyja.</p></Card>}
     </>
   );
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Mirëmëngjes';
+  if (h < 18) return 'Mirëdita';
+  return 'Mirëmbrëma';
+}
+
+const DAYS = ['e diel', 'e hënë', 'e martë', 'e mërkurë', 'e enjte', 'e premte', 'e shtunë'];
+const MONTHS = ['janar', 'shkurt', 'mars', 'prill', 'maj', 'qershor', 'korrik', 'gusht', 'shtator', 'tetor', 'nëntor', 'dhjetor'];
+
+function longDate() {
+  const d = new Date();
+  const day = DAYS[d.getDay()];
+  return `${day[0].toUpperCase()}${day.slice(1)}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }

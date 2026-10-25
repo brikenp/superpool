@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { useAuth } from '../lib/auth.jsx';
 import { call } from '../lib/firebase.js';
+import { AuthHero } from './Login.jsx';
 
 /** Shfaqet kur përdoruesi i identifikuar nuk ka profil aktiv. */
 export default function Setup() {
@@ -23,8 +24,11 @@ export default function Setup() {
 
   return (
     <div className="auth-page">
+      <AuthHero />
+      <div className="auth-side">
       <div className="auth-card">
         <div className="logo"><img src="/icon.svg" alt="" />SuperPool</div>
+        <h1>Konfigurimi</h1>
         {profile && profile.active === false ? (
           <div className="alert warn">Llogaria juaj është çaktivizuar. Kontaktoni administratorin.</div>
         ) : (
@@ -41,6 +45,7 @@ export default function Setup() {
           </>
         )}
         <button type="button" className="btn ghost small" style={{ marginTop: 12 }} onClick={logout}>Dil</button>
+      </div>
       </div>
     </div>
   );

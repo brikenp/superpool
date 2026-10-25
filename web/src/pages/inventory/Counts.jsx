@@ -1,4 +1,5 @@
 import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,7 +22,7 @@ export default function Counts() {
       <PageHeader
         title="Inventarizimi"
         subtitle="Numërimi fizik i magazinës, automjeteve ose nënmagazinës së shitësit. Diferencat kthehen në lëvizje rregullimi."
-        actions={<button type="button" className="btn primary" onClick={() => setCreating(true)}>+ Inventarizim i ri</button>}
+        actions={<button type="button" className="btn primary" onClick={() => setCreating(true)}><Plus size={16} /> Inventarizim i ri</button>}
       />
       <DataTable
         title="Inventarizimet"

@@ -1,5 +1,6 @@
 import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, X, Plus } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { POOL_SECTIONS, POOL_TYPES, UNITS } from '@shared/constants.js';
@@ -172,9 +173,9 @@ export default function PoolModelEditor() {
                     <td className="r">{money(priceOf(it))}</td>
                     <td><input type="checkbox" checked={it.showOnClient !== false} onChange={(e) => setItem(i, { showOnClient: e.target.checked })} /></td>
                     <td className="nowrap">
-                      <button type="button" className="icon-btn" title="Lart" onClick={() => move(i, -1)}>↑</button>
-                      <button type="button" className="icon-btn" title="Poshtë" onClick={() => move(i, 1)}>↓</button>
-                      <button type="button" className="icon-btn" title="Hiq" onClick={() => set('items', form.items.filter((_, j) => j !== i))}>✕</button>
+                      <button type="button" className="icon-btn neutral" title="Lart" onClick={() => move(i, -1)}><ArrowUp size={16} /></button>
+                      <button type="button" className="icon-btn neutral" title="Poshtë" onClick={() => move(i, 1)}><ArrowDown size={16} /></button>
+                      <button type="button" className="icon-btn" title="Hiq" onClick={() => set('items', form.items.filter((_, j) => j !== i))}><X size={16} /></button>
                     </td>
                   </tr>
                 );
@@ -182,7 +183,7 @@ export default function PoolModelEditor() {
             </tbody>
           </table>
         </div>
-        <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => set('items', [...form.items, emptyItem()])}>+ Shto rresht</button>
+        <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => set('items', [...form.items, emptyItem()])}><Plus size={16} /> Shto rresht</button>
       </Card>
     </>
   );

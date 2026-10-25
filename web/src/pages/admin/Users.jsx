@@ -1,3 +1,4 @@
+import { Check, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { ROLES, ROLE_CAPS } from '@shared/roles.js';
@@ -24,7 +25,7 @@ export default function Users() {
       <PageHeader
         title="Përdoruesit dhe autorizimet"
         subtitle="Çdo përdorues sheh dhe ndryshon vetëm atë që i lejon roli. Punonjësit e terrenit lidhen me kartelën e punonjësit."
-        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}>+ Përdorues</button>}
+        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Përdorues</button>}
       />
       <DataTable
         title="Përdoruesit"
@@ -46,7 +47,7 @@ export default function Users() {
               {Object.entries(CAP_LABELS).map(([cap, label]) => (
                 <tr key={cap}>
                   <td>{label}</td>
-                  {Object.keys(ROLES).map((r) => <td key={r} style={{ textAlign: 'center' }}>{ROLE_CAPS[r].includes(cap) ? '✔' : ''}</td>)}
+                  {Object.keys(ROLES).map((r) => <td key={r} style={{ textAlign: 'center' }}>{ROLE_CAPS[r].includes(cap) ? <Check size={16} className="text-ok" /> : ''}</td>)}
                 </tr>
               ))}
             </tbody>

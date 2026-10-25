@@ -1,3 +1,4 @@
+import { Plus, X } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { CONDITIONS, UNITS } from '@shared/constants.js';
@@ -105,7 +106,7 @@ export function LinesEditor({ lines, onChange, available, priceField, priceLabel
                     {readOnly ? l.note : <input value={l.note || ''} onChange={(e) => update(i, { note: e.target.value })} />}
                   </td>
                   {!readOnly && (
-                    <td><button type="button" className="icon-btn" title="Hiq rreshtin" onClick={() => remove(i)}>✕</button></td>
+                    <td><button type="button" className="icon-btn" title="Hiq rreshtin" onClick={() => remove(i)}><X size={16} /></button></td>
                   )}
                 </tr>
               );
@@ -123,7 +124,7 @@ export function LinesEditor({ lines, onChange, available, priceField, priceLabel
         </table>
       </div>
       {!readOnly && (
-        <button type="button" className="btn" style={{ marginTop: 8 }} onClick={add}>+ Shto artikull</button>
+        <button type="button" className="btn" style={{ marginTop: 8 }} onClick={add}><Plus size={16} /> Shto artikull</button>
       )}
     </div>
   );

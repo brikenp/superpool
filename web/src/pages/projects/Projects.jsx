@@ -1,4 +1,5 @@
 import { addDoc, collection, query, serverTimestamp, where } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,7 +31,7 @@ export default function Projects() {
       <PageHeader
         title="Projektet dhe kantieret"
         subtitle="Çdo ofertë e pranuar bëhet projekt me kantierin, materialet e planifikuara dhe kostot."
-        actions={can(CAPS.PROJECTS_MANAGE) && <button type="button" className="btn primary" onClick={() => setCreating(true)}>+ Projekt pa ofertë</button>}
+        actions={can(CAPS.PROJECTS_MANAGE) && <button type="button" className="btn primary" onClick={() => setCreating(true)}><Plus size={16} /> Projekt pa ofertë</button>}
       />
       <DataTable
         title="Projektet"
