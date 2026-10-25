@@ -8,6 +8,7 @@
     "test": "npm --prefix functions test",
     "emulators": "firebase emulators:start --only auth,firestore,functions,storage --project demo-superpool",
     "e2e": "node web/scripts/e2e.mjs",
-    "deploy": "npm run build && firebase deploy"
+    "deploy": "firebase deploy --only firestore,functions,storage --project superpool-system",
+    "deploy:rules": "firebase deploy --only firestore,storage --project superpool-system"
   }
 }

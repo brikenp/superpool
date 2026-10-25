@@ -12,7 +12,7 @@ kostot periodike janë sipas çmimeve publike të Google Cloud/Firebase dhe duhe
 | Baza e të dhënave | Cloud Firestore (rajoni europe-west1) | Përditësim në kohë reale te të gjithë përdoruesit; punon edhe me sinjal të dobët (cache lokale) |
 | Identifikimi | Firebase Authentication (email + fjalëkalim) | Llogari për çdo punonjës, çaktivizim i menjëhershëm |
 | Dokumentet | Firebase Storage | Kontrata, foto kantieri, PDF |
-| Hostimi | Firebase Hosting (HTTPS) | Pa server për t'u mirëmbajtur |
+| Hostimi i ndërfaqes | Vercel (HTTPS, CDN) | Publikim automatik nga GitHub, pa server për t'u mirëmbajtur |
 
 Parime:
 - **Stoku nuk ndryshohet kurrë direkt nga aplikacioni.** Çdo lëvizje kalon nga një funksion në server që kontrollon të drejtat,
@@ -74,7 +74,7 @@ që lexon nga API-ja dhe thërret të njëjtat funksione importi, i planifikuar 
 ## 6. Kostot periodike (infrastruktura)
 
 Firebase plani Blaze (paguaj sa përdor). Për një kompani me ~10–20 përdorues dhe disa mijëra dokumente në muaj,
-përdorimi zakonisht qëndron brenda ose afër kuotave falas të Firestore/Functions/Hosting — kosto e pritshme
+përdorimi zakonisht qëndron brenda ose afër kuotave falas të Firestore/Functions dhe të planit falas të Vercel (Hobby; për përdorim tregtar rekomandohet Pro, ~20 $/muaj) — kosto e pritshme
 **0–25 €/muaj**, plus kopjet rezervë të Firestore (disa €/muaj sipas madhësisë). Domeni: ~15 €/vit.
 Rekomandohet vendosja e një buxheti/alarmi në Google Cloud Billing.
 

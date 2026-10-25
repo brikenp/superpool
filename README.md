@@ -4,7 +4,7 @@ Program i personalizuar për SuperPool (ndërtim pishinash, pajisje dhe kimikate
 punonjësit, projektet/kantieret, ofertat dhe preventivat, klientët, shitjet e kimikateve, furnitorët dhe porositë,
 kostot e projekteve, raportet dhe lidhja me programin ekzistues të faturimit.
 
-- **Teknologjia:** Node.js (Cloud Functions) + Firebase (Firestore, Authentication, Storage, Hosting) + React (Vite).
+- **Teknologjia:** Node.js (Cloud Functions) + Firebase (Firestore, Authentication, Storage) + React (Vite), web-i në Vercel.
 - **Pajisjet:** funksionon nga kompjuteri dhe telefoni (ndërfaqe responsive, mund të instalohet si aplikacion — PWA).
 - **Gjuha e ndërfaqes:** shqip.
 
@@ -55,15 +55,52 @@ Hapni http://localhost:5173, krijoni një llogari te emulatori i Auth (ose përd
 
 ## Vendosja në prodhim
 
-1. Krijoni projektin në [Firebase Console](https://console.firebase.google.com) (plani **Blaze**, i nevojshëm për Cloud Functions),
-   aktivizoni Authentication (Email/Password), Firestore (rajoni `europe-west1`) dhe Storage.
-2. Vendosni ID-në e projektit te `.firebaserc`.
-3. Kopjoni `web/.env.example` në `web/.env.local` dhe plotësoni konfigurimin e web app-it.
-4. `firebase login` dhe pastaj `npm run deploy`.
-5. Hyni me llogarinë e administratorit → "Konfigurimi fillestar" → plotësoni "Të dhënat e kompanisë" (logo, NIPT, kushtet e ofertës).
-6. Importoni artikujt, klientët dhe stokun fillestar nga **Integrimi / importi** (Excel ose CSV).
+Arkitektura: **Vercel** shërben ndërfaqen web; **Firebase (`superpool-system`)** mban të dhënat, identifikimin,
+dokumentet dhe Cloud Functions. Konfigurimi i web app-it është te `web/src/lib/firebase.js` (vlerat janë publike;
+siguria vjen nga rregullat e Firestore/Storage).
 
-Kopjet rezervë: aktivizoni *Firestore scheduled backups* (Console → Firestore → Disaster recovery) me ruajtje ditore 14+ ditë.
+### 1. Firebase Console (një herë)
+
+1. **Plani Blaze** (Console → ⚙ → Usage and billing). I nevojshëm për Cloud Functions dhe Storage.
+   Vendosni edhe një buxhet me alarm (p.sh. 10 €).
+2. **Authentication** → Sign-in method → Email/Password: aktiv ✔ (është aktivizuar tashmë).
+3. **Authentication → Settings → Authorized domains** → shtoni domenin e Vercel
+   (p.sh. `superpool.vercel.app` dhe domenin tuaj, nëse keni).
+4. **Firestore**: ekziston ✔. Rregullat dhe indekset vendosen me deploy (hapi 2).
+5. **Storage** → Get started (rajoni `europe-west1` ose `EUR3`). Pa këtë nuk ngarkohen dokumentet.
+
+### 2. Funksionet, rregullat dhe indekset
+
+Nga kompjuteri juaj (Node.js 22):
+
+```bash
+npm i -g firebase-tools
+firebase login
+npm --prefix functions ci
+npm run deploy        # firestore (rregulla + indekse), functions, storage
+```
+
+Ose automatikisht nga GitHub (`.github/workflows/firebase.yml`), në çdo push te `main`:
+Google Cloud Console → IAM → Service Accounts → krijoni një llogari me rolet **Firebase Admin**,
+**Cloud Functions Admin**, **Service Account User** dhe **Artifact Registry Administrator** → Keys → Add key (JSON).
+Ngjiteni përmbajtjen në GitHub → Settings → Secrets → Actions si `FIREBASE_SERVICE_ACCOUNT`.
+
+### 3. Vercel
+
+1. vercel.com → **Add New → Project** → importoni repository-n `superpool` nga GitHub.
+2. Lëreni **Root Directory** bosh (rrënja e repo-s). Cilësimet merren nga `vercel.json`
+   (build: `npm run build --prefix web`, output: `web/dist`). Nuk nevojiten variabla mjedisi.
+3. **Deploy**. Çdo push te `main` publikohet automatikisht; degët e tjera marrin adresë "preview".
+
+### 4. Hyrja e parë
+
+1. Firebase Console → Authentication → Users → **Add user** (email-i dhe fjalëkalimi juaj).
+2. Hapni adresën e Vercel, hyni dhe shtypni **"Konfigurimi fillestar"** → bëheni administrator
+   (krijohen magazina kryesore dhe vendet bazë).
+3. Plotësoni **Të dhënat e kompanisë** (logo, NIPT, kushtet e ofertës), krijoni përdoruesit te **Përdoruesit**,
+   dhe importoni artikujt, klientët dhe stokun fillestar te **Integrimi / importi**.
+
+Kopjet rezervë: Firestore → Disaster recovery → aktivizoni backup ditor (ruajtje 14+ ditë).
 
 ## Rolet
 

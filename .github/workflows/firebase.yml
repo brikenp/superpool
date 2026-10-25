@@ -1,0 +1,47 @@
+# Teston kodin në çdo push dhe vendos në Firebase (Functions, rregullat e Firestore/Storage, indekset)
+# kur ndryshon dega main. Ndërfaqja web vendoset nga Vercel.
+#
+# Kërkon sekretin FIREBASE_SERVICE_ACCOUNT në GitHub (Settings → Secrets and variables → Actions):
+# përmbajtja JSON e një service account të projektit superpool-system (shih README → "Deploy automatik").
+name: Firebase
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix functions
+      - run: npm test --prefix functions
+      - run: npm ci --prefix web
+      - run: npm run build --prefix web
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix functions
+      - name: Kredencialet e Firebase
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+      - name: Deploy Firestore + Functions
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: npx --yes firebase-tools@15 deploy --only firestore,functions --project superpool-system --non-interactive --force
+      - name: Deploy Storage rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        continue-on-error: true # dështon vetëm nëse Storage nuk është aktivizuar ende në Console
+        run: npx --yes firebase-tools@15 deploy --only storage --project superpool-system --non-interactive

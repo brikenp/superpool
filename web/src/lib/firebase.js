@@ -9,13 +9,26 @@ import { connectStorageEmulator, getStorage } from 'firebase/storage';
 const env = import.meta.env;
 const useEmulators = env.VITE_USE_EMULATORS === 'true';
 
-export const app = initializeApp({
-  apiKey: env.VITE_FIREBASE_API_KEY || 'demo-key',
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: env.VITE_FIREBASE_PROJECT_ID || 'superpool-app',
-  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
-  appId: env.VITE_FIREBASE_APP_ID,
-});
+// Konfigurimi i web app-it "superpool-system". Këto vlera janë publike (shfaqen në çdo aplikacion web Firebase);
+// siguria garantohet nga Authentication dhe rregullat e Firestore/Storage. Variablat VITE_* i mbishkruajnë.
+const config = {
+  apiKey: env.VITE_FIREBASE_API_KEY || 'AIzaSyAIo1H_hQVjPlR-oqmIXix2TfNRAAUJfyk',
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || 'superpool-system.firebaseapp.com',
+  projectId: env.VITE_FIREBASE_PROJECT_ID || 'superpool-system',
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || 'superpool-system.firebasestorage.app',
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '495289678465',
+  appId: env.VITE_FIREBASE_APP_ID || '1:495289678465:web:d7ccebdc1d5f837a6d2b80',
+  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID || 'G-R9P7MYC5JG',
+};
+
+export const app = initializeApp(config);
+
+// Google Analytics ngarkohet vetëm në prodhim dhe vetëm kur shfletuesi e mbështet.
+if (!useEmulators && import.meta.env.PROD) {
+  import('firebase/analytics')
+    .then(({ getAnalytics, isSupported }) => isSupported().then((ok) => ok && getAnalytics(app)))
+    .catch(() => {});
+}
 
 export const auth = getAuth(app);
 
