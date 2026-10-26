@@ -11,7 +11,7 @@ const RULES = fileURLToPath(new URL('../../firestore.rules', import.meta.url));
 export function capsBlock() {
   const lines = Object.values(CAPS).map((cap) => {
     const roles = Object.keys(ROLE_CAPS).filter((r) => ROLE_CAPS[r].includes(cap));
-    return `    function can_${cap}() { return isRole([${roles.map((r) => `'${r}'`).join(', ')}]); }`;
+    return `    function can_${cap}() { return isRole([${roles.map((r) => `'${r}'`).join(', ')}]) || customCap('${cap}'); }`;
   });
   return `    // BEGIN CAPS\n${lines.join('\n')}\n    // END CAPS`;
 }

@@ -257,6 +257,27 @@ async function main() {
   assert.equal(await stockOf(mag.db, 'main', pump), 7);
   ok('porosia pranohet pjesërisht dhe plotësisht');
 
+  // --- Roli i personalizuar (leje të zgjedhura me dorë) ---
+  const custom = await admin.call('createUser', {
+    email: 'custom@superpool.al', password: 'Fjalekalim123', name: 'custom', role: 'custom', caps: ['inventory_view', 'movements_create', 'nuk_ekziston'],
+  });
+  const cu = await session('custom@superpool.al', 'Fjalekalim123');
+  assert.deepEqual((await getDoc(doc(admin.db, 'users', custom.uid))).data().caps, ['inventory_view', 'movements_create']);
+  assert.ok((await getDoc(doc(cu.db, 'products', pipe))).exists());
+  await denied(getDoc(doc(cu.db, 'productCosts', pipe)), 'custom lexon kostot');
+  await denied(getDocs(collection(cu.db, 'offers')), 'custom lexon ofertat');
+  await denied(cu.call('submitMovement', { submit: true, movement: { kind: 'purchase', sourceId: 'v_supplier', destId: 'main', supplierId: sup.id, lines: [{ productId: pipe, qty: 1, unitCost: 1 }] } }), 'custom bën blerje');
+  const cl = await cu.call('submitMovement', { submit: true, movement: { kind: 'loss', sourceId: 'main', destId: 'v_loss', notes: 'thyer', lines: [{ productId: pipe, qty: 1 }] } });
+  assert.equal(cl.status, 'pending');
+  await admin.call('updateUser', { uid: custom.uid, caps: ['inventory_view', 'offers', 'view_costs'] });
+  await waitFor(async () => {
+    try { await getDocs(collection(cu.db, 'offers')); return true; } catch { return false; }
+  }, 'custom lexon ofertat pas ndryshimit');
+  assert.ok((await getDoc(doc(cu.db, 'productCosts', pipe))).exists());
+  await denied(admin.call('createUser', { email: 'x@superpool.al', password: 'Fjalekalim123', name: 'x', role: 'custom', caps: [] }), 'custom pa leje');
+  await deleteApp(cu.app);
+  ok('roli i personalizuar: lejet e zgjedhura zbatohen në rregulla dhe funksione; ndryshimi vlen menjëherë');
+
   // --- Gjurmët ---
   const audit = await getDocs(collection(admin.db, 'auditLog'));
   assert.ok(audit.size > 15);

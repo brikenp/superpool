@@ -1,40 +1,44 @@
 rules_version = '2';
 
-// Dokumentet e projekteve dhe të klientëve. Leja kontrollohet nga roli në Firestore.
+// Dokumentet e projekteve dhe të klientëve, fotot e artikujve dhe logoja.
+// Leja kontrollohet nga roli në Firestore; roli "custom" përdor lejet e zgjedhura me dorë (users/{uid}.caps).
 service firebase.storage {
   match /b/{bucket}/o {
     function userDoc() { return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)); }
     function role() { return userDoc().data.role; }
     function active() { return request.auth != null && userDoc().data.active == true; }
     function isRole(roles) { return active() && role() in roles; }
+    function customCap(c) { return active() && role() == 'custom' && c in userDoc().data.get('caps', []); }
+    function allowed(roles, cap) { return isRole(roles) || customCap(cap); }
     function inTeam(projectId) {
       return request.auth.uid in firestore.get(/databases/(default)/documents/projects/$(projectId)).data.teamUids;
     }
     function smallFile() { return request.resource.size < 25 * 1024 * 1024; }
 
     match /projects/{projectId}/{fileName} {
-      allow read: if isRole(['admin', 'magazine', 'oferta', 'projekte']) || (active() && inTeam(projectId));
-      allow create: if smallFile() && (isRole(['admin', 'projekte']) || (active() && inTeam(projectId)));
-      allow delete: if isRole(['admin', 'projekte']);
+      allow read: if allowed(['admin', 'magazine', 'oferta', 'projekte'], 'projects_view') || (active() && inTeam(projectId));
+      allow create: if smallFile() && (allowed(['admin', 'projekte'], 'projects_manage') || (active() && inTeam(projectId)));
+      allow delete: if allowed(['admin', 'projekte'], 'projects_manage');
     }
 
     match /clients/{clientId}/{fileName} {
-      allow read: if isRole(['admin', 'magazine', 'oferta', 'projekte', 'kimikate']);
-      allow create: if smallFile() && isRole(['admin', 'oferta', 'projekte', 'kimikate']);
-      allow delete: if isRole(['admin', 'oferta', 'kimikate']);
+      allow read: if allowed(['admin', 'magazine', 'oferta', 'projekte', 'kimikate'], 'clients_view');
+      allow create: if smallFile() && (allowed(['admin', 'oferta', 'kimikate'], 'clients_manage')
+        || allowed(['admin', 'projekte'], 'finance') || allowed(['admin', 'oferta', 'projekte'], 'offers'));
+      allow delete: if allowed(['admin', 'oferta', 'kimikate'], 'clients_manage');
     }
 
     // Fotot e artikujve: i shohin të gjithë përdoruesit aktivë, i ndryshon magazina.
     match /products/{productId}/{fileName} {
       allow read: if active();
-      allow create, update: if isRole(['admin', 'magazine']) && smallFile()
+      allow create, update: if allowed(['admin', 'magazine'], 'inventory_manage') && smallFile()
         && request.resource.contentType.matches('image/.*');
-      allow delete: if isRole(['admin', 'magazine']);
+      allow delete: if allowed(['admin', 'magazine'], 'inventory_manage');
     }
 
     match /settings/{fileName} {
       allow read: if active();
-      allow write: if isRole(['admin']) && smallFile();
+      allow write: if allowed(['admin'], 'users') && smallFile();
     }
   }
 }

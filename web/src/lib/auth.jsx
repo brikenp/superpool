@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(() => {
     const role = profile?.active ? profile.role : null;
-    const caps = capsForRole(role);
+    const caps = capsForRole(role, profile?.caps);
     return {
       loading: firebaseUser === undefined || (firebaseUser && profile === undefined),
       firebaseUser,

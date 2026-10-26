@@ -15,8 +15,9 @@ import FieldHome from './field/FieldHome.jsx';
 import { freeQty } from './inventory/Products.jsx';
 
 export default function Dashboard() {
-  const { role } = useAuth();
-  if (role === 'terren') return <FieldHome />;
+  const { can } = useAuth();
+  // Kush ka vetëm ndërfaqen e terrenit (p.sh. punonjësit) sheh direkt ekranin e telefonit.
+  if (can(CAPS.FIELD) && !can(CAPS.INVENTORY_VIEW, CAPS.OFFERS, CAPS.CHEM_SALES, CAPS.PROJECTS_VIEW, CAPS.REPORTS, CAPS.CLIENTS_VIEW)) return <FieldHome />;
   return <ManagementDashboard />;
 }
 

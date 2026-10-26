@@ -1,8 +1,8 @@
 import { collection, query, where } from 'firebase/firestore';
 import {
   ArrowLeftRight, Banknote, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical,
-  Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
-  Scale, Search, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
+  FileCheck, FilePen, FilePlus, FileX, Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
+  Scale, Search, Send, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
   Warehouse, Waves, Wrench,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -46,9 +46,16 @@ export const NAV = [
     { to: '/automjetet', label: 'Automjetet', icon: Truck, caps: [C.INVENTORY_VIEW, C.FLEET] },
     { to: '/punonjesit', label: 'Punonjësit', icon: HardHat, caps: [C.FLEET] },
   ] },
-  { title: 'Klientët & ofertat', items: [
+  { title: 'Klientët', items: [
     { to: '/klientet', label: 'Klientët', icon: Handshake, caps: [C.CLIENTS_VIEW] },
-    { to: '/ofertat', label: 'Ofertat', icon: FileText, caps: [C.OFFERS] },
+  ] },
+  { title: 'Ofertat', items: [
+    { to: '/ofertat/re', label: 'Ofertë e re', icon: FilePlus, caps: [C.OFFERS], end: true },
+    { to: '/ofertat?seksioni=draft', label: 'Draft', icon: FilePen, caps: [C.OFFERS], end: true },
+    { to: '/ofertat?seksioni=derguara', label: 'Të dërguara', icon: Send, caps: [C.OFFERS], end: true },
+    { to: '/ofertat?seksioni=pranuara', label: 'Të pranuara', icon: FileCheck, caps: [C.OFFERS], end: true },
+    { to: '/ofertat?seksioni=refuzuara', label: 'Të refuzuara / skaduara', icon: FileX, caps: [C.OFFERS], end: true },
+    { to: '/ofertat', label: 'Të gjitha ofertat', icon: FileText, caps: [C.OFFERS], end: true },
     { to: '/modelet', label: 'Modelet e pishinave', icon: Waves, caps: [C.POOL_MODELS] },
   ] },
   { title: 'Kimikatet', items: [
@@ -77,7 +84,7 @@ export const NAV = [
     { to: '/raportet/chem', label: 'Shitjet e kimikateve', icon: FlaskConical, caps: [C.REPORTS], end: true },
     { to: '/raportet/orders', label: 'Porositë e furnitorëve', icon: ShoppingCart, caps: [C.REPORTS], end: true },
     { to: '/raportet/offers', label: 'Ofertat dhe statusi', icon: FileText, caps: [C.REPORTS], end: true },
-    { to: '/raportet/projects', label: 'Kostot e projekteve', icon: TrendingUp, caps: [C.VIEW_COSTS], end: true },
+    { to: '/raportet/projects', label: 'Kostot e projekteve', icon: TrendingUp, caps: [C.VIEW_COSTS], requires: [C.REPORTS], end: true },
     { to: '/raportet/invoices', label: 'Faturat dhe pagesat', icon: Receipt, caps: [C.REPORTS], end: true },
   ] },
   { title: 'Administrimi', items: [
@@ -87,6 +94,9 @@ export const NAV = [
     { to: '/gjurmet', label: 'Gjurmët e veprimeve', icon: History, caps: [C.AUDIT] },
   ] },
 ];
+
+/** `caps`: mjafton njëra nga lejet; `requires`: duhen të gjitha. */
+export const navAllowed = (can) => (i) => (!i.caps || can(...i.caps)) && (!i.requires || i.requires.every((c) => can(c)));
 
 const sectionOf = (search) => new URLSearchParams(search).get('seksioni') || '';
 
@@ -147,7 +157,7 @@ export function Layout() {
           </div>
         </div>
         {NAV.map((group) => {
-          const items = group.items.filter((i) => !i.caps || can(...i.caps));
+          const items = group.items.filter(navAllowed(can));
           if (!items.length) return null;
           const hasActive = items.some((i) => isItemActive(i, location));
           const isCollapsed = group.title && collapsed[group.title] && !hasActive;

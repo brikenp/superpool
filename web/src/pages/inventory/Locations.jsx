@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { LOCATION_KINDS } from '@shared/constants.js';
+import { CAPS, userHasCap } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
 import { EntityForm } from '../../components/EntityForm.jsx';
@@ -13,7 +14,7 @@ export default function Locations() {
   const { locations, users } = useData();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(null);
-  const sellers = users.filter((u) => ['kimikate', 'magazine', 'admin'].includes(u.role));
+  const sellers = users.filter((u) => u.active !== false && userHasCap(u, CAPS.CHEM_SALES));
 
   return (
     <>

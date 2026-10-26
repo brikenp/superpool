@@ -1,7 +1,7 @@
 import { onCall } from 'firebase-functions/v2/https';
 
 import { LOC, VIRTUAL_LOCATIONS } from '../shared/constants.js';
-import { CAPS, ROLES } from '../shared/roles.js';
+import { CAPS, CUSTOM_ROLE, ROLES, sanitizeCaps } from '../shared/roles.js';
 import { FieldValue, REGION, audit, auth, db, fail, requireCap, reserveNumber, userContext } from '../lib/context.js';
 
 async function ensureBaseData() {
@@ -69,8 +69,10 @@ async function linkEmployee(uid, employeeId, previousEmployeeId) {
 export const createUser = onCall({ region: REGION }, async (request) => {
   const user = await userContext(request);
   requireCap(user, CAPS.USERS);
-  const { email, password, name, role, employeeId = null } = request.data || {};
+  const { email, password, name, role, employeeId = null, caps } = request.data || {};
   checkRole(role);
+  const customCaps = role === CUSTOM_ROLE ? sanitizeCaps(caps) : [];
+  if (role === CUSTOM_ROLE && !customCaps.length) fail('Zgjidhni të paktën një leje për rolin e personalizuar.', 'invalid-argument');
   if (!email || !password || String(password).length < 8) fail('Email-i dhe fjalëkalimi (min. 8 karaktere) janë të detyrueshëm.', 'invalid-argument');
   let record;
   try {
@@ -82,28 +84,37 @@ export const createUser = onCall({ region: REGION }, async (request) => {
     name: name || email,
     email: record.email,
     role,
+    caps: customCaps,
     active: true,
     employeeId: employeeId || null,
     createdAt: FieldValue.serverTimestamp(),
   });
   await linkEmployee(record.uid, employeeId, null);
-  await audit(null, { user, action: 'create', collection: 'users', id: record.uid, label: record.email, changes: { role } });
+  await audit(null, { user, action: 'create', collection: 'users', id: record.uid, label: record.email, changes: { role, caps: customCaps } });
   return { uid: record.uid };
 });
 
 export const updateUser = onCall({ region: REGION }, async (request) => {
   const user = await userContext(request);
   requireCap(user, CAPS.USERS);
-  const { uid, name, role, active, employeeId, password } = request.data || {};
+  const { uid, name, role, active, employeeId, password, caps } = request.data || {};
   const ref = db.doc(`users/${uid}`);
   const snap = await ref.get();
   if (!snap.exists) fail('Përdoruesi nuk ekziston.', 'not-found');
-  if (uid === user.uid && (active === false || (role && role !== 'admin'))) {
+  if (uid === user.uid && (active === false || (role && role !== 'admin' && role !== CUSTOM_ROLE))) {
     fail('Nuk mund të çaktivizoni ose të hiqni rolin e administratorit nga vetja.');
   }
   const update = {};
   if (name !== undefined) update.name = String(name);
   if (role !== undefined) { checkRole(role); update.role = role; }
+  const effectiveRole = role ?? snap.get('role');
+  if (role !== undefined || caps !== undefined) {
+    update.caps = effectiveRole === CUSTOM_ROLE ? sanitizeCaps(caps ?? snap.get('caps')) : [];
+    if (effectiveRole === CUSTOM_ROLE && !update.caps.length) fail('Zgjidhni të paktën një leje për rolin e personalizuar.', 'invalid-argument');
+    if (uid === user.uid && effectiveRole === CUSTOM_ROLE && !update.caps.includes(CAPS.USERS)) {
+      fail('Nuk mund t\'i hiqni vetes të drejtën e menaxhimit të përdoruesve.');
+    }
+  }
   if (active !== undefined) update.active = Boolean(active);
   if (employeeId !== undefined) update.employeeId = employeeId || null;
   await ref.update(update);
@@ -117,7 +128,7 @@ export const updateUser = onCall({ region: REGION }, async (request) => {
   if (Object.keys(authUpdate).length) await auth.updateUser(uid, authUpdate);
   if (active === false) await auth.revokeRefreshTokens(uid);
   if (employeeId !== undefined) await linkEmployee(uid, employeeId || null, snap.get('employeeId'));
-  await audit(null, { user, action: 'update', collection: 'users', id: uid, label: snap.get('email'), changes: { ...update, password: password ? '***' : undefined } });
+  await audit(null, { user, action: 'update', collection: 'users', id: uid, label: snap.get('email'), changes: { ...update, ...(password ? { password: '***' } : {}) } });
   return { ok: true };
 });
 

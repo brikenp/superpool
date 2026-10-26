@@ -16,32 +16,34 @@ service cloud.firestore {
     }
     function role() { return userDoc().data.role; }
     function isRole(roles) { return active() && role() in roles; }
+    // Roli i personalizuar: lejet e zgjedhura me dorë ruhen te users/{uid}.caps.
+    function customCap(c) { return active() && role() == 'custom' && c in userDoc().data.get('caps', []); }
     function changes(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
     function untouched(keys) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
 
     // --- AFTËSITË (gjeneruar nga functions/src/shared/roles.js me `npm run sync-rules`) ---
     // BEGIN CAPS
-    function can_inventory_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
-    function can_inventory_manage() { return isRole(['admin', 'magazine']); }
-    function can_movements_create() { return isRole(['admin', 'magazine', 'projekte', 'terren']); }
-    function can_movements_approve() { return isRole(['admin', 'magazine', 'projekte']); }
-    function can_fleet() { return isRole(['admin', 'magazine']); }
-    function can_suppliers() { return isRole(['admin', 'magazine']); }
-    function can_clients_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte', 'kimikate']); }
-    function can_clients_manage() { return isRole(['admin', 'oferta', 'kimikate']); }
-    function can_finance() { return isRole(['admin', 'projekte']); }
-    function can_chem_sales() { return isRole(['admin', 'magazine', 'kimikate']); }
-    function can_chem_sales_all() { return isRole(['admin', 'magazine']); }
-    function can_offers() { return isRole(['admin', 'oferta', 'projekte']); }
-    function can_pool_models() { return isRole(['admin', 'oferta']); }
-    function can_projects_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
-    function can_projects_manage() { return isRole(['admin', 'projekte']); }
-    function can_view_costs() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
-    function can_reports() { return isRole(['admin', 'magazine', 'oferta', 'projekte']); }
-    function can_integration() { return isRole(['admin', 'magazine']); }
-    function can_audit() { return isRole(['admin']); }
-    function can_users() { return isRole(['admin']); }
-    function can_field() { return isRole(['admin', 'magazine', 'projekte', 'terren']); }
+    function can_inventory_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte']) || customCap('inventory_view'); }
+    function can_inventory_manage() { return isRole(['admin', 'magazine']) || customCap('inventory_manage'); }
+    function can_movements_create() { return isRole(['admin', 'magazine', 'projekte', 'terren']) || customCap('movements_create'); }
+    function can_movements_approve() { return isRole(['admin', 'magazine', 'projekte']) || customCap('movements_approve'); }
+    function can_fleet() { return isRole(['admin', 'magazine']) || customCap('fleet'); }
+    function can_suppliers() { return isRole(['admin', 'magazine']) || customCap('suppliers'); }
+    function can_clients_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte', 'kimikate']) || customCap('clients_view'); }
+    function can_clients_manage() { return isRole(['admin', 'oferta', 'kimikate']) || customCap('clients_manage'); }
+    function can_finance() { return isRole(['admin', 'projekte']) || customCap('finance'); }
+    function can_chem_sales() { return isRole(['admin', 'magazine', 'kimikate']) || customCap('chem_sales'); }
+    function can_chem_sales_all() { return isRole(['admin', 'magazine']) || customCap('chem_sales_all'); }
+    function can_offers() { return isRole(['admin', 'oferta', 'projekte']) || customCap('offers'); }
+    function can_pool_models() { return isRole(['admin', 'oferta']) || customCap('pool_models'); }
+    function can_projects_view() { return isRole(['admin', 'magazine', 'oferta', 'projekte']) || customCap('projects_view'); }
+    function can_projects_manage() { return isRole(['admin', 'projekte']) || customCap('projects_manage'); }
+    function can_view_costs() { return isRole(['admin', 'magazine', 'oferta', 'projekte']) || customCap('view_costs'); }
+    function can_reports() { return isRole(['admin', 'magazine', 'oferta', 'projekte']) || customCap('reports'); }
+    function can_integration() { return isRole(['admin', 'magazine']) || customCap('integration'); }
+    function can_audit() { return isRole(['admin']) || customCap('audit'); }
+    function can_users() { return isRole(['admin']) || customCap('users'); }
+    function can_field() { return isRole(['admin', 'magazine', 'projekte', 'terren']) || customCap('field'); }
     // END CAPS
 
     // Fushat që mbahen vetëm nga Cloud Functions.

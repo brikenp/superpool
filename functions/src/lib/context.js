@@ -27,7 +27,7 @@ export async function userContext(request) {
     name: data.name || request.auth.token.email || uid,
     role: data.role,
     employeeId: data.employeeId || null,
-    caps: capsForRole(data.role),
+    caps: capsForRole(data.role, data.caps),
   };
 }
 
@@ -52,7 +52,8 @@ export function audit(target, { user, action, collection, id, label, note = '', 
     docId: id || '',
     label: label || '',
     note,
-    changes,
+    // Firestore nuk pranon `undefined`; JSON i heq vlerat bosh.
+    changes: JSON.parse(JSON.stringify(changes ?? {})),
   };
   // target mund të jetë transaksion, batch ose null (shkrim i drejtpërdrejtë).
   if (target) target.set(ref, entry);

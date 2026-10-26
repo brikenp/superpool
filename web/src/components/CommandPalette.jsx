@@ -6,7 +6,7 @@ import { CAPS } from '@shared/roles.js';
 
 import { useAuth } from '../lib/auth.jsx';
 import { useData } from '../lib/data.jsx';
-import { NAV } from './Layout.jsx';
+import { NAV, navAllowed } from './Layout.jsx';
 import { ProductThumb } from './ProductImage.jsx';
 
 const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -24,7 +24,7 @@ export function CommandPalette({ onClose }) {
     const words = norm(term).split(/\s+/).filter(Boolean);
     const match = (text) => words.every((w) => norm(text).includes(w));
     const pages = NAV.flatMap((g) => g.items)
-      .filter((i) => (!i.caps || can(...i.caps)) && (!words.length || match(i.label)))
+      .filter((i) => navAllowed(can)(i) && (!words.length || match(i.label)))
       .map((i) => ({ group: 'Faqet', key: `p${i.to}`, to: i.to, label: i.label, icon: i.icon }));
     if (!words.length) return pages;
     const prods = can(CAPS.INVENTORY_VIEW)

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { LOC, MOVEMENT_KINDS } from '@shared/constants.js';
-import { CAPS, hasCap } from '@shared/roles.js';
+import { CAPS, userHasCap } from '@shared/roles.js';
 
 import { LinesEditor, cleanLines, emptyLine } from '../../components/LinesEditor.jsx';
 import { Card, Field, Loading, PageHeader, SearchSelect, useAction } from '../../components/ui.jsx';
@@ -119,7 +119,7 @@ export default function MovementForm() {
   };
   const locOptions = (kinds) => locations.filter((l) => kinds.includes(l.kind) && allowedLocation(l));
   const onlyVirtual = (kinds) => kinds.length === 1 && VIRTUAL_BY_KIND[kinds[0]];
-  const approvers = users.filter((u) => u.active !== false && hasCap(u.role, CAPS.MOVEMENTS_APPROVE));
+  const approvers = users.filter((u) => u.active !== false && userHasCap(u, CAPS.MOVEMENTS_APPROVE));
 
   const priceField = ['purchase', 'customer_return'].includes(kind) && can(CAPS.VIEW_COSTS) ? 'unitCost' : null;
   const needsApproval = def.approval && !canApprove;
