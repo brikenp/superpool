@@ -46,8 +46,25 @@ if ! $FIREBASE projects:list --non-interactive >/dev/null 2>&1; then
   $FIREBASE login --no-localhost
 fi
 
-echo "▶ Vendosja e rregullave/indekseve të Firestore dhe e Cloud Functions (disa minuta)…"
-$FIREBASE deploy --only firestore,functions --project "$PROJECT" --force
+echo "▶ Vendosja e rregullave/indekseve të Firestore…"
+$FIREBASE deploy --only firestore --project "$PROJECT" --force
+
+# Google kufizon sa funksione përditësohen njëherësh; ato që dështojnë provohen sërish vetëm (deri 4 herë).
+echo "▶ Vendosja e Cloud Functions (disa minuta)…"
+LOG=$(mktemp)
+ONLY="functions"
+for TRY in 1 2 3 4; do
+  if $FIREBASE deploy --only "$ONLY" --project "$PROJECT" --force 2>&1 | tee "$LOG"; then
+    if ! grep -q "Failed to update function\|Failed to create function" "$LOG"; then break; fi
+  fi
+  FAILED=$(grep -oE "Failed to (update|create) function [A-Za-z0-9_]+" "$LOG" | awk '{print $NF}' | sort -u || true)
+  if [ -z "$FAILED" ]; then echo "⚠ Deploy-i dështoi për një arsye tjetër — shihni mesazhet më sipër."; exit 1; fi
+  if [ "$TRY" = 4 ]; then echo "⚠ Këto funksione nuk u vendosën pas 4 provash: $FAILED"; exit 1; fi
+  ONLY=$(echo "$FAILED" | sed 's/^/functions:/' | paste -sd, -)
+  echo "↻ Pres 90 sekonda dhe provoj sërish: $ONLY"
+  sleep 90
+done
+rm -f "$LOG"
 
 # Funksionet onCall duhet të jenë të thirrshme nga shfletuesi (kontrolli i identitetit bëhet brenda kodit).
 # Në projektet me organizatë Google Workspace, deploy-i nuk arrin ta vendosë vetë këtë leje.
