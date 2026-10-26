@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { setGlobalOptions } from 'firebase-functions/v2';
 import { HttpsError } from 'firebase-functions/v2/https';
 
 import { capsForRole } from '../shared/roles.js';
@@ -12,6 +13,11 @@ export const auth = getAuth();
 export { FieldValue, Timestamp, HttpsError };
 
 export const REGION = process.env.FUNCTIONS_REGION || 'europe-west1';
+
+// Kufijtë e burimeve për të gjitha funksionet. Google llogarit kuotën e CPU-së së rajonit si
+// CPU × maxInstances për çdo funksion; me vlerat standarde (1 CPU × 100 kopje × ~30 funksione) deploy-i
+// dështon me "Quota exceeded for total allowable CPU". Për ngarkesën e SuperPool mjaftojnë këto.
+setGlobalOptions({ region: REGION, cpu: 'gcf_gen1', memory: '256MiB', maxInstances: 5 });
 
 /** Lexon përdoruesin që thërret funksionin dhe kontrollon që është aktiv. */
 export async function userContext(request) {
