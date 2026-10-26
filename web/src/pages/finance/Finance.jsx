@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -25,6 +25,15 @@ export const INVOICE_TYPES = {
   final: 'Faturë përfundimtare',
   other: 'Tjetër',
 };
+/** Fatura përfundimtare aktive e projektit (pas saj projekti nuk faturohet më), ose null. */
+export const activeFinalInvoice = (invoices) => invoices.find((i) => i.type === 'final' && i.status !== 'cancelled') || null;
+
+export async function findActiveFinalInvoice(projectId) {
+  if (!projectId) return null;
+  const snap = await getDocs(query(collection(db, 'invoices'), where('projectId', '==', projectId)));
+  return activeFinalInvoice(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+}
+
 export const invoiceTypeLabel = (i) => (i.saleId ? 'Shitje' : INVOICE_TYPES[i.type] || (i.projectId ? 'Projekt' : 'Tjetër'));
 
 export function InvoiceForm({ record, onClose }) {
@@ -76,6 +85,11 @@ export function InvoiceForm({ record, onClose }) {
       });
     }
     if (!(toNumber(amountValue) > 0)) throw new Error('Shkruani vlerën e faturës.');
+    // Pas faturës përfundimtare projekti është i mbyllur për faturim.
+    if (isNew && v.projectId) {
+      const fin = await findActiveFinalInvoice(v.projectId);
+      if (fin) throw new Error(`Projekti ka faturë përfundimtare (${fin.fiscalNumber || fin.internalNumber}). Nuk lëshohen fatura të tjera për të; nëse duhet ndryshuar, anulojeni atë me faturë korrigjuese.`);
+    }
     const data = {
       fiscalNumber: v.fiscalNumber.trim(),
       status: v.status === 'cancelled' ? 'cancelled' : v.fiscalNumber.trim() ? 'issued' : 'pending_fiscal',

@@ -11,7 +11,7 @@ import { CAPS } from '@shared/roles.js';
 import { projectMaterialSummary, projectResult } from '@shared/stock.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
-import { Card, Field, Loading, Modal, PageHeader, SearchSelect, Stat, StatusBadge, Tabs, useAction, useUi } from '../../components/ui.jsx';
+import { Badge, Card, Field, Loading, Modal, PageHeader, SearchSelect, Stat, StatusBadge, Tabs, useAction, useUi } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useData, useDocument, useQuery } from '../../lib/data.jsx';
 import { call, db, storage } from '../../lib/firebase.js';
@@ -19,7 +19,7 @@ import { date, dateTime, inAll, money, moneyWithAll, qty, round2, todayISO, toNu
 import { movementColumns } from '../inventory/Movements.jsx';
 import { createPurchaseOrder } from '../partners/PurchaseOrders.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
-import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
+import { InvoiceForm, PaymentForm, activeFinalInvoice, invoiceTypeLabel } from '../finance/Finance.jsx';
 import { ContractsCard } from '../finance/Contracts.jsx';
 import { PrintInvoiceButton } from '../../components/PrintButton.jsx';
 import { FiscalizeButton } from '../../components/Fiscal.jsx';
@@ -64,6 +64,8 @@ function ProjectHeader({ project }) {
   const { ask } = useUi();
   const [run, busy] = useAction();
   const [finalForm, setFinalForm] = useState(false);
+  const projectInvoices = useQuery(() => (can(CAPS.FINANCE, CAPS.REPORTS) ? query(collection(db, 'invoices'), where('projectId', '==', project.id)) : null), [project.id]);
+  const finalInvoice = activeFinalInvoice(projectInvoices.data);
   const setStatus = async (status) => {
     if (status === 'completed' && !(await ask({
       title: 'Mbyll projektin',
@@ -88,7 +90,9 @@ function ProjectHeader({ project }) {
         )}
         actions={(
           <>
-            {can(CAPS.FINANCE) && <button type="button" className="btn ok" onClick={() => setFinalForm(true)}><FileText size={16} /> Faturë përfundimtare</button>}
+            {finalInvoice
+              ? <Badge tone="ok">Faturuar përfundimisht · {finalInvoice.fiscalNumber || finalInvoice.internalNumber}</Badge>
+              : can(CAPS.FINANCE) && !projectInvoices.loading && <button type="button" className="btn ok" onClick={() => setFinalForm(true)}><FileText size={16} /> Faturë përfundimtare</button>}
             {can(CAPS.PROJECTS_MANAGE) && (
               <select className="btn" value="" disabled={busy} onChange={(e) => e.target.value && setStatus(e.target.value)} style={{ width: 'auto' }}>
                 <option value="">Ndrysho statusin…</option>
@@ -406,6 +410,7 @@ function Finance({ project }) {
   const expenses = useQuery(() => query(collection(db, 'projectFinance', project.id, 'expenses')), [project.id]);
   const invoices = useQuery(() => query(collection(db, 'invoices'), where('projectId', '==', project.id)), [project.id]);
   const invoiceIds = invoices.data.map((i) => i.id).join(',');
+  const finalInvoice = activeFinalInvoice(invoices.data);
   const payments = useQuery(() => (invoices.data.length
     ? query(collection(db, 'payments'), where('invoiceId', 'in', invoices.data.map((i) => i.id).slice(0, 30)))
     : null), [invoiceIds]);
@@ -453,7 +458,7 @@ function Finance({ project }) {
             <dt>Faturuar</dt><dd>{money(result.invoiced)}</dd>
             <dt>Paguar</dt><dd>{money(result.paid)}</dd>
             <dt>Detyrim i papaguar</dt><dd className={result.outstanding > 0 ? 'text-danger' : ''}>{money(result.outstanding)}</dd>
-            <dt>Pa faturuar ende</dt><dd>{money(result.notInvoiced)}</dd>
+            <dt>Pa faturuar ende</dt><dd>{finalInvoice ? money(0) : money(result.notInvoiced)}</dd>
           </dl>
           <ul className="list-plain">
             {invoices.data.map((i) => (
@@ -465,10 +470,15 @@ function Finance({ project }) {
               </li>
             ))}
           </ul>
+          {finalInvoice && (
+            <div className="alert ok" style={{ marginBottom: 8 }}>
+              Projekti është faturuar përfundimisht me faturën {finalInvoice.fiscalNumber || finalInvoice.internalNumber}. Nuk lëshohen fatura të tjera; mund të regjistrohen vetëm pagesat.
+            </div>
+          )}
           {can(CAPS.FINANCE) && (
             <div className="row">
-              <button type="button" className="btn small primary" onClick={() => setInvoiceForm({ clientId: project.clientId, projectId: project.id, type: 'advance' })}><Plus size={14} /> Paradhënie / faturë</button>
-              <button type="button" className="btn small ok" onClick={() => setFinalForm(true)}><FileText size={14} /> Faturë përfundimtare</button>
+              {!finalInvoice && <button type="button" className="btn small primary" onClick={() => setInvoiceForm({ clientId: project.clientId, projectId: project.id, type: 'advance' })}><Plus size={14} /> Paradhënie / faturë</button>}
+              {!finalInvoice && <button type="button" className="btn small ok" onClick={() => setFinalForm(true)}><FileText size={14} /> Faturë përfundimtare</button>}
               <button type="button" className="btn small" onClick={() => setPaymentForm(true)}><Plus size={14} /> Pagesë</button>
             </div>
           )}

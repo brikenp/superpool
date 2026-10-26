@@ -12,7 +12,7 @@ import { call, db } from '../../lib/firebase.js';
 import { addDays, date, inAll, money, round2, todayISO, toNumber } from '../../lib/format.js';
 import { CurrencyFields, currencyData } from '../../components/Currency.jsx';
 import { invoicePdf } from '../../lib/printDocs.js';
-import { invoiceTypeLabel } from '../finance/Finance.jsx';
+import { activeFinalInvoice, invoiceTypeLabel } from '../finance/Finance.jsx';
 
 /**
  * Fatura përfundimtare e projektit: rreshtat e ofertës (ose vlera e kontratës), TVSH, dhe zbritja e
@@ -81,7 +81,9 @@ export function FinalInvoiceForm({ project, onClose }) {
   const toPay = round2(gross - deducted);
   const contract = toNumber(finance?.contractValue);
 
+  const existingFinal = activeFinalInvoice(invoices);
   const save = () => run(async () => {
+    if (existingFinal) throw new Error(`Projekti ka tashmë faturë përfundimtare (${existingFinal.fiscalNumber || existingFinal.internalNumber}). Anulojeni atë me faturë korrigjuese nëse duhet bërë e re.`);
     if (!lines?.length || !(net > 0)) throw new Error('Shtoni rreshtat e faturës.');
     if (toPay < 0) throw new Error('Faturat e mëparshme e kalojnë vlerën totale. Kontrolloni rreshtat ose paradhëniet.');
     const { number: internalNumber } = await call('allocateNumber', { prefix: 'FAT' });
