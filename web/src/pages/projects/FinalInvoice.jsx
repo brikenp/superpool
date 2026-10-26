@@ -9,7 +9,8 @@ import { Field, Modal, useAction } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useDocument, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
-import { addDays, date, money, round2, todayISO, toNumber } from '../../lib/format.js';
+import { addDays, date, inAll, money, round2, todayISO, toNumber } from '../../lib/format.js';
+import { CurrencyFields, currencyData } from '../../components/Currency.jsx';
 import { invoicePdf } from '../../lib/printDocs.js';
 import { invoiceTypeLabel } from '../finance/Finance.jsx';
 
@@ -25,7 +26,20 @@ export function FinalInvoiceForm({ project, onClose }) {
   const { uid, can } = useAuth();
   const [run, busy] = useAction();
   const [lines, setLines] = useState(null);
-  const [v, setV] = useState({ date: todayISO(), dueDate: addDays(todayISO(), 15), fiscalNumber: '', notes: '', vatPct: company.vatPct ?? 20, complete: true });
+  const [v, setV] = useState({ date: todayISO(), dueDate: addDays(todayISO(), 15), fiscalNumber: '', notes: '', vatPct: company.vatPct ?? 20, complete: true, currency: 'ALL', exchangeRate: 1 });
+  const rate = v.currency === 'EUR' ? toNumber(v.exchangeRate) : 1;
+  // Paradhëniet mund të jenë në monedhë tjetër: kthehen në monedhën e kësaj fature përmes vlerës në lekë.
+  const inCurrency = (i) => ((i.currency || 'ALL') === v.currency ? Number(i.amount || 0) : round2(inAll(i) / (rate || 1)));
+  // Ndryshimi i monedhës / kursit i kthen çmimet e rreshtave (oferta është në lekë).
+  const changeCurrency = (patch) => {
+    const next = { ...v, ...patch };
+    const fromRate = v.currency === 'EUR' ? toNumber(v.exchangeRate) : 1;
+    const toRate = next.currency === 'EUR' ? toNumber(next.exchangeRate) : 1;
+    if (fromRate > 0 && toRate > 0 && fromRate !== toRate) {
+      setLines((ls) => (ls || []).map((l) => ({ ...l, unitPrice: round2((toNumber(l.unitPrice) * fromRate) / toRate) })));
+    }
+    setV(next);
+  };
   const previous = invoices.filter((i) => i.status !== 'cancelled' && i.type !== 'final');
 
   // Rreshtat nisin nga oferta e pranuar; rreshtat e fshehur për klientin bashkohen në një rresht.
@@ -63,7 +77,7 @@ export function FinalInvoiceForm({ project, onClose }) {
   const net = round2((lines || []).reduce((s, l) => s + toNumber(l.qty) * toNumber(l.unitPrice), 0));
   const vat = round2((net * toNumber(v.vatPct)) / 100);
   const gross = round2(net + vat);
-  const deducted = round2(previous.reduce((s, i) => s + Number(i.amount || 0), 0));
+  const deducted = round2(previous.reduce((s, i) => s + inCurrency(i), 0));
   const toPay = round2(gross - deducted);
   const contract = toNumber(finance?.contractValue);
 
@@ -81,8 +95,9 @@ export function FinalInvoiceForm({ project, onClose }) {
       projectId: project.id,
       lines: lines.map((l) => ({ description: String(l.description || '').trim(), unit: l.unit || '', qty: toNumber(l.qty), unitPrice: round2(toNumber(l.unitPrice)) })),
       vatPct: toNumber(v.vatPct), net, vat, gross,
-      deductions: previous.map((i) => ({ invoiceId: i.id, label: `${invoiceTypeLabel(i)} ${i.fiscalNumber || i.internalNumber || ''}`.trim(), date: i.date || '', amount: Number(i.amount || 0) })),
+      deductions: previous.map((i) => ({ invoiceId: i.id, label: `${invoiceTypeLabel(i)} ${i.fiscalNumber || i.internalNumber || ''}`.trim(), date: i.date || '', amount: inCurrency(i) })),
       amount: toPay,
+      ...currencyData(v.currency, v.exchangeRate, toPay),
       notes: v.notes || '',
       createdBy: uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     };
@@ -105,10 +120,11 @@ export function FinalInvoiceForm({ project, onClose }) {
         <Field label="Afati i pagesës"><input type="date" value={v.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
         <Field label="Nr. fiskal (nëse është lëshuar)"><input value={v.fiscalNumber} onChange={(e) => set('fiscalNumber', e.target.value)} /></Field>
         <Field label="TVSH %"><input className="num" type="number" step="any" value={v.vatPct} onChange={(e) => set('vatPct', e.target.value)} /></Field>
+        <CurrencyFields currency={v.currency} rate={v.exchangeRate} amount={toPay} onChange={(patch) => changeCurrency(patch.currency === 'EUR' && !toNumber(patch.exchangeRate ?? v.exchangeRate) ? { ...patch, exchangeRate: company.eurRate || '' } : patch)} />
       </div>
       <div className="table-wrap" style={{ marginTop: 12 }}>
         <table className="table">
-          <thead><tr><th>Përshkrimi</th><th style={{ width: 90 }}>Njësia</th><th className="r" style={{ width: 100 }}>Sasia</th><th className="r" style={{ width: 140 }}>Çmimi pa TVSH</th><th className="r">Vlera</th><th style={{ width: 40 }} /></tr></thead>
+          <thead><tr><th>Përshkrimi</th><th style={{ width: 90 }}>Njësia</th><th className="r" style={{ width: 100 }}>Sasia</th><th className="r" style={{ width: 140 }}>Çmimi pa TVSH ({v.currency === 'EUR' ? '€' : 'L'})</th><th className="r">Vlera</th><th style={{ width: 40 }} /></tr></thead>
           <tbody>
             {!lines && <tr><td colSpan={6} className="muted">Po ngarkohen rreshtat e ofertës…</td></tr>}
             {(lines || []).map((l, i) => (
@@ -121,19 +137,19 @@ export function FinalInvoiceForm({ project, onClose }) {
                 </td>
                 <td><input className="num" type="number" step="any" value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} /></td>
                 <td><input className="num" type="number" step="any" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} /></td>
-                <td className="r">{money(toNumber(l.qty) * toNumber(l.unitPrice))}</td>
+                <td className="r">{money(toNumber(l.qty) * toNumber(l.unitPrice), v.currency)}</td>
                 <td><button type="button" className="btn ghost small" aria-label="Hiq" onClick={() => setLines((ls) => ls.filter((_, k) => k !== i))}><Trash2 size={16} /></button></td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr><td colSpan={4}>Vlera pa TVSH{contract > 0 && Math.abs(contract - net) > 1 ? <small className="text-danger"> (kontrata: {money(contract)})</small> : null}</td><td className="r">{money(net)}</td><td /></tr>
-            <tr><td colSpan={4}>TVSH {v.vatPct}%</td><td className="r">{money(vat)}</td><td /></tr>
-            <tr><td colSpan={4}><b>Totali me TVSH</b></td><td className="r"><b>{money(gross)}</b></td><td /></tr>
+            <tr><td colSpan={4}>Vlera pa TVSH{contract > 0 && rate > 0 && Math.abs(contract / rate - net) > 1 ? <small className="text-danger"> (kontrata: {money(contract)})</small> : null}</td><td className="r">{money(net, v.currency)}</td><td /></tr>
+            <tr><td colSpan={4}>TVSH {v.vatPct}%</td><td className="r">{money(vat, v.currency)}</td><td /></tr>
+            <tr><td colSpan={4}><b>Totali me TVSH</b></td><td className="r"><b>{money(gross, v.currency)}</b></td><td /></tr>
             {previous.map((i) => (
-              <tr key={i.id}><td colSpan={4}>Minus: {invoiceTypeLabel(i)} {i.fiscalNumber || i.internalNumber || ''} · {date(i.date)}</td><td className="r">−{money(i.amount)}</td><td /></tr>
+              <tr key={i.id}><td colSpan={4}>Minus: {invoiceTypeLabel(i)} {i.fiscalNumber || i.internalNumber || ''} · {date(i.date)}</td><td className="r">−{money(inCurrency(i), v.currency)}</td><td /></tr>
             ))}
-            <tr><td colSpan={4}><b>Për t'u paguar</b></td><td className="r"><b className={toPay < 0 ? 'text-danger' : ''}>{money(toPay)}</b></td><td /></tr>
+            <tr><td colSpan={4}><b>Për t'u paguar</b></td><td className="r"><b className={toPay < 0 ? 'text-danger' : ''}>{money(toPay, v.currency)}</b></td><td /></tr>
           </tfoot>
         </table>
       </div>

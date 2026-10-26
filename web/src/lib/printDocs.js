@@ -46,11 +46,12 @@ export function numberToWords(value) {
   return groups.join(' e ');
 }
 
-export function amountInWords(amount) {
+export function amountInWords(amount, currency = 'ALL') {
   const v = Math.round(Math.abs(Number(amount) || 0) * 100);
-  const lek = Math.floor(v / 100);
+  const main = Math.floor(v / 100);
   const q = v % 100;
-  return `${numberToWords(lek)} lekë${q ? ` e ${q} qindarka` : ''}`;
+  const [unit, sub] = currency === 'EUR' ? ['euro', 'cent'] : ['lekë', 'qindarka'];
+  return `${numberToWords(main)} ${unit}${q ? ` e ${q} ${sub}` : ''}`;
 }
 
 function clientLines(client, fallbackName) {
@@ -90,6 +91,8 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
   const d = new jsPDF({ unit: 'mm', format: 'a4' });
   const kind = invoice.fiscal?.invoiceType === 'EINVOICE' ? 'E-faturë' : invoice.saleId ? 'Faturë shitjeje' : INVOICE_TYPES[invoice.type] || 'Faturë';
   const number = invoice.fiscalNumber || invoice.internalNumber || invoice.saleNumber || '';
+  const cur = invoice.currency === 'EUR' ? 'EUR' : 'ALL';
+  const m = (v) => money(v, cur);
   let y = brandHeader(d, company, kind.toUpperCase(), `${number ? `Nr. ${number}` : 'Nr. në pritje'} · ${date(invoice.date)}`);
 
   // Klienti majtas, të dhënat e dokumentit djathtas.
@@ -114,19 +117,19 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
   // Fatura përfundimtare: rreshtat pa TVSH, TVSH, totali dhe zbritja e paradhënieve.
   const detailed = Array.isArray(invoice.lines) && invoice.lines.length > 0;
   const body = detailed
-    ? invoice.lines.map((l, i) => [i + 1, '', l.description, `${qty(l.qty)} ${UNITS[l.unit] || l.unit || ''}`, money(l.unitPrice), money(Number(l.qty) * Number(l.unitPrice))])
+    ? invoice.lines.map((l, i) => [i + 1, '', l.description, `${qty(l.qty)} ${UNITS[l.unit] || l.unit || ''}`, m(l.unitPrice), m(Number(l.qty) * Number(l.unitPrice))])
     : sale?.lines?.length
-      ? sale.lines.map((l, i) => [i + 1, l.code || '', l.name, `${qty(l.qty)} ${UNITS[l.unit] || l.unit || ''}`, money(l.unitPrice), money(l.total)])
-      : [[1, '', (invoice.notes || kind) + (project && !invoice.notes ? ` — ${project.name}` : ''), '1', money(invoice.amount), money(invoice.amount)]];
+      ? sale.lines.map((l, i) => [i + 1, l.code || '', l.name, `${qty(l.qty)} ${UNITS[l.unit] || l.unit || ''}`, m(l.unitPrice), m(l.total)])
+      : [[1, '', (invoice.notes || kind) + (project && !invoice.notes ? ` — ${project.name}` : ''), '1', m(invoice.amount), m(invoice.amount)]];
   const foot = detailed
     ? [
-      ['', '', '', '', 'Vlera pa TVSH', money(invoice.net)],
-      ['', '', '', '', `TVSH ${invoice.vatPct ?? ''}%`, money(invoice.vat)],
-      ['', '', '', '', 'Totali me TVSH', money(invoice.gross)],
-      ...(invoice.deductions || []).map((x) => ['', '', `Minus: ${x.label}${x.date ? ` · ${date(x.date)}` : ''}`, '', '', `-${money(x.amount)}`]),
-      ['', '', '', '', "PËR T'U PAGUAR", money(invoice.amount)],
+      ['', '', '', '', 'Vlera pa TVSH', m(invoice.net)],
+      ['', '', '', '', `TVSH ${invoice.vatPct ?? ''}%`, m(invoice.vat)],
+      ['', '', '', '', 'Totali me TVSH', m(invoice.gross)],
+      ...(invoice.deductions || []).map((x) => ['', '', `Minus: ${x.label}${x.date ? ` · ${date(x.date)}` : ''}`, '', '', `-${m(x.amount)}`]),
+      ['', '', '', '', "PËR T'U PAGUAR", m(invoice.amount)],
     ]
-    : [['', '', '', '', 'TOTALI', money(invoice.amount)]];
+    : [['', '', '', '', 'TOTALI', m(invoice.amount)]];
   autoTable(d, {
     startY: y,
     head: [['#', 'Kodi', 'Përshkrimi', 'Sasia', detailed ? 'Çmimi pa TVSH' : 'Çmimi', 'Vlera']],
@@ -142,10 +145,14 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
   });
   y = d.lastAutoTable.finalY + 6;
   d.setFontSize(9);
-  d.text(`Shuma me fjalë: ${amountInWords(invoice.amount)}`, 14, y);
+  d.text(`Shuma me fjalë: ${amountInWords(invoice.amount, cur)}`, 14, y);
+  if (cur === 'EUR' && Number(invoice.exchangeRate) > 0) {
+    y += 5;
+    d.text(`Kursi: 1 € = ${invoice.exchangeRate} L  ·  Vlera në lekë: ${money(Number(invoice.amount) * Number(invoice.exchangeRate))}`, 14, y);
+  }
   y += 6;
   if (payments.length) {
-    d.text(`Paguar: ${money(paid)}   ·   Mbetet për t'u paguar: ${money(Number(invoice.amount || 0) - paid)}`, 14, y);
+    d.text(`Paguar: ${m(paid)}   ·   Mbetet për t'u paguar: ${m(Number(invoice.amount || 0) - paid)}`, 14, y);
     y += 6;
   }
   if (invoice.notes && (sale?.lines?.length || detailed)) { d.text(d.splitTextToSize(`Shënime: ${invoice.notes}`, 180), 14, y); y += 8; }
@@ -204,6 +211,7 @@ export async function paymentPdf(payment, { company, clientsById = {} }) {
   const { jsPDF, autoTable } = await loadPdf();
   const d = new jsPDF({ unit: 'mm', format: 'a4' });
   const ref = payment.reference || '';
+  const cur = payment.currency === 'EUR' ? 'EUR' : 'ALL';
   const head = [payment.number, date(payment.date)].filter(Boolean).join(' · ');
   const half = d.internal.pageSize.getHeight() / 2;
 
@@ -230,10 +238,11 @@ export async function paymentPdf(payment, { company, clientsById = {} }) {
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 52 } },
       body: [
         ['U arkëtua nga', clientLines(clientsById[payment.clientId], payment.clientName).join('\n')],
-        ['Shuma', money(payment.amount)],
-        ['Shuma me fjalë', amountInWords(payment.amount)],
+        ['Shuma', money(payment.amount, cur)],
+        ['Shuma me fjalë', amountInWords(payment.amount, cur)],
+        cur === 'EUR' && Number(payment.exchangeRate) > 0 ? ['Kursi', `1 € = ${payment.exchangeRate} L  ·  ${money(Number(payment.amount) * Number(payment.exchangeRate))}`] : null,
         ['Mënyra e pagesës', PAYMENT_METHODS[payment.method] || payment.method || ''],
-        invoice ? ['Për faturën', [invoice.fiscalNumber || invoice.internalNumber, date(invoice.date), money(invoice.amount)].filter(Boolean).join(' · ')] : null,
+        invoice ? ['Për faturën', [invoice.fiscalNumber || invoice.internalNumber, date(invoice.date), money(invoice.amount, invoice.currency)].filter(Boolean).join(' · ')] : null,
         ref ? ['Referenca', ref] : null,
         payment.status === 'cancelled' ? ['Statusi', 'ANULUAR'] : null,
       ].filter(Boolean),

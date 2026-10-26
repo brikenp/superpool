@@ -60,7 +60,7 @@ function FiscalizeModal({ invoice, sale, onClose, onDone }) {
       </p>
       <dl className="props">
         <dt>Klienti</dt><dd>{client.name}{client.nipt ? ` · NIPT ${client.nipt}` : ''}</dd>
-        <dt>Vlera</dt><dd><b>{money(invoice.amount)}</b>{invoice.deductions?.length ? ` (pas zbritjes së ${invoice.deductions.length} paradhënieve)` : ''}</dd>
+        <dt>Vlera</dt><dd><b>{money(invoice.amount, invoice.currency)}</b>{invoice.deductions?.length ? ` (pas zbritjes së ${invoice.deductions.length} paradhënieve)` : ''}</dd>
         {company.fiscalEnv === 'test' && <><dt>Mjedisi</dt><dd className="text-warn">TEST — fatura nuk ka vlerë tatimore</dd></>}
       </dl>
       <div className="form-grid">

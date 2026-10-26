@@ -217,3 +217,13 @@ test('fiskalizimi: kërkesa për POS.AL nga shitja, fatura përfundimtare dhe ko
   assert.equal(corr.order.items[0].totalWithTax, -360);
   assert.deepEqual(corr.order.options.correction, { iic: 'ABC', issueDateTime: 'T' });
 });
+
+test('fiskalizimi: faturë në euro dërgon monedhën dhe kursin', async () => {
+  const { buildFiscalRequest, buildCorrectionRequest } = await import('../src/shared/fiscal.js');
+  const config = { shopId: 'demo', vatPayer: true, vatPct: 20, bankAccounts: [{ iban: 'AL1' }] };
+  const invoice = { internalNumber: 'FAT-E', amount: 1200, currency: 'EUR', exchangeRate: 98.5 };
+  const b = buildFiscalRequest({ config, invoice, client: { name: 'Ana' }, options: { invoiceType: 'NONCASH', paymentMethod: 'ACCOUNT' } });
+  assert.deepEqual([b.order.currency, b.order.exchangeRate, b.order.items[0].priceWithoutTax, b.order.items[0].totalWithTax], ['EUR', 98.5, 1000, 1200]);
+  const c = buildCorrectionRequest({ config, invoice: { ...invoice, fiscal: { iic: 'X', issueDateTime: 'T' } }, original: b });
+  assert.deepEqual([c.order.currency, c.order.exchangeRate], ['EUR', 98.5]);
+});

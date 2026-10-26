@@ -11,10 +11,11 @@ import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../compo
 import { CorrectInvoiceButton, EinvoicePdfButton, FiscalBadge, FiscalizeButton } from '../../components/Fiscal.jsx';
 import { invoicePdf } from '../../lib/printDocs.js';
 import { Field, Modal, PageHeader, SearchSelect, StatusBadge, useAction } from '../../components/ui.jsx';
+import { CurrencyFields, currencyData } from '../../components/Currency.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
-import { addDays, date, money, todayISO, toNumber } from '../../lib/format.js';
+import { addDays, date, inAll, money, moneyWithAll, todayISO, toNumber } from '../../lib/format.js';
 
 export const INVOICE_STATUS = { pending_fiscal: 'Pa numër fiskal', issued: 'E lëshuar', cancelled: 'Anuluar' };
 // Lloji i faturës manuale (fusha "type"); faturat e shitjeve krijohen nga moduli i shitjeve.
@@ -31,10 +32,14 @@ export function InvoiceForm({ record, onClose }) {
   const { uid } = useAuth();
   const projects = useQuery(() => query(collection(db, 'projects')), []);
   const isNew = !record.id;
-  const [v, setV] = useState({
-    fiscalNumber: '', date: todayISO(), dueDate: addDays(todayISO(), 15), amount: '', projectId: '', notes: '',
-    type: record.projectId ? 'advance' : 'other', ...record,
+  const [v, setV] = useState(() => {
+    const base = {
+      fiscalNumber: '', date: todayISO(), dueDate: addDays(todayISO(), 15), amount: '', projectId: '', notes: '',
+      type: record.projectId ? 'advance' : 'other', currency: 'ALL', ...record,
+    };
+    return { ...base, exchangeRate: base.exchangeRate ?? (base.currency === 'EUR' ? company.eurRate || '' : 1) };
   });
+  const lockedMoney = Boolean(record.saleId || record.lines || record.fiscal);
   const [run, busy] = useAction();
   const set = (k, val) => setV((s) => ({ ...s, [k]: val }));
   // Pa klient të zgjedhur shfaqen të gjitha projektet; zgjedhja e projektit plotëson klientin.
@@ -58,10 +63,12 @@ export function InvoiceForm({ record, onClose }) {
       clientId: v.clientId,
       clientName: clientsById[v.clientId]?.name || v.clientName || '',
       amount: toNumber(v.amount),
+      ...currencyData(v.currency, v.exchangeRate, lockedMoney ? record.amount : v.amount),
       projectId: v.projectId || null,
       notes: v.notes || '',
       updatedAt: serverTimestamp(),
     };
+    if (lockedMoney) { delete data.currency; delete data.exchangeRate; if (record.currency) delete data.amountAll; }
     if (!record.saleId) data.type = INVOICE_TYPES[v.type] ? v.type : 'other';
     if (isNew && record.contractId) Object.assign(data, { contractId: record.contractId, contractNumber: record.contractNumber || '', installmentKey: record.installmentKey || null });
     if (isNew) {
@@ -72,7 +79,7 @@ export function InvoiceForm({ record, onClose }) {
         await addDoc(collection(db, 'payments'), {
           number,
           date: v.date, clientId: v.clientId, clientName: data.clientName, invoiceId: ref.id, projectId: data.projectId,
-          amount: data.amount, method: v.paidMethod || 'bank', reference: data.fiscalNumber || internalNumber,
+          amount: data.amount, currency: data.currency, exchangeRate: data.exchangeRate, amountAll: data.amountAll, method: v.paidMethod || 'bank', reference: data.fiscalNumber || internalNumber,
           status: 'active', source: 'superpool', createdBy: uid, createdAt: serverTimestamp(),
         });
       }
@@ -127,7 +134,8 @@ export function InvoiceForm({ record, onClose }) {
           </Field>
         )}
         <Field label="Nr. fiskal i faturës"><input value={v.fiscalNumber} disabled={Boolean(record.fiscal?.fic)} onChange={(e) => set('fiscalNumber', e.target.value)} /></Field>
-        <Field label="Vlera me TVSH (L)" required><input className="num" type="number" step="any" value={v.amount} disabled={Boolean(record.saleId || record.lines)} onChange={(e) => set('amount', e.target.value)} /></Field>
+        <Field label={`Vlera me TVSH (${v.currency === 'EUR' ? '€' : 'L'})`} required><input className="num" type="number" step="any" value={v.amount} disabled={lockedMoney} onChange={(e) => set('amount', e.target.value)} /></Field>
+        <CurrencyFields currency={v.currency} rate={v.exchangeRate} amount={v.amount} disabled={lockedMoney} onChange={(patch) => setV((s) => ({ ...s, ...patch }))} />
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
         <Field label="Afati i pagesës"><input type="date" value={v.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
         {!record.saleId && (
@@ -163,10 +171,20 @@ export function InvoiceForm({ record, onClose }) {
 export function PaymentForm({ record, invoices = [], onClose }) {
   const { clients, clientsById } = useData();
   const { uid } = useAuth();
-  const [v, setV] = useState({ date: todayISO(), amount: '', method: 'bank', reference: '', invoiceId: '', ...record });
+  const { company } = useData();
+  const [v, setV] = useState(() => {
+    const inv = invoices.find((i) => i.id === record.invoiceId);
+    const currency = record.currency || inv?.currency || 'ALL';
+    return { date: todayISO(), amount: '', method: 'bank', reference: '', invoiceId: '', currency, exchangeRate: currency === 'EUR' ? inv?.exchangeRate || company.eurRate || '' : 1, ...record };
+  });
   const [run, busy] = useAction();
   const set = (k, val) => setV((s) => ({ ...s, [k]: val }));
   const clientInvoices = invoices.filter((i) => i.clientId === v.clientId);
+  // Pagesa merr monedhën e faturës që zgjidhet.
+  const pickInvoice = (id) => {
+    const inv = invoices.find((i) => i.id === id);
+    setV((s) => ({ ...s, invoiceId: id, ...(inv ? { currency: inv.currency || 'ALL', exchangeRate: inv.currency === 'EUR' ? inv.exchangeRate || company.eurRate || '' : 1 } : {}) }));
+  };
 
   const save = () => run(async () => {
     if (!v.clientId) throw new Error('Zgjidhni klientin.');
@@ -175,7 +193,7 @@ export function PaymentForm({ record, invoices = [], onClose }) {
     await addDoc(collection(db, 'payments'), {
       number,
       date: v.date, clientId: v.clientId, clientName: clientsById[v.clientId]?.name || '', invoiceId: v.invoiceId || null,
-      amount: toNumber(v.amount), method: v.method, reference: v.reference || '', status: 'active', source: 'superpool',
+      amount: toNumber(v.amount), ...currencyData(v.currency, v.exchangeRate, v.amount), method: v.method, reference: v.reference || '', status: 'active', source: 'superpool',
       createdBy: uid, createdAt: serverTimestamp(),
     });
     onClose();
@@ -188,7 +206,7 @@ export function PaymentForm({ record, invoices = [], onClose }) {
         <Field label="Klienti" required className="span-2">
           <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={v.clientId || ''} onChange={(val) => set('clientId', val)} />
         </Field>
-        <Field label="Shuma (L)" required><input className="num" type="number" step="any" value={v.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
+        <Field label={`Shuma (${v.currency === 'EUR' ? '€' : 'L'})`} required><input className="num" type="number" step="any" value={v.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
         <Field label="Mënyra">
           <select value={v.method} onChange={(e) => set('method', e.target.value)}>
@@ -196,11 +214,12 @@ export function PaymentForm({ record, invoices = [], onClose }) {
           </select>
         </Field>
         <Field label="Fatura">
-          <select value={v.invoiceId || ''} onChange={(e) => set('invoiceId', e.target.value)}>
+          <select value={v.invoiceId || ''} onChange={(e) => pickInvoice(e.target.value)}>
             <option value="">—</option>
-            {clientInvoices.map((i) => <option key={i.id} value={i.id}>{i.fiscalNumber || i.internalNumber} · {money(i.amount)}</option>)}
+            {clientInvoices.map((i) => <option key={i.id} value={i.id}>{i.fiscalNumber || i.internalNumber} · {money(i.amount, i.currency)}</option>)}
           </select>
         </Field>
+        <CurrencyFields currency={v.currency} rate={v.exchangeRate} amount={v.amount} onChange={(patch) => setV((s) => ({ ...s, ...patch }))} />
         <Field label="Referenca (nr. transferte, kupon…)" className="span-2"><input value={v.reference} onChange={(e) => set('reference', e.target.value)} /></Field>
       </div>
     </Modal>
@@ -233,14 +252,14 @@ function FinanceSection({ section }) {
   for (const i of invoices.data) {
     if (i.status === 'cancelled') continue;
     const d = (debts[i.clientId] ||= { id: i.clientId, clientName: i.clientName, invoiced: 0, paid: 0, overdue: 0, lastDate: '' });
-    d.invoiced += Number(i.amount || 0);
-    if (i.dueDate && i.dueDate < todayISO()) d.overdue += Number(i.amount || 0);
+    d.invoiced += inAll(i);
+    if (i.dueDate && i.dueDate < todayISO()) d.overdue += inAll(i);
     if (i.date > d.lastDate) d.lastDate = i.date;
   }
   for (const p of payments.data) {
     if (p.status === 'cancelled') continue;
     const d = (debts[p.clientId] ||= { id: p.clientId, clientName: p.clientName, invoiced: 0, paid: 0, overdue: 0, lastDate: '' });
-    d.paid += Number(p.amount || 0);
+    d.paid += inAll(p);
   }
   const debtRows = Object.values(debts)
     .map((d) => ({ ...d, balance: d.invoiced - d.paid, overdueBalance: Math.max(0, d.overdue - d.paid) }))
@@ -289,7 +308,7 @@ function FinanceSection({ section }) {
             { key: 'internalNumber', label: 'Nr. i brendshëm', value: (i) => i.internalNumber || i.saleNumber || '' },
             { key: 'clientName', label: 'Klienti' },
             { key: 'dueDate', label: 'Afati', render: (i) => date(i.dueDate) },
-            { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : i.amount) },
+            { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : inAll(i)), render: (i) => (i.status === 'cancelled' ? money(0) : moneyWithAll(i)) },
             { key: 'status', label: 'Statusi', value: (i) => INVOICE_STATUS[i.status], render: (i) => <StatusBadge status={i.status} labels={INVOICE_STATUS} /> },
             printColumn((i) => <span className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}><FiscalizeButton invoice={i} /><PrintInvoiceButton invoice={i} /></span>),
           ]}
@@ -306,7 +325,7 @@ function FinanceSection({ section }) {
             { key: 'clientName', label: 'Klienti' },
             { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHODS[p.method] || p.method },
             { key: 'reference', label: 'Referenca' },
-            { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : p.amount) },
+            { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : inAll(p)), render: (p) => (p.status === 'cancelled' ? money(0) : moneyWithAll(p)) },
             printColumn((p) => <PrintPaymentButton payment={p} />),
           ]}
         />

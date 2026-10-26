@@ -14,7 +14,7 @@ import { Card, Field, Loading, PageHeader, SearchSelect } from '../../components
 import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
-import { date, firstOfMonth, round2, todayISO } from '../../lib/format.js';
+import { date, firstOfMonth, inAll, round2, todayISO } from '../../lib/format.js';
 import { StockTable } from '../inventory/Stock.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
@@ -271,7 +271,7 @@ function ProjectsReport({ f }) {
       const out = {};
       for (const p of projects.data) {
         const snap = await getDocs(collection(db, 'projectFinance', p.id, 'expenses'));
-        out[p.id] = snap.docs.reduce((s, d) => s + Number(d.get('amount') || 0), 0);
+        out[p.id] = snap.docs.reduce((s, d) => s + inAll(d.data()), 0);
       }
       if (alive) setExpenses(out);
     })();
@@ -283,7 +283,7 @@ function ProjectsReport({ f }) {
     .filter((p) => !f.client || p.clientId === f.client)
     .map((p) => {
       const fin = finById[p.id] || {};
-      const invoiced = invoices.data.filter((i) => i.projectId === p.id && i.status !== 'cancelled').reduce((s, i) => s + Number(i.amount || 0), 0);
+      const invoiced = invoices.data.filter((i) => i.projectId === p.id && i.status !== 'cancelled').reduce((s, i) => s + inAll(i), 0);
       return { ...p, r: projectResult({ ...fin, contractValue: Number(fin.contractValue || 0), expenses: expenses[p.id] || 0, invoiced }) };
     });
   return (
@@ -317,8 +317,8 @@ function InvoicesReport({ f }) {
   const payments = useQuery(() => query(collection(db, 'payments'), where('date', '>=', f.from), where('date', '<=', f.to)), [f.from, f.to]);
   const openInvoices = useQuery(() => (paymentForm ? query(collection(db, 'invoices'), where('status', 'in', ['pending_fiscal', 'issued'])) : null), [Boolean(paymentForm)]);
   const rows = [
-    ...invoices.data.filter((i) => i.status !== 'cancelled').map((i) => ({ id: `i${i.id}`, record: i, date: i.date, type: `Faturë · ${invoiceTypeLabel(i)}`, doc: i.fiscalNumber || i.internalNumber || '', clientId: i.clientId, clientName: i.clientName, projectId: i.projectId, debit: Number(i.amount || 0), credit: 0 })),
-    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, payment: p, date: p.date, type: `Pagesë (${PAYMENT_METHODS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: p.projectId || null, debit: 0, credit: Number(p.amount || 0) })),
+    ...invoices.data.filter((i) => i.status !== 'cancelled').map((i) => ({ id: `i${i.id}`, record: i, date: i.date, type: `Faturë · ${invoiceTypeLabel(i)}`, doc: i.fiscalNumber || i.internalNumber || '', clientId: i.clientId, clientName: i.clientName, projectId: i.projectId, debit: inAll(i), credit: 0 })),
+    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, payment: p, date: p.date, type: `Pagesë (${PAYMENT_METHODS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: p.projectId || null, debit: 0, credit: inAll(p) })),
   ]
     .filter((r) => (!f.client || r.clientId === f.client) && (!f.project || r.projectId === f.project))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));

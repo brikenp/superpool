@@ -29,7 +29,7 @@ export default function Settings() {
   if (!v) return null;
   const save = () => run(() => setDoc(doc(db, 'settings', 'company'), {
     ...Object.fromEntries([...FIELDS, ...TEXTS].map(([k]) => [k, v[k] || ''])),
-    vatPct: toNumber(v.vatPct), offerValidityDays: toNumber(v.offerValidityDays),
+    vatPct: toNumber(v.vatPct), offerValidityDays: toNumber(v.offerValidityDays), eurRate: toNumber(v.eurRate),
   }, { merge: true }), 'Të dhënat u ruajtën.');
 
   return (
@@ -39,6 +39,7 @@ export default function Settings() {
         <div className="form-grid">
           {FIELDS.map(([k, l]) => <Field key={k} label={l}><input value={v[k] || ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></Field>)}
           <Field label="TVSH (%)"><input className="num" type="number" value={v.vatPct ?? 20} onChange={(e) => setV({ ...v, vatPct: e.target.value })} /></Field>
+          <Field label="Kursi i euros (L për 1 €)" hint="Propozohet te faturat dhe pagesat në euro; mund të ndryshohet për çdo faturë."><input className="num" type="number" step="any" value={v.eurRate ?? ''} onChange={(e) => setV({ ...v, eurRate: e.target.value })} /></Field>
           <Field label="Vlefshmëria e ofertës (ditë)"><input className="num" type="number" value={v.offerValidityDays ?? 30} onChange={(e) => setV({ ...v, offerValidityDays: e.target.value })} /></Field>
           <Field label="Logoja" hint="Logoja SuperPool përdoret në menu, në faqen e hyrjes dhe në të gjitha PDF-të (fatura, oferta, fletë prodhimi, raporte).">
             <span className="logo-plate" style={{ height: 56, alignSelf: 'flex-start' }}><img src="/logo-superpool.jpg" alt="SuperPool" /></span>

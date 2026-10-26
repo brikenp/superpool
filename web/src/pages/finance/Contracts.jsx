@@ -4,7 +4,7 @@ import { FileSignature, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { CONTRACT_STATUS } from '@shared/constants.js';
+import { CONTRACT_STATUS, CURRENCIES } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
@@ -82,9 +82,9 @@ export default function Contracts() {
           { key: 'projectName', label: 'Projekti' },
           { key: 'title', label: 'Objekti' },
           { key: 'endDate', label: 'Afati', render: (c) => (c.endDate ? <span className={c.endDate < todayISO() && !['completed', 'cancelled'].includes(c.status) ? 'text-danger' : ''}>{date(c.endDate)}</span> : '') },
-          { key: 'total', label: 'Vlera me TVSH', type: 'money', total: true },
-          { key: 'invoiced', label: 'Faturuar', type: 'money', total: true },
-          { key: 'next', label: 'Kësti i radhës', value: (c) => (c.next ? `${c.next.label} · ${date(c.next.dueDate)}` : ''), render: (c) => (c.next ? <span className={c.next.dueDate && c.next.dueDate < todayISO() ? 'text-danger' : ''}>{c.next.label} · {money(c.next.amount)} · {date(c.next.dueDate)}</span> : '') },
+          { key: 'total', label: 'Vlera me TVSH', type: 'money', render: (c) => money(c.total, c.currency) },
+          { key: 'invoiced', label: 'Faturuar', type: 'money', render: (c) => money(c.invoiced, c.currency) },
+          { key: 'next', label: 'Kësti i radhës', value: (c) => (c.next ? `${c.next.label} · ${date(c.next.dueDate)}` : ''), render: (c) => (c.next ? <span className={c.next.dueDate && c.next.dueDate < todayISO() ? 'text-danger' : ''}>{c.next.label} · {money(c.next.amount, c.currency)} · {date(c.next.dueDate)}</span> : '') },
           { key: 'status', label: 'Statusi', value: (c) => CONTRACT_STATUS[c.status], render: (c) => <StatusBadge status={c.status} labels={CONTRACT_STATUS} /> },
         ]}
         empty="Nuk ka kontrata. Krijoni një nga butoni «Kontratë e re» ose nga projekti."
@@ -132,14 +132,14 @@ export function ContractForm({ record, onClose, onSaved }) {
     if (!v.clientId) throw new Error('Zgjidhni klientin.');
     if (!(toNumber(v.value) > 0)) throw new Error('Shkruani vlerën e kontratës.');
     if (v.installments.some((i) => !(toNumber(i.amount) > 0))) throw new Error('Çdo këst duhet të ketë shumë më të madhe se zero.');
-    if (v.installments.length && Math.abs(sum - total) > 1) throw new Error(`Shuma e kësteve (${money(sum)}) nuk përputhet me vlerën me TVSH (${money(total)}).`);
+    if (v.installments.length && Math.abs(sum - total) > 1) throw new Error(`Shuma e kësteve (${money(sum, v.currency)}) nuk përputhet me vlerën me TVSH (${money(total, v.currency)}).`);
     const project = projects.data.find((p) => p.id === v.projectId);
     const data = {
       title: v.title.trim(), date: v.date, startDate: v.startDate || '', endDate: v.endDate || '',
       clientId: v.clientId, clientName: clientsById[v.clientId]?.name || v.clientName || '',
       projectId: v.projectId || null, projectName: project ? `${project.code} · ${project.name}` : '',
       offerId: v.offerId || null,
-      value: toNumber(v.value), vatPct: toNumber(v.vatPct), total, warrantyMonths: toNumber(v.warrantyMonths),
+      value: toNumber(v.value), vatPct: toNumber(v.vatPct), total, currency: v.currency === 'EUR' ? 'EUR' : 'ALL', warrantyMonths: toNumber(v.warrantyMonths),
       paymentTerms: v.paymentTerms || '', notes: v.notes || '', status: v.status,
       installments: v.installments.map((i) => ({ key: i.key || newKey(), label: String(i.label || '').trim() || 'Këst', amount: round2(toNumber(i.amount)), dueDate: i.dueDate || '', pct: i.pct ?? null })),
       updatedAt: serverTimestamp(),
@@ -175,16 +175,21 @@ export function ContractForm({ record, onClose, onSaved }) {
         <Field label="Fillimi i punimeve"><input type="date" value={v.startDate} onChange={(e) => set('startDate', e.target.value)} /></Field>
         <Field label="Afati i përfundimit"><input type="date" value={v.endDate} onChange={(e) => set('endDate', e.target.value)} /></Field>
         <Field label="Garancia (muaj)"><input className="num" type="number" value={v.warrantyMonths} onChange={(e) => set('warrantyMonths', e.target.value)} /></Field>
-        <Field label="Vlera pa TVSH (L)" required><input className="num" type="number" step="any" value={v.value} onChange={(e) => set('value', e.target.value)} /></Field>
+        <Field label="Monedha">
+          <select value={v.currency || 'ALL'} onChange={(e) => set('currency', e.target.value)}>
+            {Object.entries(CURRENCIES).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}
+          </select>
+        </Field>
+        <Field label={`Vlera pa TVSH (${v.currency === 'EUR' ? '€' : 'L'})`} required><input className="num" type="number" step="any" value={v.value} onChange={(e) => set('value', e.target.value)} /></Field>
         <Field label="TVSH %"><input className="num" type="number" step="any" value={v.vatPct} onChange={(e) => set('vatPct', e.target.value)} /></Field>
-        <Field label="Vlera me TVSH"><input className="num" value={money(total)} disabled /></Field>
+        <Field label="Vlera me TVSH"><input className="num" value={money(total, v.currency)} disabled /></Field>
         <Field label="Kushtet e pagesës" className="span-all"><input value={v.paymentTerms} onChange={(e) => set('paymentTerms', e.target.value)} /></Field>
         <Field label="Shënime" className="span-all"><textarea value={v.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
       </div>
 
       <div className="row" style={{ margin: '18px 0 8px' }}>
         <b>Këstet e pagesës</b>
-        <span className={`muted ${v.installments.length && Math.abs(sum - total) > 1 ? 'text-danger' : ''}`}>Shuma: {money(sum)} / {money(total)}</span>
+        <span className={`muted ${v.installments.length && Math.abs(sum - total) > 1 ? 'text-danger' : ''}`}>Shuma: {money(sum, v.currency)} / {money(total, v.currency)}</span>
         <select className="right" style={{ width: 'auto' }} value="" onChange={(e) => e.target.value && applySplit(e.target.value)} disabled={!(total > 0)}>
           <option value="">Ndarje e shpejtë…</option>
           {Object.keys(SPLITS).map((k) => <option key={k} value={k}>{k}</option>)}
@@ -259,12 +264,12 @@ export function ContractDetail() {
           </>
         )}
       />
-      {overdue.length > 0 && <div className="alert warn">Këste me afat të kaluar: {overdue.map((i) => `${i.label} (${date(i.dueDate)}, ${money(i.amount - i.paid)} pa paguar)`).join('; ')}.</div>}
+      {overdue.length > 0 && <div className="alert warn">Këste me afat të kaluar: {overdue.map((i) => `${i.label} (${date(i.dueDate)}, ${money(i.amount - i.paid, c.currency)} pa paguar)`).join('; ')}.</div>}
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
-        <Stat label="Vlera me TVSH" value={money(total)} sub={`Pa TVSH: ${money(c.value)}`} />
-        <Stat label="Faturuar" value={money(invoiced)} sub={`Pa faturuar: ${money(total - invoiced)}`} />
-        <Stat label="Paguar" value={money(paid)} tone="ok" />
-        <Stat label="Detyrim i papaguar" value={money(invoiced - paid)} tone={invoiced - paid > 0.01 ? 'danger' : 'ok'} />
+        <Stat label="Vlera me TVSH" value={money(total, c.currency)} sub={`Pa TVSH: ${money(c.value, c.currency)}`} />
+        <Stat label="Faturuar" value={money(invoiced, c.currency)} sub={`Pa faturuar: ${money(total - invoiced, c.currency)}`} />
+        <Stat label="Paguar" value={money(paid, c.currency)} tone="ok" />
+        <Stat label="Detyrim i papaguar" value={money(invoiced - paid, c.currency)} tone={invoiced - paid > 0.01 ? 'danger' : 'ok'} />
       </div>
       <div className="grid grid-2">
         <Card title="Të dhënat">
@@ -294,14 +299,14 @@ export function ContractDetail() {
                 <tr key={it.key}>
                   <td data-label="Kësti">{it.label}{it.invoices.length > 0 && <><br /><small className="muted">{it.invoices.map((i) => `${invoiceTypeLabel(i)} ${i.fiscalNumber || i.internalNumber || ''}`).join(', ')}</small></>}</td>
                   <td data-label="Afati" className={it.overdue ? 'text-danger' : ''}>{date(it.dueDate)}</td>
-                  <td data-label="Shuma" className="r">{money(it.amount)}</td>
-                  <td data-label="Faturuar" className="r">{money(it.invoiced)}</td>
-                  <td data-label="Paguar" className="r">{money(it.paid)}</td>
+                  <td data-label="Shuma" className="r">{money(it.amount, c.currency)}</td>
+                  <td data-label="Faturuar" className="r">{money(it.invoiced, c.currency)}</td>
+                  <td data-label="Paguar" className="r">{money(it.paid, c.currency)}</td>
                   <td data-label="Gjendja"><Badge tone={it.overdue ? 'danger' : STATE_TONE[it.state]}>{it.overdue ? 'Me vonesë' : STATE_LABEL[it.state]}</Badge></td>
                   <td>
                     {canInvoice && it.state === 'open' && c.status !== 'cancelled' && (
                       <button type="button" className="btn small primary" onClick={() => setInvoiceForm({
-                        clientId: c.clientId, projectId: c.projectId || '', contractId: id, contractNumber: c.number, installmentKey: it.key,
+                        clientId: c.clientId, projectId: c.projectId || '', contractId: id, contractNumber: c.number, installmentKey: it.key, currency: c.currency || 'ALL',
                         type: items[0]?.key === it.key ? 'advance' : items.at(-1)?.key === it.key ? 'final' : 'partial',
                         amount: round2(it.amount - it.invoiced), date: todayISO(), dueDate: it.dueDate && it.dueDate > todayISO() ? it.dueDate : todayISO(),
                         notes: `${c.number} · ${it.label}`,
@@ -311,7 +316,7 @@ export function ContractDetail() {
                       </button>
                     )}
                     {canInvoice && it.state === 'invoiced' && (
-                      <button type="button" className="btn small" onClick={() => setPaymentForm({ clientId: c.clientId, invoiceId: it.invoices[0]?.id || '', amount: round2(it.invoiced - it.paid) })}>Pagesë</button>
+                      <button type="button" className="btn small" onClick={() => setPaymentForm({ clientId: c.clientId, invoiceId: it.invoices[0]?.id || '', amount: round2(it.invoiced - it.paid), currency: it.invoices[0]?.currency || c.currency || 'ALL', exchangeRate: it.invoices[0]?.exchangeRate })}>Pagesë</button>
                     )}
                   </td>
                 </tr>
@@ -342,7 +347,7 @@ export function ContractsCard({ clientId, projectId, preset }) {
           <li key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/kontratat/${c.id}`)}>
             <span style={{ flex: 1 }}>{c.number} · {c.title || 'Kontratë'}<br /><small className="muted">{date(c.date)} → {date(c.endDate)}</small></span>
             <StatusBadge status={c.status} labels={CONTRACT_STATUS} />
-            <b>{money(contractTotal(c))}</b>
+            <b>{money(contractTotal(c), c.currency)}</b>
           </li>
         ))}
         {!contracts.loading && !contracts.data.length && <li className="muted">Nuk ka kontrata.</li>}

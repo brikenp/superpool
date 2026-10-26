@@ -16,7 +16,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { ContractsCard } from '../finance/Contracts.jsx';
 import { db, storage } from '../../lib/firebase.js';
-import { date, dateTime, money } from '../../lib/format.js';
+import { date, dateTime, inAll, money, moneyWithAll } from '../../lib/format.js';
 import { InvoiceForm, PaymentForm, INVOICE_STATUS } from '../finance/Finance.jsx';
 import { clientFields, normalizeClient } from './Clients.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
@@ -53,10 +53,10 @@ export default function ClientCard() {
 
   const activeInvoices = invoices.data.filter((i) => i.status !== 'cancelled');
   const activePayments = payments.data.filter((p) => p.status !== 'cancelled');
-  const invoiced = activeInvoices.reduce((s, i) => s + Number(i.amount || 0), 0);
-  const paid = activePayments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const invoiced = activeInvoices.reduce((s, i) => s + inAll(i), 0);
+  const paid = activePayments.reduce((s, p) => s + inAll(p), 0);
   const today = new Date().toISOString().slice(0, 10);
-  const overdue = activeInvoices.filter((i) => i.dueDate && i.dueDate < today).reduce((s, i) => s + Number(i.amount || 0), 0) - paid;
+  const overdue = activeInvoices.filter((i) => i.dueDate && i.dueDate < today).reduce((s, i) => s + inAll(i), 0) - paid;
   const byDate = (a, b) => (b.date || '').localeCompare(a.date || '');
 
   return (
@@ -154,7 +154,7 @@ export default function ClientCard() {
                 { key: 'date', label: 'Data', render: (i) => date(i.date) },
                 { key: 'number', label: 'Nr. fiskal', value: (i) => i.fiscalNumber || i.internalNumber },
                 { key: 'dueDate', label: 'Afati', render: (i) => date(i.dueDate) },
-                { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : i.amount) },
+                { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : inAll(i)), render: (i) => (i.status === 'cancelled' ? money(0) : moneyWithAll(i)) },
                 { key: 'status', label: 'Statusi', value: (i) => INVOICE_STATUS[i.status], render: (i) => <StatusBadge status={i.status} labels={INVOICE_STATUS} /> },
                 printColumn((i) => <span className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}><FiscalizeButton invoice={i} /><PrintInvoiceButton invoice={i} /></span>),
               ]}
@@ -169,7 +169,7 @@ export default function ClientCard() {
                 { key: 'date', label: 'Data', render: (p) => date(p.date) },
                 { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHODS[p.method] || p.method },
                 { key: 'reference', label: 'Referenca' },
-                { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : p.amount) },
+                { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : inAll(p)), render: (p) => (p.status === 'cancelled' ? money(0) : moneyWithAll(p)) },
                 printColumn((p) => <PrintPaymentButton payment={p} />),
               ]}
             />

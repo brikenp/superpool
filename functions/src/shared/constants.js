@@ -182,3 +182,9 @@ export const CONTRACT_STATUS = {
   completed: 'Përfunduar',
   cancelled: 'Anuluar',
 };
+
+// Monedhat e faturave. Shumat në EUR ruhen edhe në lekë (amountAll) me kursin e ditës së faturës.
+export const CURRENCIES = {
+  ALL: { label: 'Lekë (ALL)', symbol: 'L', words: ['lekë', 'qindarka'] },
+  EUR: { label: 'Euro (EUR)', symbol: '€', words: ['euro', 'cent'] },
+};

@@ -88,8 +88,9 @@ export function buildFiscalRequest({ config, invoice, sale = null, client = {}, 
     orderId: String(invoice.internalNumber || invoice.saleNumber || invoice.id),
     order: {
       items,
-      currency: 'ALL',
-      exchangeRate: 1,
+      // Faturat në euro: çmimet janë në EUR dhe kursi (L për 1 €) dërgohet si exchangeRate.
+      currency: invoice.currency === 'EUR' ? 'EUR' : 'ALL',
+      exchangeRate: invoice.currency === 'EUR' ? Number(invoice.exchangeRate) || 1 : 1,
       options: {
         invoiceType,
         paymentMethod,
@@ -120,8 +121,8 @@ export function buildCorrectionRequest({ config, invoice, original }) {
     orderId: `${invoice.internalNumber || invoice.id}-K`,
     order: {
       items,
-      currency: 'ALL',
-      exchangeRate: 1,
+      currency: original.order.currency || 'ALL',
+      exchangeRate: original.order.exchangeRate || 1,
       options: {
         ...original.order.options,
         ...(original.order.options?.isEinvoice ? { eInvoiceOptions: { ...original.order.options.eInvoiceOptions, prepaidAmount: 0, type: 'CORRECTIVE' } } : {}),

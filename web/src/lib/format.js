@@ -2,7 +2,19 @@ const moneyFmt = new Intl.NumberFormat('sq-AL', { minimumFractionDigits: 2, maxi
 const qtyFmt = new Intl.NumberFormat('sq-AL', { maximumFractionDigits: 3 });
 const pctFmt = new Intl.NumberFormat('sq-AL', { maximumFractionDigits: 1 });
 
-export const money = (v) => `${moneyFmt.format(Number(v || 0))} L`;
+/** Shuma me simbolin e monedhës (L ose €). */
+export const money = (v, currency = 'ALL') => `${moneyFmt.format(Number(v || 0))} ${currency === 'EUR' ? '€' : 'L'}`;
+/** Vlera e faturës / pagesës në lekë (për detyrimet dhe totalet): amountAll, ose amount kur është në lekë. */
+export const inAll = (x) => {
+  if (!x) return 0;
+  if (x.amountAll !== undefined && x.amountAll !== null) return Number(x.amountAll) || 0;
+  const rate = x.currency === 'EUR' ? Number(x.exchangeRate) || 0 : 1;
+  return Math.round(Number(x.amount || 0) * rate * 100) / 100;
+};
+/** "1.250,00 €  (≈ 123.125,00 L)" për shumat në euro. */
+export const moneyWithAll = (x, field = 'amount') => (x?.currency === 'EUR'
+  ? `${money(x[field], 'EUR')} (≈ ${money(inAll(x))})`
+  : money(x?.[field]));
 export const num = (v) => moneyFmt.format(Number(v || 0));
 export const qty = (v) => qtyFmt.format(Number(v || 0));
 export const pct = (v) => `${pctFmt.format(Number(v || 0))}%`;

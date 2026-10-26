@@ -15,7 +15,7 @@ import { Card, Field, Loading, Modal, PageHeader, SearchSelect, Stat, StatusBadg
 import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useData, useDocument, useQuery } from '../../lib/data.jsx';
 import { call, db, storage } from '../../lib/firebase.js';
-import { date, dateTime, money, qty, round2, todayISO, toNumber } from '../../lib/format.js';
+import { date, dateTime, inAll, money, moneyWithAll, qty, round2, todayISO, toNumber } from '../../lib/format.js';
 import { movementColumns } from '../inventory/Movements.jsx';
 import { createPurchaseOrder } from '../partners/PurchaseOrders.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
@@ -418,8 +418,8 @@ function Finance({ project }) {
     plannedOtherCost: Number(f.plannedOtherCost || 0),
     realMaterialCost: Number(f.realMaterialCost || 0),
     expenses: expensesTotal,
-    invoiced: invoices.data.filter((i) => i.status !== 'cancelled').reduce((s, i) => s + Number(i.amount || 0), 0),
-    paid: payments.data.filter((p) => p.status !== 'cancelled').reduce((s, p) => s + Number(p.amount || 0), 0),
+    invoiced: invoices.data.filter((i) => i.status !== 'cancelled').reduce((s, i) => s + inAll(i), 0),
+    paid: payments.data.filter((p) => p.status !== 'cancelled').reduce((s, p) => s + inAll(p), 0),
   }), [f.contractValue, f.plannedMaterialCost, f.plannedOtherCost, f.realMaterialCost, expensesTotal, invoices.data, payments.data]);
 
   const editContract = async () => {
@@ -459,7 +459,7 @@ function Finance({ project }) {
             {invoices.data.map((i) => (
               <li key={i.id} className={i.status === 'cancelled' ? 'muted' : ''} style={{ cursor: can(CAPS.FINANCE) ? 'pointer' : undefined }} onClick={() => can(CAPS.FINANCE) && setInvoiceForm(i)}>
                 <span style={{ flex: 1 }}>{invoiceTypeLabel(i)} · {i.fiscalNumber || i.internalNumber || 'pa numër'} · {date(i.date)}{i.status === 'cancelled' ? ' (anuluar)' : ''}</span>
-                <b>{money(i.amount)}</b>
+                <b>{moneyWithAll(i)}</b>
                 <FiscalizeButton invoice={i} />
                 <PrintInvoiceButton invoice={i} />
               </li>
