@@ -311,6 +311,42 @@ async function main() {
   assert.equal(projInv.docs.find((d) => d.id === adv.id).data().type, 'advance');
   ok('fatura manuale (paradhënie) e lidhur me projektin, me pagesën e saj');
 
+  // --- Puna pa internet: i njëjti dokument i dërguar dy herë nuk dyfishohet ---
+  const before = await stockOf(mag.db, vehLoc, pipe);
+  const off = { submit: true, requestId: 'offlineTest1234567890', movement: { kind: 'transfer', sourceId: 'main', destId: vehLoc, lines: [{ productId: pipe, qty: 2 }] } };
+  const o1 = await mag.call('submitMovement', off);
+  const o2 = await mag.call('submitMovement', off);
+  assert.equal(o1.id, 'offlineTest1234567890');
+  assert.equal(o2.duplicate, true);
+  assert.equal(o2.number, o1.number);
+  assert.equal(await stockOf(mag.db, vehLoc, pipe), before + 2);
+  await denied(worker.call('submitMovement', { ...off, movement: { ...off.movement, kind: 'loss', destId: 'v_loss', notes: 'x' } }), 'requestId i dikujt tjetër');
+  await mag.call('cancelMovement', { id: o1.id, reason: 'test' });
+  ok('dokumenti i dërguar dy herë nga telefoni (pa internet) regjistrohet vetëm një herë');
+
+  // --- Kontratat ---
+  const { number: kon } = await admin.call('allocateNumber', { prefix: 'KON' });
+  assert.match(kon, /^KON-/);
+  const contract = await addDoc(collection(admin.db, 'contracts'), {
+    number: kon, clientId: client.id, clientName: 'Vila Golem', projectId, value: 100000, vatPct: 20, total: 120000, status: 'signed',
+    installments: [{ key: 'k1', label: 'Paradhënie', amount: 36000, dueDate: '2026-10-01' }, { key: 'k2', label: 'Fund', amount: 84000, dueDate: '2026-12-01' }],
+  });
+  await addDoc(collection(admin.db, 'invoices'), {
+    type: 'advance', contractId: contract.id, installmentKey: 'k1', projectId, clientId: client.id, clientName: 'Vila Golem', amount: 36000,
+    date: '2026-10-01', dueDate: '2026-10-01', fiscalNumber: '', status: 'pending_fiscal', source: 'superpool', createdBy: admin.uid,
+  });
+  const cInv = await getDocs(query(collection(admin.db, 'invoices'), where('contractId', '==', contract.id)));
+  assert.equal(cInv.size, 1);
+  await denied(getDoc(doc(gerti.db, 'contracts', contract.id)), 'Gerti lexon kontratat');
+  await denied(addDoc(collection(mag.db, 'contracts'), { number: 'X' }), 'magazinieri krijon kontratë');
+  await denied(gerti.call('allocateNumber', { prefix: 'KON' }), 'Gerti merr numër kontrate');
+  ok(`kontrata ${kon} me këste; fatura e këstit lidhet me kontratën; aksesi i kufizuar`);
+
+  // --- Modelet e pishinave ---
+  await addDoc(collection(ofer.db, 'poolModels'), { name: 'Import test', poolType: 'skimmer', items: [{ section: 'piping', description: 'Tub', unit: 'm', formula: 'ceil(P)' }] });
+  await denied(addDoc(collection(mag.db, 'poolModels'), { name: 'x', items: [] }), 'magazinieri krijon model');
+  ok('modelet e pishinave krijohen nga roli i ofertave');
+
   // --- Roli i personalizuar (leje të zgjedhura me dorë) ---
   const custom = await admin.call('createUser', {
     email: 'custom@superpool.al', password: 'Fjalekalim123', name: 'custom', role: 'custom', caps: ['inventory_view', 'movements_create', 'nuk_ekziston'],

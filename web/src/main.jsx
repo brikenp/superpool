@@ -18,3 +18,8 @@ createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </StrictMode>,
 );
+
+// Service worker: aplikacioni hapet edhe pa internet (vetëm në versionin e publikuar).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register(`/sw.js?v=${__BUILD_ID__}`).catch(() => {}); });
+}

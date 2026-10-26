@@ -55,6 +55,9 @@ export const submitMovement = onCall({ region: REGION }, async (request) => {
   const movement = sanitizeMovement(request.data?.movement || {});
   const submit = Boolean(request.data?.submit);
   const existingId = request.data?.id || null;
+  // requestId: ID e dhënë nga telefoni për dokumentet e regjistruara pa internet. Nëse dërgohet dy herë
+  // (p.sh. lidhja ra para përgjigjes), dokumenti nuk dyfishohet.
+  const requestId = !existingId && /^[A-Za-z0-9_-]{12,40}$/.test(request.data?.requestId || '') ? request.data.requestId : null;
   assertCanCreate(user, movement.kind);
 
   const def = MOVEMENT_KINDS[movement.kind];
@@ -63,7 +66,15 @@ export const submitMovement = onCall({ region: REGION }, async (request) => {
   if (movement.kind === 'issue' && !movement.employeeId && user.employeeId) movement.employeeId = user.employeeId;
 
   return db.runTransaction(async (tx) => {
-    const ref = existingId ? db.doc(`movements/${existingId}`) : db.collection('movements').doc();
+    const ref = existingId ? db.doc(`movements/${existingId}`)
+      : requestId ? db.doc(`movements/${requestId}`) : db.collection('movements').doc();
+    if (requestId) {
+      const dup = await tx.get(ref);
+      if (dup.exists) {
+        if (dup.get('createdBy') !== user.uid) fail('Dokumenti ekziston.', 'already-exists');
+        return { id: ref.id, number: dup.get('number'), status: dup.get('status'), duplicate: true };
+      }
+    }
     let existing = null;
     if (existingId) {
       const snap = await tx.get(ref);

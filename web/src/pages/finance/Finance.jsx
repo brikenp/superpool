@@ -60,6 +60,7 @@ export function InvoiceForm({ record, onClose }) {
       updatedAt: serverTimestamp(),
     };
     if (!record.saleId) data.type = INVOICE_TYPES[v.type] ? v.type : 'other';
+    if (isNew && record.contractId) Object.assign(data, { contractId: record.contractId, contractNumber: record.contractNumber || '', installmentKey: record.installmentKey || null });
     if (isNew) {
       const ref = await addDoc(collection(db, 'invoices'), { ...data, kind: v.projectId ? 'project' : 'other', source: 'superpool', createdBy: uid, createdAt: serverTimestamp() });
       if (v.paidNow) {
@@ -79,6 +80,7 @@ export function InvoiceForm({ record, onClose }) {
   return (
     <Modal title={isNew ? 'Shto faturë manuale' : `Fatura ${record.fiscalNumber || record.internalNumber || ''}`} onClose={onClose}
       footer={<><button type="button" className="btn" onClick={onClose}>Anulo</button><button type="button" className="btn primary" disabled={busy} onClick={save}>Ruaj</button></>}>
+      {record.contractNumber && <div className="alert info">Kësti i kontratës {record.contractNumber} — fatura lidhet me kontratën.</div>}
       <p className="muted" style={{ marginTop: 0 }}>Fatura fiskale lëshohet në programin e faturimit; këtu regjistrohet numri dhe vlera për ndjekjen e detyrimeve.</p>
       <div className="form-grid">
         <Field label="Klienti" required className="span-2">

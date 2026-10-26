@@ -174,3 +174,11 @@ export const POOL_TYPES = {
   prefabricated: 'E parafabrikuar',
   other: 'Tjetër',
 };
+
+export const CONTRACT_STATUS = {
+  draft: 'Draft',
+  signed: 'Nënshkruar',
+  active: 'Në zbatim',
+  completed: 'Përfunduar',
+  cancelled: 'Anuluar',
+};

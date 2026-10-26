@@ -21,6 +21,8 @@ const Stock = page(() => import('./pages/inventory/Stock.jsx'));
 const Movements = page(() => import('./pages/inventory/Movements.jsx'));
 const MovementForm = page(() => import('./pages/inventory/MovementForm.jsx'));
 const MovementDetail = page(() => import('./pages/inventory/MovementDetail.jsx'));
+const Contracts = page(() => import('./pages/finance/Contracts.jsx'));
+const ContractDetail = page(() => import('./pages/finance/Contracts.jsx').then((m) => ({ default: m.ContractDetail })));
 const ProductionForm = page(() => import('./pages/inventory/ProductionForm.jsx'));
 const Counts = page(() => import('./pages/inventory/Counts.jsx'));
 const CountDetail = page(() => import('./pages/inventory/CountDetail.jsx'));
@@ -93,6 +95,8 @@ const ROUTES = [
   ['/modelet/:id', PoolModelEditor, [C.POOL_MODELS]],
   ['/projektet', Projects, [C.PROJECTS_VIEW, C.FIELD]],
   ['/projektet/:id', ProjectDetail, [C.PROJECTS_VIEW, C.FIELD]],
+  ['/kontratat', Contracts, [C.FINANCE, C.PROJECTS_MANAGE, C.REPORTS]],
+  ['/kontratat/:id', ContractDetail, [C.FINANCE, C.PROJECTS_MANAGE, C.REPORTS]],
   ['/financa', Finance, [C.FINANCE, C.REPORTS]],
   ['/financa/:section', Finance, [C.FINANCE, C.REPORTS]],
   ['/raportet', Reports, [C.REPORTS]],

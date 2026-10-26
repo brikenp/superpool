@@ -20,6 +20,7 @@ import { movementColumns } from '../inventory/Movements.jsx';
 import { createPurchaseOrder } from '../partners/PurchaseOrders.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
+import { ContractsCard } from '../finance/Contracts.jsx';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -458,6 +459,9 @@ function Finance({ project }) {
           )}
         </Card>
       </div>
+      {can(CAPS.FINANCE, CAPS.PROJECTS_MANAGE, CAPS.REPORTS) && (
+        <ContractsCard clientId={project.clientId} projectId={project.id} preset={{ value: f.contractValue || '', title: project.name, offerId: project.offerId || null }} />
+      )}
       {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}
       {paymentForm && <PaymentForm record={{ clientId: project.clientId }} invoices={invoices.data.filter((i) => i.status !== 'cancelled')} onClose={() => setPaymentForm(false)} />}
     </>

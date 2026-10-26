@@ -12,6 +12,7 @@ import { EntityForm } from '../../components/EntityForm.jsx';
 import { Card, Field, Loading, PageHeader, Stat, StatusBadge, Tabs, useAction } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
+import { ContractsCard } from '../finance/Contracts.jsx';
 import { db, storage } from '../../lib/firebase.js';
 import { date, dateTime, money } from '../../lib/format.js';
 import { InvoiceForm, PaymentForm, INVOICE_STATUS } from '../finance/Finance.jsx';
@@ -136,6 +137,7 @@ export default function ClientCard() {
           ]}
         />
       )}
+      {tab === 'finance' && can(CAPS.FINANCE, CAPS.PROJECTS_MANAGE, CAPS.REPORTS) && <ContractsCard clientId={id} />}
       {tab === 'finance' && (
         <div className="grid grid-2">
           <Card title="Faturat" actions={can(CAPS.FINANCE) && <button type="button" className="btn small" onClick={() => setInvoiceForm({ clientId: id })}><Plus size={16} /> Faturë</button>}>

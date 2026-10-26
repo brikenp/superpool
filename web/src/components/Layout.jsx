@@ -1,7 +1,7 @@
 import { collection, query, where } from 'firebase/firestore';
 import {
   ArrowLeftRight, Banknote, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
-  FileCheck, FilePen, FilePlus, FileX, Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
+  FileCheck, FilePen, FileSignature, FilePlus, FileX, Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
   Scale, Search, Send, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
   Warehouse, Waves, Wrench,
 } from 'lucide-react';
@@ -14,6 +14,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { useQuery } from '../lib/data.jsx';
 import { db } from '../lib/firebase.js';
 import { useTheme } from '../lib/theme.js';
+import { OutboxIndicator } from './Outbox.jsx';
 import { CommandPalette } from './CommandPalette.jsx';
 
 const C = CAPS;
@@ -64,6 +65,7 @@ export const NAV = [
     { to: '/kimikate/nenmagazina', label: 'Nënmagazina e shitësit', icon: Warehouse, caps: [C.CHEM_SALES] },
   ] },
   { title: 'Financa', items: [
+    { to: '/kontratat', label: 'Kontratat', icon: FileSignature, caps: [C.FINANCE, C.PROJECTS_MANAGE, C.REPORTS] },
     { to: '/financa/detyrimet', label: 'Detyrimet e klientëve', icon: Wallet, caps: [C.FINANCE, C.REPORTS] },
     { to: '/financa/faturat', label: 'Faturat', icon: Receipt, caps: [C.FINANCE, C.REPORTS] },
     { to: '/financa/pagesat', label: 'Pagesat', icon: Banknote, caps: [C.FINANCE, C.REPORTS] },
@@ -189,6 +191,7 @@ export function Layout() {
             <kbd>{isMac ? '⌘' : 'Ctrl'} K</kbd>
           </button>
           <div className="spacer" />
+          <OutboxIndicator />
           <button type="button" className="icon-btn neutral" onClick={toggleTheme} aria-label="Ndrysho temën" title={theme === 'dark' ? 'Tema e çelur' : 'Tema e errët'}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>

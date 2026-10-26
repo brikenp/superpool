@@ -56,9 +56,16 @@ export async function call(name, data) {
   } catch (err) {
     // "internal [0]" = kërkesa nuk arriti fare te serveri (funksioni nuk është vendosur, ose nuk ka internet).
     if (err?.code === 'functions/internal' && /\[0\]/.test(err.message || '')) {
-      throw new Error(navigator.onLine === false
+      const e = new Error(navigator.onLine === false
         ? 'Nuk ka lidhje me internetin.'
-        : 'Shërbimi i serverit (Cloud Functions) nuk është i arritshëm. Kontrolloni që funksionet janë vendosur me "npm run deploy".');
+        : 'Shërbimi i serverit (Cloud Functions) nuk është i arritshëm. Kontrolloni lidhjen me internetin ose që funksionet janë vendosur.');
+      e.network = true; // kërkesa nuk arriti te serveri — mund të provohet përsëri
+      throw e;
+    }
+    if (['functions/unavailable', 'functions/deadline-exceeded'].includes(err?.code)) {
+      const e = new Error('Lidhja me serverin u ndërpre.');
+      e.network = true;
+      throw e;
     }
     const message = err?.message && !/^internal$/i.test(err.message)
       ? err.message

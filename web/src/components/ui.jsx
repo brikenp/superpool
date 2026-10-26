@@ -71,7 +71,7 @@ export function Badge({ tone = '', children }) {
 
 const STATUS_TONES = {
   confirmed: 'ok', accepted: 'ok', received: 'ok', active: 'info', issued: 'ok', completed: 'ok',
-  pending: 'warn', sent: 'info', partial: 'warn', draft: '', planned: '', pending_fiscal: 'warn',
+  pending: 'warn', sent: 'info', signed: 'info', partial: 'warn', draft: '', planned: '', pending_fiscal: 'warn',
   rejected: 'danger', cancelled: 'danger', expired: 'danger',
 };
 

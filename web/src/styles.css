@@ -508,3 +508,7 @@ button.nav-group-title .chev { transition: transform 0.15s; opacity: 0.7; }
 @media (max-width: 1000px) {
   .topbar .topbar-logo { display: inline-flex; height: 34px; padding: 4px 8px; border-radius: 8px; }
 }
+/* Treguesi i punës pa internet */
+.btn.warn { color: var(--warn); border-color: var(--warn-border, var(--border)); background: var(--warn-bg, transparent); }
+.show-sm { display: none; }
+@media (max-width: 640px) { .hide-sm { display: none; } .show-sm { display: inline; } }

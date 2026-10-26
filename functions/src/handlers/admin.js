@@ -138,6 +138,7 @@ const NUMBER_PREFIXES = {
   PRJ: CAPS.PROJECTS_MANAGE,
   NUM: CAPS.INVENTORY_MANAGE,
   FAT: CAPS.FINANCE,
+  KON: [CAPS.FINANCE, CAPS.PROJECTS_MANAGE],
 };
 
 /** Jep numrin e radhës për dokumentet që krijohen nga aplikacioni (oferta, porosi, projekte...). */
@@ -145,7 +146,7 @@ export const allocateNumber = onCall({ region: REGION }, async (request) => {
   const user = await userContext(request);
   const { prefix } = request.data || {};
   if (!NUMBER_PREFIXES[prefix]) fail('Prefiks i panjohur.', 'invalid-argument');
-  requireCap(user, NUMBER_PREFIXES[prefix]);
+  requireCap(user, ...[].concat(NUMBER_PREFIXES[prefix]));
   return db.runTransaction(async (tx) => {
     const n = await reserveNumber(tx, prefix);
     n.commit();

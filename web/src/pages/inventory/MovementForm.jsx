@@ -10,6 +10,7 @@ import { Card, Field, Loading, PageHeader, SearchSelect, useAction } from '../..
 import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useData, useDocument, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
+import { callOrQueue, newRequestId } from '../../lib/outbox.js';
 import { todayISO } from '../../lib/format.js';
 
 const VIRTUAL_BY_KIND = { supplier: LOC.SUPPLIER, customer: LOC.CUSTOMER, consumed: LOC.CONSUMED, loss: LOC.LOSS, adjust: LOC.ADJUST };
@@ -48,6 +49,7 @@ export default function MovementForm() {
   const [form, setForm] = useState(null);
   const [error, setError] = useState('');
   const [run, busy] = useAction();
+  const [requestId] = useState(newRequestId); // i njëjti për çdo provë dërgimi të këtij dokumenti
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -134,8 +136,10 @@ export default function MovementForm() {
     }
     setError('');
     run(async () => {
-      const res = await call('submitMovement', {
+      // Dokumentet e reja nga terreni mund të regjistrohen edhe pa internet: ruhen në telefon dhe dërgohen më vonë.
+      const res = await (id ? call : (name, data) => callOrQueue(name, data, `${def.label} · ${form.date}`))('submitMovement', {
         id: id || undefined,
+        requestId: id ? undefined : requestId,
         submit: submitNow,
         movement: {
           kind,
@@ -152,9 +156,10 @@ export default function MovementForm() {
           lines,
         },
       });
+      if (res.queued) { navigate(backTo, { replace: true }); return res; }
       navigate(`/levizjet/${res.id}`, { replace: true });
       return res;
-    }, (res) => (res.status === 'confirmed' ? `${res.number} u konfirmua.` : res.status === 'pending' ? `${res.number} u dërgua për miratim.` : `${res.number} u ruajt si draft.`));
+    }, (res) => (res.queued ? 'Pa internet: dokumenti u ruajt në telefon dhe do të dërgohet automatikisht sapo të ketë lidhje.' : res.status === 'confirmed' ? `${res.number} u konfirmua.` : res.status === 'pending' ? `${res.number} u dërgua për miratim.` : `${res.number} u ruajt si draft.`));
   };
 
   const locationSelect = ({ field, kinds, label }) => {

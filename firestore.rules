@@ -160,6 +160,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Kontratat me klientët: afatet, vlera dhe këstet (faturat lidhen me contractId).
+    match /contracts/{id} {
+      allow read: if can_finance() || can_projects_manage() || can_reports();
+      allow create, update: if can_finance() || can_projects_manage();
+      allow delete: if false; // anulohen, nuk fshihen
+    }
+
     match /payments/{id} {
       allow read: if can_reports() || can_finance()
         || (can_chem_sales() && resource.data.createdBy == request.auth.uid);
