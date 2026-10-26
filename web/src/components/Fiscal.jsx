@@ -1,5 +1,5 @@
 import { BadgeCheck, FileDown, Stamp } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { FISCAL_INVOICE_TYPES, FISCAL_PAYMENT_METHODS, defaultFiscalOptions } from '@shared/fiscal.js';
@@ -145,4 +145,63 @@ export function TaxpayerLookupButton({ client, onApply }) {
     }, 'Të dhënat e klientit u përditësuan nga tatimet.');
   };
   return <button type="button" className="btn" disabled={busy} onClick={lookup}><BadgeCheck size={16} /> Nga tatimet (NIPT)</button>;
+}
+
+const NIPT_RE = /^[A-Z]\d{8}[A-Z]$/i;
+
+/**
+ * Pjesë e formularit të klientit: kërkon NIPT-in (ose emrin) te POS.AL dhe plotëson emrin, adresën dhe qytetin.
+ * Kur shkruhet një NIPT i plotë, kërkimi bëhet vetë. Paralajmëron edhe nëse klienti ekziston tashmë.
+ */
+export function NiptLookup({ values, record, patch }) {
+  const { company, clients } = useData();
+  const [state, setState] = useState({ busy: false, results: null, error: '', lastNipt: '' });
+  const nipt = String(values.nipt || '').trim().toUpperCase();
+  const duplicate = nipt && clients.find((c) => c.nipt === nipt && c.id !== record?.id);
+
+  const apply = (t) => {
+    patch({ name: t.name, nipt: t.nipt, address: t.address, ...(t.town ? { city: t.town } : {}), type: 'business' });
+    setState((s) => ({ ...s, results: null }));
+  };
+  const search = async (query) => {
+    setState((s) => ({ ...s, busy: true, error: '', results: null, lastNipt: NIPT_RE.test(query) ? query : s.lastNipt }));
+    try {
+      const { taxpayers } = await call('lookupTaxpayer', NIPT_RE.test(query) ? { nipt: query } : { name: query });
+      if (!taxpayers.length) setState((s) => ({ ...s, busy: false, error: 'Nuk u gjet në regjistrin e tatimeve.' }));
+      else if (taxpayers.length === 1 && NIPT_RE.test(query)) { apply(taxpayers[0]); setState((s) => ({ ...s, busy: false })); }
+      else setState((s) => ({ ...s, busy: false, results: taxpayers }));
+    } catch (err) {
+      setState((s) => ({ ...s, busy: false, error: err.message }));
+    }
+  };
+
+  // Kërkim automatik sapo NIPT-i ka formën e plotë (p.sh. L12345678A), vetëm një herë për çdo NIPT.
+  useEffect(() => {
+    if (!company.fiscalEnabled || !NIPT_RE.test(nipt) || nipt === state.lastNipt || nipt === record?.nipt) return;
+    const t = setTimeout(() => search(nipt), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nipt, company.fiscalEnabled]);
+
+  if (!company.fiscalEnabled) return duplicate ? <small className="text-warn">Ky NIPT është i regjistruar te klienti «{duplicate.name}».</small> : null;
+  const query = nipt || String(values.name || '').trim();
+  return (
+    <div style={{ marginTop: 6 }}>
+      <button type="button" className="btn small" disabled={state.busy || query.length < 3} onClick={() => search(query)}>
+        <BadgeCheck size={14} /> {state.busy ? 'Po kërkohet…' : nipt ? 'Kërko NIPT-in te tatimet' : 'Kërko emrin te tatimet'}
+      </button>
+      {duplicate && <div><small className="text-warn">Ky NIPT është i regjistruar te klienti «{duplicate.name}».</small></div>}
+      {state.error && <div><small className="text-danger">{state.error}</small></div>}
+      {state.results && (
+        <ul className="list-plain" style={{ marginTop: 6, maxHeight: 220, overflow: 'auto' }}>
+          {state.results.map((t) => (
+            <li key={t.nipt} style={{ cursor: 'pointer' }} onClick={() => apply(t)}>
+              <span style={{ flex: 1 }}><b>{t.name}</b> · {t.nipt}<br /><small className="muted">{t.address}</small></span>
+              <span className="btn small">Zgjidh</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }

@@ -9,11 +9,12 @@ import { EntityForm } from '../../components/EntityForm.jsx';
 import { PageHeader } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData } from '../../lib/data.jsx';
+import { NiptLookup } from '../../components/Fiscal.jsx';
 
 export const clientFields = [
   { key: 'name', label: 'Emri / subjekti', required: true, span: 2 },
   { key: 'type', label: 'Lloji', type: 'select', required: true, options: [{ value: 'individual', label: 'Individ' }, { value: 'business', label: 'Biznes' }] },
-  { key: 'nipt', label: 'NIPT' },
+  { key: 'nipt', label: 'NIPT', extra: NiptLookup, hint: 'Me POS.AL aktiv, emri dhe adresa plotësohen nga tatimet.' },
   { key: 'contactPerson', label: 'Personi i kontaktit' },
   { key: 'phone', label: 'Telefoni', type: 'tel' },
   { key: 'email', label: 'Email', type: 'email' },

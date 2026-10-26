@@ -60,6 +60,8 @@ export function EntityForm({ title, collectionName, record, fields, onClose, onS
           <Field key={f.key} label={f.type === 'checkbox' ? null : f.label} required={f.required} hint={f.hint}
             className={f.span === 'all' ? 'span-all' : f.span === 2 ? 'span-2' : ''}>
             <Input f={f} value={values[f.key]} onChange={(v) => set(f.key, v)} />
+            {/* Shtesë e fushës (p.sh. kërkimi i NIPT-it në tatime) që mund të plotësojë fusha të tjera. */}
+            {f.extra && <f.extra values={values} record={record} patch={(obj) => setValues((s) => ({ ...s, ...obj }))} />}
           </Field>
         ))}
       </form>
