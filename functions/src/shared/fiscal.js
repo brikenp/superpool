@@ -28,18 +28,20 @@ export function defaultFiscalOptions({ client = {}, sale = null, invoice = {} })
  * Rreshtat fiskalë: çmimi pa TVSH dhe totali me TVSH për çdo artikull.
  *  - shitjet: çmimi në SuperPool është me TVSH
  *  - fatura përfundimtare: rreshtat janë pa TVSH
- *  - fatura manuale: një rresht me vlerën me TVSH
+ *  - fatura manuale: rreshtat e artikujve (çmim me TVSH, TVSH për rresht), ose një rresht me vlerën
  */
 export function fiscalItems({ invoice, sale, vatPayer = true, vatPct = 20 }) {
-  const rate = vatPayer ? Number(invoice.vatPct ?? vatPct) : 0;
-  const taxFields = { tax: vatPayer, taxRate: rate, taxType: vatPayer ? String(rate) : 'TAX_FREE' };
-  const item = ({ name, code, unit, quantity, withTax, withoutTax }) => {
-    const net = withoutTax ?? withTax / (1 + rate / 100);
-    const totalWithTax = withTax !== undefined ? r2(quantity * withTax) : r2(quantity * net * (1 + rate / 100));
+  const defaultRate = vatPayer ? Number(invoice.vatPct ?? vatPct) : 0;
+  const item = ({ name, code, unit, quantity, withTax, withoutTax, rate = defaultRate }) => {
+    const r = vatPayer ? Number(rate) : 0;
+    const net = withoutTax ?? withTax / (1 + r / 100);
+    const totalWithTax = withTax !== undefined ? r2(quantity * withTax) : r2(quantity * net * (1 + r / 100));
     return {
       quantity: Number(quantity),
       priceWithoutTax: r8(net),
-      ...taxFields,
+      tax: vatPayer,
+      taxRate: r,
+      taxType: vatPayer ? String(r) : 'TAX_FREE',
       totalWithTax,
       name: String(name || 'Artikull').slice(0, 200),
       unit: UNIT_CODES[unit] || 'XPP',
@@ -48,7 +50,11 @@ export function fiscalItems({ invoice, sale, vatPayer = true, vatPct = 20 }) {
     };
   };
   if (Array.isArray(invoice.lines) && invoice.lines.length) {
-    return invoice.lines.map((l) => item({ name: l.description, unit: l.unit, quantity: l.qty, withoutTax: Number(l.unitPrice) }));
+    // Rreshtat me çmim me TVSH (faturat manuale) ruajnë totalin e saktë; ato pa TVSH (përfundimtare) llogariten.
+    return invoice.lines.map((l) => item({
+      name: l.description, code: l.code, unit: l.unit, quantity: l.qty, rate: l.vatPct ?? defaultRate,
+      ...(l.unitPriceGross != null ? { withTax: Number(l.unitPriceGross) } : { withoutTax: Number(l.unitPrice) }),
+    }));
   }
   if (sale?.lines?.length) {
     return sale.lines.map((l) => item({ name: l.name, code: l.code, unit: l.unit, quantity: l.qty, withTax: Number(l.unitPrice) }));

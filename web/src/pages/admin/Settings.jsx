@@ -19,6 +19,8 @@ const TEXTS = [
   ['defaultPaymentTerms', 'Kushtet standarde të pagesës (oferta)'],
   ['defaultDeliveryTerm', 'Afati standard i realizimit (oferta)'],
   ['offerFooter', 'Teksti në fund të ofertës'],
+  ['bankInfo', 'Llogaritë bankare (dalin në fatura), p.sh. BKT · IBAN AL47 2121 …'],
+  ['invoiceFooter', 'Teksti në fund të faturës'],
 ];
 
 export default function Settings() {

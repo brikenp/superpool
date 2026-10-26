@@ -227,3 +227,18 @@ test('fiskalizimi: faturë në euro dërgon monedhën dhe kursin', async () => {
   const c = buildCorrectionRequest({ config, invoice: { ...invoice, fiscal: { iic: 'X', issueDateTime: 'T' } }, original: b });
   assert.deepEqual([c.order.currency, c.order.exchangeRate], ['EUR', 98.5]);
 });
+
+test('fiskalizimi: rreshtat e faturës manuale (çmim me TVSH, TVSH për rresht, emri i artikullit)', async () => {
+  const { buildFiscalRequest } = await import('../src/shared/fiscal.js');
+  const invoice = {
+    internalNumber: 'FAT-L', amount: 1300,
+    lines: [
+      { description: 'Pompë 1HP', code: 'PMP-1', unit: 'cope', qty: 1, unitPriceGross: 1200, unitPrice: 1000, vatPct: 20 },
+      { description: 'Transport', unit: 'set', qty: 1, unitPriceGross: 100, unitPrice: 100, vatPct: 0 },
+    ],
+  };
+  const b = buildFiscalRequest({ config: { shopId: 's', vatPayer: true }, invoice, client: { name: 'A' }, options: { invoiceType: 'CASH', paymentMethod: 'BANKNOTE' } });
+  const [a, t] = b.order.items;
+  assert.deepEqual([a.name, a.code, a.priceWithoutTax, a.totalWithTax, a.taxType], ['Pompë 1HP', 'PMP-1', 1000, 1200, '20']);
+  assert.deepEqual([t.name, t.taxRate, t.totalWithTax, t.taxType], ['Transport', 0, 100, '0']);
+});

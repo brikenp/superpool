@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { PAYMENT_METHODS } from '@shared/constants.js';
+import { PAYMENT_METHODS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
@@ -15,7 +15,7 @@ import { CurrencyFields, currencyData } from '../../components/Currency.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
-import { addDays, date, inAll, money, moneyWithAll, todayISO, toNumber } from '../../lib/format.js';
+import { addDays, date, inAll, money, moneyWithAll, round2, todayISO, toNumber } from '../../lib/format.js';
 
 export const INVOICE_STATUS = { pending_fiscal: 'Pa numër fiskal', issued: 'E lëshuar', cancelled: 'Anuluar' };
 // Lloji i faturës manuale (fusha "type"); faturat e shitjeve krijohen nga moduli i shitjeve.
@@ -39,7 +39,21 @@ export function InvoiceForm({ record, onClose }) {
     };
     return { ...base, exchangeRate: base.exchangeRate ?? (base.currency === 'EUR' ? company.eurRate || '' : 1) };
   });
-  const lockedMoney = Boolean(record.saleId || record.lines || record.fiscal);
+  // Faturat e shitjeve, të fiskalizuarat dhe ato përfundimtare (me zbritje) nuk ndryshojnë vlerë.
+  const lockedMoney = Boolean(record.saleId || record.fiscal || record.deductions?.length);
+  const [lines, setLines] = useState(() => {
+    const vat = Number(company.vatPct ?? 20);
+    if (record.lines?.length) {
+      return record.lines.map((l) => {
+        const lv = Number(l.vatPct ?? record.vatPct ?? vat);
+        return { ...l, vatPct: lv, priceGross: l.unitPriceGross ?? round2(Number(l.unitPrice) * (1 + lv / 100)) };
+      });
+    }
+    if (record.saleId || !isNew) return null; // faturat e vjetra pa rreshta: vetëm vlera totale
+    return [{ productId: '', code: '', description: record.notes || '', unit: 'cope', qty: 1, priceGross: record.amount || '', vatPct: vat }];
+  });
+  const linesTotal = lines ? round2(lines.reduce((sum, l) => sum + round2(toNumber(l.qty) * toNumber(l.priceGross)), 0)) : null;
+  const amountValue = lines ? linesTotal : v.amount;
   const [run, busy] = useAction();
   const set = (k, val) => setV((s) => ({ ...s, [k]: val }));
   // Pa klient të zgjedhur shfaqen të gjitha projektet; zgjedhja e projektit plotëson klientin.
@@ -54,7 +68,14 @@ export function InvoiceForm({ record, onClose }) {
 
   const save = () => run(async () => {
     if (!v.clientId) throw new Error('Zgjidhni klientin.');
-    if (!(toNumber(v.amount) > 0)) throw new Error('Shkruani vlerën e faturës.');
+    if (lines) {
+      if (!lines.length) throw new Error('Shtoni të paktën një artikull ose shërbim.');
+      lines.forEach((l, i) => {
+        if (!String(l.description || '').trim()) throw new Error(`Rreshti ${i + 1}: shkruani emrin e artikullit / shërbimit.`);
+        if (!(toNumber(l.qty) > 0) || !(toNumber(l.priceGross) > 0)) throw new Error(`Rreshti ${i + 1}: sasia dhe çmimi duhet të jenë më të mëdha se zero.`);
+      });
+    }
+    if (!(toNumber(amountValue) > 0)) throw new Error('Shkruani vlerën e faturës.');
     const data = {
       fiscalNumber: v.fiscalNumber.trim(),
       status: v.status === 'cancelled' ? 'cancelled' : v.fiscalNumber.trim() ? 'issued' : 'pending_fiscal',
@@ -62,14 +83,29 @@ export function InvoiceForm({ record, onClose }) {
       dueDate: v.dueDate,
       clientId: v.clientId,
       clientName: clientsById[v.clientId]?.name || v.clientName || '',
-      amount: toNumber(v.amount),
-      ...currencyData(v.currency, v.exchangeRate, lockedMoney ? record.amount : v.amount),
+      amount: toNumber(amountValue),
+      ...currencyData(v.currency, v.exchangeRate, lockedMoney ? record.amount : amountValue),
       projectId: v.projectId || null,
       notes: v.notes || '',
       updatedAt: serverTimestamp(),
     };
     if (lockedMoney) { delete data.currency; delete data.exchangeRate; if (record.currency) delete data.amountAll; }
     if (!record.saleId) data.type = INVOICE_TYPES[v.type] ? v.type : 'other';
+    // Rreshtat ruhen me çmim pa TVSH (për tatimet) dhe me TVSH (siç u shkrua).
+    if (lines && !lockedMoney) {
+      data.lines = lines.map((l) => {
+        const vat = toNumber(l.vatPct);
+        const gross = toNumber(l.priceGross);
+        return {
+          productId: l.productId || null, code: l.code || '', description: String(l.description).trim(), unit: l.unit || 'cope',
+          qty: toNumber(l.qty), unitPriceGross: gross, unitPrice: Math.round((gross / (1 + vat / 100)) * 1e8) / 1e8, vatPct: vat,
+        };
+      });
+      data.gross = linesTotal;
+      data.net = round2(data.lines.reduce((sum, l) => sum + round2(l.qty * l.unitPriceGross) / (1 + l.vatPct / 100), 0));
+      data.vat = round2(data.gross - data.net);
+      data.vatPct = data.lines[0].vatPct;
+    }
     if (isNew && record.contractId) Object.assign(data, { contractId: record.contractId, contractNumber: record.contractNumber || '', installmentKey: record.installmentKey || null });
     if (isNew) {
       const { number: internalNumber } = await call('allocateNumber', { prefix: 'FAT' });
@@ -84,15 +120,15 @@ export function InvoiceForm({ record, onClose }) {
         });
       }
     } else {
-      if (record.saleId || record.lines || record.fiscal) delete data.amount;
-    if (record.fiscal) { delete data.fiscalNumber; delete data.status; } // i fiskalizuar: kodet nuk ndryshohen me dorë // vlera vjen nga shitja / rreshtat e faturës përfundimtare // vlera e shitjes vjen nga dokumenti i shitjes
+      if (lockedMoney) delete data.amount; // vlera vjen nga shitja / fiskalizimi / fatura përfundimtare
+      if (record.fiscal) { delete data.fiscalNumber; delete data.status; } // kodet fiskale nuk ndryshohen me dorë
       await setDoc(doc(db, 'invoices', record.id), data, { merge: true });
     }
     onClose();
   }, 'Fatura u ruajt.');
 
   return (
-    <Modal title={isNew ? 'Shto faturë manuale' : `Fatura ${record.fiscalNumber || record.internalNumber || ''}`} onClose={onClose}
+    <Modal title={isNew ? 'Shto faturë manuale' : `Fatura ${record.fiscalNumber || record.internalNumber || ''}`} onClose={onClose} wide
       footer={(
         <>
           {!isNew && (
@@ -134,8 +170,8 @@ export function InvoiceForm({ record, onClose }) {
           </Field>
         )}
         <Field label="Nr. fiskal i faturës"><input value={v.fiscalNumber} disabled={Boolean(record.fiscal?.fic)} onChange={(e) => set('fiscalNumber', e.target.value)} /></Field>
-        <Field label={`Vlera me TVSH (${v.currency === 'EUR' ? '€' : 'L'})`} required><input className="num" type="number" step="any" value={v.amount} disabled={lockedMoney} onChange={(e) => set('amount', e.target.value)} /></Field>
-        <CurrencyFields currency={v.currency} rate={v.exchangeRate} amount={v.amount} disabled={lockedMoney} onChange={(patch) => setV((s) => ({ ...s, ...patch }))} />
+        {!lines && <Field label={`Vlera me TVSH (${v.currency === 'EUR' ? '€' : 'L'})`} required><input className="num" type="number" step="any" value={v.amount} disabled={lockedMoney} onChange={(e) => set('amount', e.target.value)} /></Field>}
+        <CurrencyFields currency={v.currency} rate={v.exchangeRate} amount={amountValue} disabled={lockedMoney} onChange={(patch) => setV((s) => ({ ...s, ...patch }))} />
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
         <Field label="Afati i pagesës"><input type="date" value={v.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
         {!record.saleId && (
@@ -146,6 +182,14 @@ export function InvoiceForm({ record, onClose }) {
               onChange={pickProject}
             />
           </Field>
+        )}
+        {lines && (
+          <div className="span-all">
+            <InvoiceLinesEditor lines={lines} onChange={setLines} currency={v.currency} disabled={lockedMoney} />
+          </div>
+        )}
+        {!lines && !lockedMoney && (
+          <div className="span-all"><button type="button" className="btn small" onClick={() => setLines([{ productId: '', code: '', description: v.notes || '', unit: 'cope', qty: 1, priceGross: v.amount, vatPct: Number(company.vatPct ?? 20) }])}>+ Shto rreshta artikujsh</button></div>
         )}
         <Field label="Shënime" className="span-all"><input value={v.notes || ''} onChange={(e) => set('notes', e.target.value)} /></Field>
         {isNew && (
@@ -332,6 +376,64 @@ function FinanceSection({ section }) {
       )}
       {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}
       {paymentForm && <PaymentForm record={paymentForm} invoices={invoices.data.filter((i) => i.status !== 'cancelled')} onClose={() => setPaymentForm(null)} />}
+    </>
+  );
+}
+
+/** Rreshtat e faturës: artikull nga magazina ose shërbim me tekst, sasia, çmimi me TVSH dhe norma e TVSH-së. */
+function InvoiceLinesEditor({ lines, onChange, currency, disabled }) {
+  const { products } = useData();
+  const sym = currency === 'EUR' ? '€' : 'L';
+  const options = products.filter((p) => p.active !== false).map((p) => ({ value: p.id, label: `${p.code} · ${p.name}`, sub: p.salePrice ? money(p.salePrice) : '' }));
+  const setLine = (i, patch) => onChange(lines.map((l, k) => (k === i ? { ...l, ...patch } : l)));
+  const pick = (i, id) => {
+    const p = products.find((x) => x.id === id);
+    if (!p) { setLine(i, { productId: '', code: '' }); return; }
+    setLine(i, { productId: p.id, code: p.code || '', description: p.name, unit: p.unit || 'cope', ...(currency !== 'EUR' && p.salePrice ? { priceGross: p.salePrice } : {}) });
+  };
+  const total = lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.priceGross), 0);
+  return (
+    <>
+      <b style={{ display: 'block', margin: '6px 0' }}>Artikujt / shërbimet</b>
+      <div className="table-wrap">
+        <table className="table lines">
+          <thead>
+            <tr>
+              <th style={{ minWidth: 230 }}>Artikulli (nga magazina) ose përshkrimi</th><th style={{ width: 110 }}>Njësia</th><th className="r" style={{ width: 80 }}>Sasia</th>
+              <th className="r" style={{ width: 120 }}>Çmimi me TVSH ({sym})</th><th style={{ width: 92 }}>TVSH</th><th className="r" style={{ width: 120 }}>Vlera</th><th style={{ width: 36 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((l, i) => (
+              <tr key={i}>
+                <td>
+                  <SearchSelect options={options} value={l.productId || ''} onChange={(id) => pick(i, id)} disabled={disabled} placeholder="Kërko artikullin…" />
+                  <input style={{ marginTop: 4 }} value={l.description} disabled={disabled} placeholder="Emri në faturë (p.sh. Montim pishine)" onChange={(e) => setLine(i, { description: e.target.value })} />
+                </td>
+                <td>
+                  <select value={l.unit} disabled={disabled} onChange={(e) => setLine(i, { unit: e.target.value })}>
+                    {Object.entries(UNITS).map(([k, u]) => <option key={k} value={k}>{u}</option>)}
+                  </select>
+                </td>
+                <td><input className="num" type="number" step="any" value={l.qty} disabled={disabled} onChange={(e) => setLine(i, { qty: e.target.value })} /></td>
+                <td>
+                  <input className="num" type="number" step="any" value={l.priceGross} disabled={disabled} onChange={(e) => setLine(i, { priceGross: e.target.value })} />
+                  {toNumber(l.priceGross) > 0 && <small className="muted">pa TVSH: {money(toNumber(l.priceGross) / (1 + toNumber(l.vatPct) / 100), currency)}</small>}
+                </td>
+                <td>
+                  <select value={l.vatPct} disabled={disabled} onChange={(e) => setLine(i, { vatPct: Number(e.target.value) })}>
+                    {[20, 10, 6, 0].map((v) => <option key={v} value={v}>{v}%</option>)}
+                  </select>
+                </td>
+                <td className="r">{money(toNumber(l.qty) * toNumber(l.priceGross), currency)}</td>
+                <td>{!disabled && lines.length > 1 && <button type="button" className="btn ghost small" aria-label="Hiq" onClick={() => onChange(lines.filter((_, k) => k !== i))}>×</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr><td colSpan={5}>Totali me TVSH</td><td className="r">{money(total, currency)}</td><td /></tr></tfoot>
+        </table>
+      </div>
+      {!disabled && <button type="button" className="btn small" style={{ marginTop: 6 }} onClick={() => onChange([...lines, { productId: '', code: '', description: '', unit: 'cope', qty: 1, priceGross: '', vatPct: lines.at(-1)?.vatPct ?? 20 }])}>+ Rresht</button>}
     </>
   );
 }
