@@ -173,7 +173,6 @@ kbd { font-family: var(--font); font-size: 0.72rem; font-weight: 600; color: var
 .user-chip .who .r { font-size: 0.74rem; color: var(--muted); }
 .content { padding: 24px 28px 48px; max-width: 1480px; width: 100%; margin: 0 auto; }
 .btn.menu-btn { display: none; }
-.topbar-logo { display: none; }
 .backdrop { display: none; }
 
 @media (max-width: 1000px) {
@@ -181,7 +180,6 @@ kbd { font-family: var(--font); font-size: 0.72rem; font-weight: 600; color: var
   .sidebar.open { transform: none; }
   .backdrop.open { display: block; position: fixed; inset: 0; background: rgba(2, 6, 23, 0.5); z-index: 50; backdrop-filter: blur(2px); }
   .btn.menu-btn { display: inline-flex; }
-  .topbar-logo { display: inline-flex; height: 34px; padding: 4px 8px; border-radius: 8px; }
   .content { padding: 16px 14px 90px; }
   .topbar { padding: 0 12px; }
   .search-trigger { min-width: 0; }
@@ -426,7 +424,7 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .auth-card { width: 100%; max-width: 380px; }
 .auth-card h1 { font-size: 1.6rem; }
 .auth-card .logo { display: none; align-items: center; gap: 10px; margin-bottom: 22px; font-size: 1.3rem; font-weight: 700; }
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .auth-page { grid-template-columns: 1fr; }
   .auth-hero { display: none; }
   .auth-card .logo { display: flex; }
@@ -505,3 +503,8 @@ button.nav-group-title .chev { transition: transform 0.15s; opacity: 0.7; }
 }
 .app-footer .logo-plate { height: 34px; padding: 4px 8px; border-radius: 8px; }
 @media print { .app-footer { display: none; } }
+/* Logoja në shiritin e sipërm vetëm në celular (në desktop është te menuja anësore). */
+.topbar .topbar-logo { display: none; }
+@media (max-width: 1000px) {
+  .topbar .topbar-logo { display: inline-flex; height: 34px; padding: 4px 8px; border-radius: 8px; }
+}
