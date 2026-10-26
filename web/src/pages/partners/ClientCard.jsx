@@ -2,7 +2,7 @@ import { addDoc, collection, deleteDoc, doc, query, serverTimestamp, where } fro
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import { Paperclip, X, Plus } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { OFFER_STATUS, PAYMENT_METHODS, PROJECT_STATUS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -18,9 +18,10 @@ import { db, storage } from '../../lib/firebase.js';
 import { date, dateTime, money } from '../../lib/format.js';
 import { InvoiceForm, PaymentForm, INVOICE_STATUS } from '../finance/Finance.jsx';
 import { clientFields, normalizeClient } from './Clients.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function ClientCard() {
-  const { id } = useParams();
+  const id = useRouteId();
   const navigate = useNavigate();
   const { clientsById } = useData();
   const { uid, can } = useAuth();

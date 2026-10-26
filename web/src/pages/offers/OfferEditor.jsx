@@ -1,7 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
 import { X, Plus } from 'lucide-react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { OFFER_STATUS, POOL_SECTIONS, POOL_TYPES, UNITS } from '@shared/constants.js';
 
@@ -16,6 +16,7 @@ import { clientOfferPdf, internalEstimatePdf } from '../../lib/offerPdf.js';
 import { clientFields, normalizeClient } from '../partners/Clients.jsx';
 import { freeQty } from '../inventory/Products.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 const TEXT_FIELDS = [
   ['technicalText', 'Zgjidhja teknike (përshkrimi i punimeve)'],
@@ -30,7 +31,7 @@ const TEXT_FIELDS = [
 const emptyLine = () => ({ key: newKey(), section: 'other', productId: null, code: '', description: '', unit: 'cope', formula: '', qty: 1, unitCost: 0, unitPrice: 0, showOnClient: true });
 
 export default function OfferEditor() {
-  const { id } = useParams();
+  const id = useRouteId();
   const isNew = id === 're';
   const [params] = useSearchParams();
   const navigate = useNavigate();

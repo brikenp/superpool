@@ -111,14 +111,30 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
   d.text(meta, 120, y + 8);
   y += 10 + Math.max(4, meta.length) * 5;
 
-  const body = sale?.lines?.length
-    ? sale.lines.map((l, i) => [i + 1, l.code || '', l.name, `${qty(l.qty)} ${UNITS[l.unit] || l.unit || ''}`, money(l.unitPrice), money(l.total)])
-    : [[1, '', invoice.notes || kind + (project ? ` — ${project.name}` : ''), '1', money(invoice.amount), money(invoice.amount)]];
+  // Fatura përfundimtare: rreshtat pa TVSH, TVSH, totali dhe zbritja e paradhënieve.
+  const detailed = Array.isArray(invoice.lines) && invoice.lines.length > 0;
+  const body = detailed
+    ? invoice.lines.map((l, i) => [i + 1, '', l.description, `${qty(l.qty)} ${UNITS[l.unit] || l.unit || ''}`, money(l.unitPrice), money(Number(l.qty) * Number(l.unitPrice))])
+    : sale?.lines?.length
+      ? sale.lines.map((l, i) => [i + 1, l.code || '', l.name, `${qty(l.qty)} ${UNITS[l.unit] || l.unit || ''}`, money(l.unitPrice), money(l.total)])
+      : [[1, '', (invoice.notes || kind) + (project && !invoice.notes ? ` — ${project.name}` : ''), '1', money(invoice.amount), money(invoice.amount)]];
+  const foot = detailed
+    ? [
+      ['', '', '', '', 'Vlera pa TVSH', money(invoice.net)],
+      ['', '', '', '', `TVSH ${invoice.vatPct ?? ''}%`, money(invoice.vat)],
+      ['', '', '', '', 'Totali me TVSH', money(invoice.gross)],
+      ...(invoice.deductions || []).map((x) => ['', '', `Minus: ${x.label}${x.date ? ` · ${date(x.date)}` : ''}`, '', '', `-${money(x.amount)}`]),
+      ['', '', '', '', "PËR T'U PAGUAR", money(invoice.amount)],
+    ]
+    : [['', '', '', '', 'TOTALI', money(invoice.amount)]];
   autoTable(d, {
     startY: y,
-    head: [['#', 'Kodi', 'Përshkrimi', 'Sasia', 'Çmimi', 'Vlera']],
+    head: [['#', 'Kodi', 'Përshkrimi', 'Sasia', detailed ? 'Çmimi pa TVSH' : 'Çmimi', 'Vlera']],
     body,
-    foot: [['', '', '', '', 'TOTALI', money(invoice.amount)]],
+    foot,
+    didParseCell: (c) => {
+      if (c.section === 'foot' && c.row.index < foot.length - 1) Object.assign(c.cell.styles, { fillColor: [235, 242, 247], textColor: 20, fontStyle: 'normal' });
+    },
     styles: { fontSize: 9, cellPadding: 2 },
     headStyles: { fillColor: NAVY },
     footStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold' },
@@ -132,7 +148,7 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
     d.text(`Paguar: ${money(paid)}   ·   Mbetet për t'u paguar: ${money(Number(invoice.amount || 0) - paid)}`, 14, y);
     y += 6;
   }
-  if (invoice.notes && sale?.lines?.length) { d.text(d.splitTextToSize(`Shënime: ${invoice.notes}`, 180), 14, y); y += 8; }
+  if (invoice.notes && (sale?.lines?.length || detailed)) { d.text(d.splitTextToSize(`Shënime: ${invoice.notes}`, 180), 14, y); y += 8; }
   if (invoice.status === 'cancelled') {
     d.setTextColor(200, 30, 30);
     d.setFontSize(28);

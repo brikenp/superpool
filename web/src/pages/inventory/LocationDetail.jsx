@@ -1,6 +1,6 @@
 import { collection, query, where } from 'firebase/firestore';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { LOCATION_KINDS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -12,6 +12,7 @@ import { useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { StockTable } from './Stock.jsx';
 import { movementColumns } from './Movements.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 /** Pasqyra e lëvizjeve hyrëse/dalëse për çdo artikull të një vendi (p.sh. rakordimi i Gertit). */
 export function FlowSummary({ movements, locationId, title }) {
@@ -54,7 +55,7 @@ export function FlowSummary({ movements, locationId, title }) {
 }
 
 export default function LocationDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const navigate = useNavigate();
   const { locationsById } = useData();
   const { can } = useAuth();

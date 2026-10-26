@@ -1,7 +1,7 @@
 import { collection, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { useState } from 'react';
 import { X, Plus } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { MOVEMENT_STATUS, PO_STATUS } from '@shared/constants.js';
 
@@ -13,9 +13,10 @@ import { db } from '../../lib/firebase.js';
 import { date, money, todayISO } from '../../lib/format.js';
 import { supplierFields } from './Suppliers.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function SupplierDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const navigate = useNavigate();
   const { suppliersById, products, productsById } = useData();
   const [tab, setTab] = useState('prices');

@@ -2,7 +2,7 @@ import { addDoc, collection, doc, query, serverTimestamp, setDoc, updateDoc, whe
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { FileSignature, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { CONTRACT_STATUS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -15,6 +15,7 @@ import { call, db, storage } from '../../lib/firebase.js';
 import { addDays, date, money, round2, todayISO, toNumber } from '../../lib/format.js';
 import { newKey } from '../../lib/offerCalc.js';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from './Finance.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 // Ndarje e shpejtë e kësteve (përqindje e vlerës me TVSH).
 const SPLITS = {
@@ -213,7 +214,7 @@ export function ContractForm({ record, onClose, onSaved }) {
 }
 
 export function ContractDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const { can, uid, profile } = useAuth();
   const { data: c, loading } = useDocument(`contracts/${id}`);
   const seeInvoices = can(CAPS.FINANCE, CAPS.REPORTS);

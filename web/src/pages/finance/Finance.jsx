@@ -76,7 +76,7 @@ export function InvoiceForm({ record, onClose }) {
         });
       }
     } else {
-      if (record.saleId) delete data.amount; // vlera e shitjes vjen nga dokumenti i shitjes
+      if (record.saleId || record.lines) delete data.amount; // vlera vjen nga shitja / rreshtat e faturës përfundimtare // vlera e shitjes vjen nga dokumenti i shitjes
       await setDoc(doc(db, 'invoices', record.id), data, { merge: true });
     }
     onClose();
@@ -105,7 +105,7 @@ export function InvoiceForm({ record, onClose }) {
           </Field>
         )}
         <Field label="Nr. fiskal i faturës"><input value={v.fiscalNumber} onChange={(e) => set('fiscalNumber', e.target.value)} /></Field>
-        <Field label="Vlera me TVSH (L)" required><input className="num" type="number" step="any" value={v.amount} disabled={Boolean(record.saleId)} onChange={(e) => set('amount', e.target.value)} /></Field>
+        <Field label="Vlera me TVSH (L)" required><input className="num" type="number" step="any" value={v.amount} disabled={Boolean(record.saleId || record.lines)} onChange={(e) => set('amount', e.target.value)} /></Field>
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
         <Field label="Afati i pagesës"><input type="date" value={v.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
         {!record.saleId && (

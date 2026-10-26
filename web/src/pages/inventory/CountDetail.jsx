@@ -1,6 +1,6 @@
 import { doc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { UNITS } from '@shared/constants.js';
 
@@ -11,11 +11,12 @@ import { loadPdf } from '../../lib/export.js';
 import { call, db } from '../../lib/firebase.js';
 import { date, qty, round3, toNumber } from '../../lib/format.js';
 import { productOption } from '../../components/ProductImage.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 const STATUS = { draft: 'Në numërim', confirmed: 'Konfirmuar', cancelled: 'Anuluar' };
 
 export default function CountDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const { data: count, loading } = useDocument(`inventoryCounts/${id}`);
   const { products, productsById, company } = useData();
   const { ask } = useUi();

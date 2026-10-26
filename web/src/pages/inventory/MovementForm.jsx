@@ -12,6 +12,7 @@ import { unitCostOf, useData, useDocument, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
 import { callOrQueue, newRequestId } from '../../lib/outbox.js';
 import { todayISO } from '../../lib/format.js';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 const VIRTUAL_BY_KIND = { supplier: LOC.SUPPLIER, customer: LOC.CUSTOMER, consumed: LOC.CONSUMED, loss: LOC.LOSS, adjust: LOC.ADJUST };
 
@@ -27,7 +28,8 @@ const HELP = {
 };
 
 export default function MovementForm() {
-  const { kind: kindParam, id } = useParams();
+  const { kind: kindParam } = useParams();
+  const id = useRouteId();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { uid, profile, can, role } = useAuth();

@@ -4,7 +4,7 @@ import {
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useMemo, useState } from 'react';
 import { FileText, PackageMinus, PackagePlus, Paperclip, Plus, TriangleAlert, Undo2, Wrench, X } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { EXPENSE_CATEGORIES, POOL_TYPES, PROJECT_STATUS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -22,9 +22,11 @@ import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
 import { ContractsCard } from '../finance/Contracts.jsx';
 import { PrintInvoiceButton } from '../../components/PrintButton.jsx';
+import { FinalInvoiceForm } from './FinalInvoice.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function ProjectDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const { can } = useAuth();
   const [tab, setTab] = useState('materials');
   const { data: project, loading } = useDocument(`projects/${id}`);
@@ -60,6 +62,7 @@ function ProjectHeader({ project }) {
   const { can } = useAuth();
   const { ask } = useUi();
   const [run, busy] = useAction();
+  const [finalForm, setFinalForm] = useState(false);
   const setStatus = async (status) => {
     if (status === 'completed' && !(await ask({
       title: 'Mbyll projektin',
@@ -82,13 +85,19 @@ function ProjectHeader({ project }) {
             {project.offerId && <> · <Link to={`/ofertat/${project.offerId}`}><FileText size={13} style={{ verticalAlign: '-2px' }} /> Oferta {project.offerNumber}</Link></>}
           </>
         )}
-        actions={can(CAPS.PROJECTS_MANAGE) && (
-          <select className="btn" value="" disabled={busy} onChange={(e) => e.target.value && setStatus(e.target.value)} style={{ width: 'auto' }}>
-            <option value="">Ndrysho statusin…</option>
-            {Object.entries(PROJECT_STATUS).filter(([k]) => k !== project.status).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
+        actions={(
+          <>
+            {can(CAPS.FINANCE) && <button type="button" className="btn ok" onClick={() => setFinalForm(true)}><FileText size={16} /> Faturë përfundimtare</button>}
+            {can(CAPS.PROJECTS_MANAGE) && (
+              <select className="btn" value="" disabled={busy} onChange={(e) => e.target.value && setStatus(e.target.value)} style={{ width: 'auto' }}>
+                <option value="">Ndrysho statusin…</option>
+                {Object.entries(PROJECT_STATUS).filter(([k]) => k !== project.status).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            )}
+          </>
         )}
       />
+      {finalForm && <FinalInvoiceForm project={project} onClose={() => setFinalForm(false)} />}
       {can(CAPS.MOVEMENTS_CREATE) && ['planned', 'active'].includes(project.status) && (
         <div className="row" style={{ marginBottom: 14 }}>
           <Link className="btn" to={`/levizjet/re/issue?${q}`}><PackagePlus size={16} /> Dalje materialesh</Link>
@@ -391,6 +400,7 @@ function Finance({ project }) {
   const [run] = useAction();
   const [invoiceForm, setInvoiceForm] = useState(null);
   const [paymentForm, setPaymentForm] = useState(false);
+  const [finalForm, setFinalForm] = useState(false);
   const fin = useDocument(`projectFinance/${project.id}`);
   const expenses = useQuery(() => query(collection(db, 'projectFinance', project.id, 'expenses')), [project.id]);
   const invoices = useQuery(() => query(collection(db, 'invoices'), where('projectId', '==', project.id)), [project.id]);
@@ -456,6 +466,7 @@ function Finance({ project }) {
           {can(CAPS.FINANCE) && (
             <div className="row">
               <button type="button" className="btn small primary" onClick={() => setInvoiceForm({ clientId: project.clientId, projectId: project.id, type: 'advance' })}><Plus size={14} /> Paradhënie / faturë</button>
+              <button type="button" className="btn small ok" onClick={() => setFinalForm(true)}><FileText size={14} /> Faturë përfundimtare</button>
               <button type="button" className="btn small" onClick={() => setPaymentForm(true)}><Plus size={14} /> Pagesë</button>
             </div>
           )}
@@ -465,6 +476,7 @@ function Finance({ project }) {
         <ContractsCard clientId={project.clientId} projectId={project.id} preset={{ value: f.contractValue || '', title: project.name, offerId: project.offerId || null }} />
       )}
       {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}
+      {finalForm && <FinalInvoiceForm project={project} onClose={() => setFinalForm(false)} />}
       {paymentForm && <PaymentForm record={{ clientId: project.clientId }} invoices={invoices.data.filter((i) => i.status !== 'cancelled')} onClose={() => setPaymentForm(false)} />}
     </>
   );

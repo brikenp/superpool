@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { PAYMENT_METHODS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -12,9 +12,10 @@ import { call } from '../../lib/firebase.js';
 import { date, money, qty } from '../../lib/format.js';
 import { INVOICE_STATUS } from '../finance/Finance.jsx';
 import { SALE_STATUS } from './Sales.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function SaleDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const { can } = useAuth();
   const { ask } = useUi();
   const { company } = useData();

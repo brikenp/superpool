@@ -104,8 +104,9 @@ export function DataProvider({ children }) {
       clientsById: byId(clients.data),
       costsById: byId(costs.data),
       company: { name: 'SuperPool', vatPct: 20, ...(settings.data || {}), loaded: !settings.loading },
+      listsLoading: { clients: clients.loading, suppliers: suppliers.loading, products: products.loading, locations: locations.loading },
     };
-  }, [products.data, products.loading, categories.data, locations.data, locations.loading, employees.data,
+  }, [clients.loading, suppliers.loading, products.data, products.loading, categories.data, locations.data, locations.loading, employees.data,
     vehicles.data, users.data, suppliers.data, clients.data, costs.data, settings.data, settings.loading]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

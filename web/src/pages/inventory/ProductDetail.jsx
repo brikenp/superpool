@@ -1,6 +1,6 @@
 import { collection, query, where } from 'firebase/firestore';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { LOCATION_KINDS, MOVEMENT_KINDS, MOVEMENT_STATUS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -13,9 +13,10 @@ import { db } from '../../lib/firebase.js';
 import { date, money, qty } from '../../lib/format.js';
 import { ProductForm, freeQty } from './Products.jsx';
 import { ImageModal } from '../../components/ProductImage.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function ProductDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const navigate = useNavigate();
   const { productsById, locationsById, costsById, suppliersById } = useData();
   const { can } = useAuth();

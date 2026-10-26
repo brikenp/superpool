@@ -1,6 +1,6 @@
 import { collection, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { LOC, PO_STATUS, UNITS } from '@shared/constants.js';
 
@@ -12,9 +12,10 @@ import { loadPdf } from '../../lib/export.js';
 import { call, db } from '../../lib/firebase.js';
 import { date, money, qty, round3, todayISO, toNumber } from '../../lib/format.js';
 import { poTotal } from './PurchaseOrders.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function PurchaseOrderDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const { data: po, loading } = useDocument(`purchaseOrders/${id}`);
   const { productsById, suppliersById, costsById, company } = useData();
   const { ask } = useUi();

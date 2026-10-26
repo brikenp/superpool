@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { CONDITIONS, MOVEMENT_KINDS, MOVEMENT_STATUS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -11,9 +11,10 @@ import { movementPdf } from '../../lib/docPdf.js';
 import { call } from '../../lib/firebase.js';
 import { date, dateTime, money, qty } from '../../lib/format.js';
 import { ProductThumb } from '../../components/ProductImage.jsx';
+import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function MovementDetail() {
-  const { id } = useParams();
+  const id = useRouteId();
   const navigate = useNavigate();
   const { uid, can } = useAuth();
   const { ask } = useUi();
