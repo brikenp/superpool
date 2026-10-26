@@ -27,7 +27,7 @@ export default function Setup() {
       <AuthHero />
       <div className="auth-side">
       <div className="auth-card">
-        <div className="logo"><img src="/icon.svg" alt="" />SuperPool</div>
+        <div className="logo"><span className="logo-plate"><img src="/logo-superpool.jpg" alt="SuperPool" /></span></div>
         <h1>Konfigurimi</h1>
         {profile && profile.active === false ? (
           <div className="alert warn">Llogaria juaj është çaktivizuar. Kontaktoni administratorin.</div>

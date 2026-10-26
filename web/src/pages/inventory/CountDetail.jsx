@@ -71,7 +71,7 @@ export default function CountDetail() {
       head: [['Kodi', 'Artikulli', 'Njësia', 'Sasia e numëruar', 'Shënim']],
       body: lines.map((l) => [l.code, l.name, UNITS[l.unit] || l.unit, l.countedQty === '' ? '' : qty(l.countedQty), '']),
       styles: { fontSize: 9, minCellHeight: 8 },
-      headStyles: { fillColor: [11, 111, 164] },
+      headStyles: { fillColor: [25, 46, 65] },
     });
     pdf.save(`${count.number}.pdf`);
   });

@@ -2,58 +2,14 @@
 
 import { POOL_SECTIONS, POOL_TYPES, UNITS } from '@shared/constants.js';
 
+import { BRAND_NAVY, brandHeader } from './brand.js';
 import { loadPdf } from './export.js';
 import { date, money, qty } from './format.js';
 import { offerTotals, offerVariables } from './offerCalc.js';
 
-const BRAND = [11, 111, 164];
-
-function header(doc, company, title, subtitle) {
-  const w = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...BRAND);
-  doc.rect(0, 0, w, 5, 'F');
-  let x = 14;
-  if (company.logoDataUrl) {
-    try {
-      const props = doc.getImageProperties(company.logoDataUrl);
-      const h = 18;
-      const lw = Math.min(50, (props.width / props.height) * h);
-      doc.addImage(company.logoDataUrl, 14, 10, lw, h);
-      x = 14 + lw + 4;
-    } catch { /* logo e pavlefshme — vazhdo pa të */ }
-  }
-  doc.setFontSize(16);
-  doc.setTextColor(8, 84, 125);
-  doc.text(company.name || 'SuperPool', x, 17);
-  doc.setFontSize(8);
-  doc.setTextColor(90);
-  const info = [company.tagline, company.address, [company.phone, company.email, company.web].filter(Boolean).join(' · '), company.nipt ? `NIPT: ${company.nipt}` : '']
-    .filter(Boolean);
-  info.forEach((line, i) => doc.text(line, x, 22 + i * 3.8));
-  doc.setFontSize(15);
-  doc.setTextColor(20);
-  doc.text(title, w - 14, 17, { align: 'right' });
-  doc.setFontSize(9);
-  doc.setTextColor(90);
-  doc.text(subtitle, w - 14, 22, { align: 'right' });
-  doc.setTextColor(20);
-  return Math.max(32, 22 + info.length * 3.8 + 4);
-}
-
-function footer(doc, company) {
-  const pages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pages; i += 1) {
-    doc.setPage(i);
-    const w = doc.internal.pageSize.getWidth();
-    const h = doc.internal.pageSize.getHeight();
-    doc.setDrawColor(220);
-    doc.line(14, h - 13, w - 14, h - 13);
-    doc.setFontSize(7.5);
-    doc.setTextColor(120);
-    doc.text(company.offerFooter || company.name || '', 14, h - 8);
-    doc.text(`Faqe ${i} / ${pages}`, w - 14, h - 8, { align: 'right' });
-  }
-}
+// Koka dhe fundi me logon SuperPool; fundi vizatohet automatikisht te doc.save().
+const header = (doc, company, title, subtitle) => Math.max(32, brandHeader(doc, company, title, subtitle));
+const footer = (doc, company) => { doc.brandFooterText = company.offerFooter || ''; };
 
 function ensureSpace(doc, y, needed) {
   if (y + needed > doc.internal.pageSize.getHeight() - 20) {
@@ -67,7 +23,7 @@ function paragraph(doc, title, text, y) {
   if (!text) return y;
   y = ensureSpace(doc, y, 14);
   doc.setFontSize(10.5);
-  doc.setTextColor(...BRAND);
+  doc.setTextColor(...BRAND_NAVY);
   doc.text(title, 14, y);
   doc.setTextColor(20);
   doc.setFontSize(9);
@@ -105,14 +61,14 @@ export async function clientOfferPdf(offer, company, client) {
   y = doc.lastAutoTable.finalY + 5;
 
   doc.setFontSize(10.5);
-  doc.setTextColor(...BRAND);
+  doc.setTextColor(...BRAND_NAVY);
   doc.text('Të dhënat e pishinës', 14, y);
   doc.setTextColor(20);
   autoTable(doc, {
     startY: y + 2,
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 1.6 },
-    headStyles: { fillColor: BRAND },
+    headStyles: { fillColor: BRAND_NAVY },
     head: [['Lloji', 'Përmasat (G × Gj)', 'Thellësia', 'Sipërfaqja', 'Vëllimi i ujit', 'Qarkullimi']],
     body: [[
       POOL_TYPES[offer.poolType] || offer.poolType || '',
@@ -140,7 +96,7 @@ export async function clientOfferPdf(offer, company, client) {
   }
   y = ensureSpace(doc, y, 20);
   doc.setFontSize(10.5);
-  doc.setTextColor(...BRAND);
+  doc.setTextColor(...BRAND_NAVY);
   doc.text('Pajisjet, materialet dhe shërbimet që përfshihen', 14, y);
   doc.setTextColor(20);
   autoTable(doc, {
@@ -148,7 +104,7 @@ export async function clientOfferPdf(offer, company, client) {
     head: [offer.showLinePrices ? ['Përshkrimi', 'Sasia', 'Njësia', 'Çmimi', 'Vlera'] : ['Përshkrimi', 'Sasia', 'Njësia']],
     body,
     styles: { fontSize: 8.5, cellPadding: 1.4 },
-    headStyles: { fillColor: BRAND },
+    headStyles: { fillColor: BRAND_NAVY },
     columnStyles: { 1: { halign: 'right', cellWidth: 20 }, 2: { cellWidth: 18 }, 3: { halign: 'right', cellWidth: 28 }, 4: { halign: 'right', cellWidth: 30 } },
   });
   y = doc.lastAutoTable.finalY + 4;
@@ -172,7 +128,7 @@ export async function clientOfferPdf(offer, company, client) {
     didParseCell: (data) => {
       if (data.row.index === totals.length - 1) {
         data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.fillColor = BRAND;
+        data.cell.styles.fillColor = BRAND_NAVY;
         data.cell.styles.textColor = 255;
       }
     },
@@ -229,7 +185,7 @@ export async function internalEstimatePdf(offer, company, { productsById, suppli
     head: [['Kodi', 'Përshkrimi', 'Formula', 'Sasia', 'Nj.', 'Kosto nj.', 'Kosto', 'Çmimi nj.', 'Vlera', 'Furnitori', 'E lirë / porosit']],
     body,
     styles: { fontSize: 7.5, cellPadding: 1.2 },
-    headStyles: { fillColor: BRAND },
+    headStyles: { fillColor: BRAND_NAVY },
     columnStyles: {
       3: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 10: { halign: 'right' },
     },

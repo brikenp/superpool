@@ -151,11 +151,7 @@ export function Layout() {
     <div className="shell">
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
-          <img src="/icon.svg" alt="" />
-          <div>
-            <div className="name">SuperPool</div>
-            <div className="tag">Menaxhimi i biznesit</div>
-          </div>
+          <img className="brand-logo" src="/logo-superpool.jpg" alt="SuperPool — Pools · Wellness · Aquaparks · Chemicals" />
         </div>
         {NAV.map((group) => {
           const items = group.items.filter(navAllowed(can));
@@ -186,6 +182,7 @@ export function Layout() {
       <div className="main">
         <header className="topbar">
           <button type="button" className="btn small menu-btn" onClick={() => setOpen(true)} aria-label="Hap menynë"><Menu size={18} /></button>
+          <Link to="/" className="logo-plate topbar-logo" aria-label="SuperPool — kreu"><img src="/logo-superpool.jpg" alt="SuperPool" /></Link>
           <button type="button" className="search-trigger" onClick={() => setPalette(true)} aria-label="Kërko">
             <Search size={16} />
             <span className="label">Kërko faqe, artikuj, klientë…</span>
@@ -206,6 +203,10 @@ export function Layout() {
         </header>
         <main className="content">
           <Outlet />
+          <footer className="app-footer">
+            <span className="logo-plate"><img src="/logo-superpool.jpg" alt="SuperPool" /></span>
+            <span>© {new Date().getFullYear()} SuperPool · Sistemi i menaxhimit</span>
+          </footer>
         </main>
       </div>
       {palette && <CommandPalette onClose={() => setPalette(false)} />}

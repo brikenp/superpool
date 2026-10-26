@@ -44,7 +44,7 @@ export default function SaleDetail() {
       body: sale.lines.map((l) => [l.name, `${qty(l.qty)} ${UNITS[l.unit] || ''}`, money(l.unitPrice), money(l.total)]),
       foot: [['Totali me TVSH', '', '', money(sale.total)]],
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [11, 111, 164] },
+      headStyles: { fillColor: [25, 46, 65] },
       footStyles: { fillColor: [235, 242, 247], textColor: 20 },
     });
     d.setFontSize(7);

@@ -39,8 +39,8 @@
   --info-bg: #f0f9ff;
   --info-border: #bae6fd;
 
-  --sidebar-bg: #0b1424;
-  --sidebar-bg-2: #0f1c33;
+  --sidebar-bg: #111f2d;
+  --sidebar-bg-2: #192e41; /* ngjyra e sfondit të logos */
   --sidebar-text: #a9b8cc;
   --sidebar-text-strong: #f1f5f9;
   --sidebar-hover: rgba(148, 163, 184, 0.1);
@@ -95,8 +95,8 @@
   --info: #38bdf8;
   --info-bg: rgba(56, 189, 248, 0.08);
   --info-border: rgba(56, 189, 248, 0.3);
-  --sidebar-bg: #070b14;
-  --sidebar-bg-2: #0b1222;
+  --sidebar-bg: #0c1622;
+  --sidebar-bg-2: #192e41;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
   --ring: 0 0 0 3px rgba(56, 189, 248, 0.35);
@@ -129,7 +129,8 @@ svg.lucide { flex-shrink: 0; }
   scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
 }
 .sidebar .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; color: var(--sidebar-text-strong); }
-.sidebar .brand img { width: 34px; height: 34px; border-radius: 10px; box-shadow: 0 6px 16px rgba(6, 182, 212, 0.35); }
+.sidebar .brand { padding: 0 0 14px; margin: -4px -4px 4px; }
+.sidebar .brand .brand-logo { display: block; width: 100%; height: auto; border-radius: 8px; }
 .sidebar .brand .name { font-weight: 700; font-size: 1.08rem; letter-spacing: -0.02em; line-height: 1.1; }
 .sidebar .brand .tag { font-size: 0.72rem; color: var(--sidebar-text); font-weight: 500; }
 .nav-group { margin-top: 14px; }
@@ -172,6 +173,7 @@ kbd { font-family: var(--font); font-size: 0.72rem; font-weight: 600; color: var
 .user-chip .who .r { font-size: 0.74rem; color: var(--muted); }
 .content { padding: 24px 28px 48px; max-width: 1480px; width: 100%; margin: 0 auto; }
 .btn.menu-btn { display: none; }
+.topbar-logo { display: none; }
 .backdrop { display: none; }
 
 @media (max-width: 1000px) {
@@ -179,6 +181,7 @@ kbd { font-family: var(--font); font-size: 0.72rem; font-weight: 600; color: var
   .sidebar.open { transform: none; }
   .backdrop.open { display: block; position: fixed; inset: 0; background: rgba(2, 6, 23, 0.5); z-index: 50; backdrop-filter: blur(2px); }
   .btn.menu-btn { display: inline-flex; }
+  .topbar-logo { display: inline-flex; height: 34px; padding: 4px 8px; border-radius: 8px; }
   .content { padding: 16px 14px 90px; }
   .topbar { padding: 0 12px; }
   .search-trigger { min-width: 0; }
@@ -414,7 +417,6 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 }
 .auth-hero .waves { position: absolute; left: -10%; right: -10%; bottom: -30px; opacity: 0.35; }
 .auth-hero .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.25rem; color: #fff; position: relative; }
-.auth-hero .brand img { width: 42px; height: 42px; border-radius: 12px; }
 .auth-hero h2 { color: #fff; font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; max-width: 480px; margin: 0 0 14px; position: relative; }
 .auth-hero p { color: #bae6fd; max-width: 460px; position: relative; }
 .auth-hero ul { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 10px; position: relative; }
@@ -424,7 +426,6 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .auth-card { width: 100%; max-width: 380px; }
 .auth-card h1 { font-size: 1.6rem; }
 .auth-card .logo { display: none; align-items: center; gap: 10px; margin-bottom: 22px; font-size: 1.3rem; font-weight: 700; }
-.auth-card .logo img { width: 40px; border-radius: 10px; }
 @media (max-width: 900px) {
   .auth-page { grid-template-columns: 1fr; }
   .auth-hero { display: none; }
@@ -492,3 +493,15 @@ button.nav-group-title {
 button.nav-group-title:hover { color: var(--sidebar-text-strong); }
 button.nav-group-title .chev { transition: transform 0.15s; opacity: 0.7; }
 .nav-group.collapsed button.nav-group-title .chev { transform: rotate(-90deg); }
+
+/* Logoja SuperPool (sfond blu i errët): mbahet gjithmonë mbi sfondin e saj, pa u ndryshuar. */
+.logo-plate { display: inline-flex; background: #192e41; border-radius: 10px; padding: 6px 10px; line-height: 0; }
+.logo-plate img { height: 100%; width: auto; display: block; }
+.auth-card .logo .logo-plate { height: 64px; }
+.auth-hero .brand .hero-logo { width: min(360px, 80%); height: auto; border-radius: 10px; }
+.app-footer {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 32px; padding-top: 16px;
+  border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem;
+}
+.app-footer .logo-plate { height: 34px; padding: 4px 8px; border-radius: 8px; }
+@media print { .app-footer { display: none; } }

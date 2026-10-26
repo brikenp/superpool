@@ -1,5 +1,7 @@
 // Eksport në Excel dhe PDF. Libraritë ngarkohen vetëm kur nevojiten (lazy import).
 
+import { BRAND_NAVY, brandFooter, brandHeader, loadLogo } from './brand.js';
+
 function download(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -21,12 +23,21 @@ export async function exportExcel({ title, columns, rows, filters = [] }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'SuperPool';
   const ws = wb.addWorksheet(String(title).slice(0, 30) || 'Raport');
+  // Shiriti me logon SuperPool (sfondi i njëjtë me atë të logos).
+  const logo = await loadLogo();
+  const band = ws.addRow([]);
+  band.height = 54;
+  for (let i = 1; i <= Math.max(columns.length, 6); i += 1) {
+    band.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF192E41' } };
+  }
+  if (logo) ws.addImage(wb.addImage({ base64: logo, extension: 'jpeg' }), { tl: { col: 0.1, row: 0.1 }, ext: { width: 259, height: 64 } });
+  ws.addRow([]);
   ws.addRow([title]).font = { bold: true, size: 14 };
   filters.forEach((f) => ws.addRow([f]));
   ws.addRow([]);
   const header = ws.addRow(columns.map((c) => c.label));
   header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  header.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B6FA4' } }; });
+  header.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF192E41' } }; });
   for (const row of rows) {
     const r = ws.addRow(columns.map((c) => {
       const v = c.value(row);
@@ -47,7 +58,18 @@ export async function exportExcel({ title, columns, rows, filters = [] }) {
 }
 
 export async function loadPdf() {
-  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  const [{ jsPDF: Base }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable'), loadLogo()]);
+  // Çdo PDF i sistemit del me fundin e markës SuperPool (logo + numri i faqes).
+  // (jsPDF kthen objektin e vet nga konstruktori, prandaj mbështillet me funksion dhe jo me "extends".)
+  function jsPDF(...opts) {
+    const doc = new Base(...opts);
+    const save = doc.save.bind(doc);
+    doc.save = (...args) => {
+      brandFooter(doc, doc.brandFooterText);
+      return save(...args);
+    };
+    return doc;
+  }
   return { jsPDF, autoTable };
 }
 
@@ -62,15 +84,8 @@ export async function exportPdf({ title, columns, rows, filters = [], company = 
   const { jsPDF, autoTable } = await loadPdf();
   const landscape = columns.length > 6;
   const doc = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  let y = brandHeader(doc, company, title, new Date().toLocaleString('sq-AL'));
   doc.setFontSize(9);
-  doc.setTextColor(100);
-  doc.text(company.name || 'SuperPool', 14, 12);
-  doc.text(new Date().toLocaleString('sq-AL'), doc.internal.pageSize.getWidth() - 14, 12, { align: 'right' });
-  doc.setTextColor(20);
-  doc.setFontSize(14);
-  doc.text(title, 14, 21);
-  doc.setFontSize(9);
-  let y = 27;
   filters.forEach((f) => { doc.text(f, 14, y); y += 5; });
   autoTable(doc, {
     startY: y + 1,
@@ -78,14 +93,9 @@ export async function exportPdf({ title, columns, rows, filters = [], company = 
     body: rows.map((r) => columns.map((c) => fmtCell(c, c.value(r)))),
     foot: totals ? [columns.map((c, i) => (i === 0 ? 'Totali' : totals[c.label] !== undefined ? fmtCell(c, totals[c.label]) : ''))] : undefined,
     styles: { fontSize: 8, cellPadding: 1.6 },
-    headStyles: { fillColor: [11, 111, 164] },
+    headStyles: { fillColor: BRAND_NAVY },
     footStyles: { fillColor: [235, 242, 247], textColor: 20 },
     columnStyles: Object.fromEntries(columns.map((c, i) => [i, c.type === 'money' || c.type === 'number' ? { halign: 'right' } : {}])),
-    didDrawPage: () => {
-      const page = doc.internal.getNumberOfPages();
-      doc.setFontSize(8);
-      doc.text(`Faqe ${page}`, doc.internal.pageSize.getWidth() - 14, doc.internal.pageSize.getHeight() - 8, { align: 'right' });
-    },
   });
   doc.save(`${safeName(title)}.pdf`);
 }

@@ -81,7 +81,7 @@ export default function PurchaseOrderDetail() {
       body: (po.lines || []).map((l, i) => [i + 1, l.code, l.name, UNITS[l.unit] || l.unit, qty(l.qty), money(l.unitPrice), money(l.qty * l.unitPrice)]),
       foot: [['', '', 'Totali (pa TVSH)', '', '', '', money(poTotal(po))]],
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [11, 111, 164] },
+      headStyles: { fillColor: [25, 46, 65] },
       footStyles: { fillColor: [235, 242, 247], textColor: 20 },
     });
     if (po.notes) d.text(d.splitTextToSize(`Shënime: ${po.notes}`, 180), 14, d.lastAutoTable.finalY + 8);

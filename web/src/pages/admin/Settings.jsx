@@ -21,23 +21,6 @@ const TEXTS = [
   ['offerFooter', 'Teksti në fund të ofertës'],
 ];
 
-/** Zvogëlon logon dhe e ruan si data URL (përdoret në PDF pa varësi nga Storage/CORS). */
-function resizeImage(file, max = 500) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/png'));
-    };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
-  });
-}
-
 export default function Settings() {
   const { company } = useData();
   const [v, setV] = useState(null);
@@ -46,7 +29,7 @@ export default function Settings() {
   if (!v) return null;
   const save = () => run(() => setDoc(doc(db, 'settings', 'company'), {
     ...Object.fromEntries([...FIELDS, ...TEXTS].map(([k]) => [k, v[k] || ''])),
-    vatPct: toNumber(v.vatPct), offerValidityDays: toNumber(v.offerValidityDays), logoDataUrl: v.logoDataUrl || '',
+    vatPct: toNumber(v.vatPct), offerValidityDays: toNumber(v.offerValidityDays),
   }, { merge: true }), 'Të dhënat u ruajtën.');
 
   return (
@@ -57,9 +40,8 @@ export default function Settings() {
           {FIELDS.map(([k, l]) => <Field key={k} label={l}><input value={v[k] || ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></Field>)}
           <Field label="TVSH (%)"><input className="num" type="number" value={v.vatPct ?? 20} onChange={(e) => setV({ ...v, vatPct: e.target.value })} /></Field>
           <Field label="Vlefshmëria e ofertës (ditë)"><input className="num" type="number" value={v.offerValidityDays ?? 30} onChange={(e) => setV({ ...v, offerValidityDays: e.target.value })} /></Field>
-          <Field label="Logoja (PNG/JPG)">
-            <input type="file" accept="image/*" onChange={(e) => e.target.files[0] && run(async () => setV({ ...v, logoDataUrl: await resizeImage(e.target.files[0]) }))} />
-            {v.logoDataUrl && <img src={v.logoDataUrl} alt="Logo" style={{ maxHeight: 60, marginTop: 8, alignSelf: 'flex-start' }} />}
+          <Field label="Logoja" hint="Logoja SuperPool përdoret në menu, në faqen e hyrjes dhe në të gjitha PDF-të (fatura, oferta, fletë prodhimi, raporte).">
+            <span className="logo-plate" style={{ height: 56, alignSelf: 'flex-start' }}><img src="/logo-superpool.jpg" alt="SuperPool" /></span>
           </Field>
         </div>
       </Card>

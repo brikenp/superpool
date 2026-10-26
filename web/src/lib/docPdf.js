@@ -2,31 +2,13 @@
 
 import { CONDITIONS, MOVEMENT_KINDS, MOVEMENT_STATUS, UNITS } from '@shared/constants.js';
 
+import { brandHeader } from './brand.js';
 import { loadPdf } from './export.js';
 import { date, money, qty } from './format.js';
 
+/** Koka e dokumenteve (me logon SuperPool). */
 export function companyHeader(doc, company, title, subtitle) {
-  const w = doc.internal.pageSize.getWidth();
-  doc.setFillColor(11, 111, 164);
-  doc.rect(0, 0, w, 4, 'F');
-  doc.setFontSize(15);
-  doc.setTextColor(11, 84, 125);
-  doc.text(company.name || 'SuperPool', 14, 16);
-  doc.setFontSize(8);
-  doc.setTextColor(90);
-  const info = [company.tagline, company.address, [company.phone, company.email].filter(Boolean).join(' · '), company.nipt ? `NIPT: ${company.nipt}` : '']
-    .filter(Boolean);
-  info.forEach((line, i) => doc.text(line, 14, 21 + i * 3.8));
-  doc.setFontSize(14);
-  doc.setTextColor(20);
-  doc.text(title, w - 14, 16, { align: 'right' });
-  if (subtitle) {
-    doc.setFontSize(9);
-    doc.setTextColor(90);
-    doc.text(subtitle, w - 14, 21, { align: 'right' });
-  }
-  doc.setTextColor(20);
-  return 21 + info.length * 3.8 + 4;
+  return brandHeader(doc, company, title, subtitle);
 }
 
 export async function movementPdf({ movement, company, costs, extra = {} }) {
@@ -60,9 +42,11 @@ export async function movementPdf({ movement, company, costs, extra = {} }) {
 
   const showCond = movement.kind === 'return';
   const showCost = Boolean(costs);
-  const head = ['#', 'Kodi', 'Artikulli', 'Njësia', 'Sasia', showCond && 'Gjendja', showCost && 'Kosto', showCost && 'Vlera', 'Shënim'].filter(Boolean);
+  const isProd = movement.kind === 'production';
+  const head = ['#', 'Kodi', 'Artikulli', 'Njësia', 'Sasia', isProd && 'Lëvizja', showCond && 'Gjendja', showCost && 'Kosto', showCost && 'Vlera', 'Shënim'].filter(Boolean);
   const body = (movement.lines || []).map((l, i) => [
     i + 1, l.code, l.name, UNITS[l.unit] || l.unit, qty(l.qty),
+    isProd && (l.sourceId === 'v_production' ? 'Prodhuar (hyn)' : 'Material (del)'),
     showCond && CONDITIONS[l.condition || 'good'],
     showCost && money(costs[i] || 0),
     showCost && money((costs[i] || 0) * l.qty),
@@ -73,7 +57,7 @@ export async function movementPdf({ movement, company, costs, extra = {} }) {
     head: [head],
     body,
     styles: { fontSize: 8.5, cellPadding: 1.5 },
-    headStyles: { fillColor: [11, 111, 164] },
+    headStyles: { fillColor: [25, 46, 65] },
   });
   y = doc.lastAutoTable.finalY + 6;
   if (movement.notes) {

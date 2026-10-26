@@ -48,7 +48,7 @@ export default function Login() {
       <AuthHero />
       <div className="auth-side">
         <form className="auth-card" onSubmit={submit}>
-          <div className="logo"><img src="/icon.svg" alt="" />SuperPool</div>
+          <div className="logo"><span className="logo-plate"><img src="/logo-superpool.jpg" alt="SuperPool" /></span></div>
           <h1>Mirë se vini</h1>
           <p className="muted" style={{ marginTop: 0, marginBottom: 22 }}>Hyni me llogarinë që ju ka krijuar administratori.</p>
           {error && <div className="alert error">{error}</div>}
@@ -73,7 +73,7 @@ export default function Login() {
 export function AuthHero() {
   return (
     <div className="auth-hero">
-      <div className="brand"><img src="/icon.svg" alt="" />SuperPool</div>
+      <div className="brand"><img className="hero-logo" src="/logo-superpool.jpg" alt="SuperPool" /></div>
       <div>
         <h2>Magazina, projektet dhe ofertat në një vend.</h2>
         <p>Ndiqni çdo material nga hyrja në magazinë deri te përdorimi në kantier ose shitja te klienti.</p>
