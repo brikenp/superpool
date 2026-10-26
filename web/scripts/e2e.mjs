@@ -264,24 +264,41 @@ async function main() {
     recipe: [{ productId: chlor, qty: 0.5 }, { productId: pipe, qty: 2 }],
   })).id;
   const [pipe0, chlor0] = [await stockOf(mag.db, 'main', pipe), await stockOf(mag.db, 'main', chlor)];
+  // Fleta e prodhimit: 3 kg aditiv në magazinë.
+  await denied(gerti.call('confirmProduction', { production: { locationId: 'main', items: [{ productId: adt, qty: 1 }] } }), 'Gerti prodhon');
+  await denied(mag.call('confirmProduction', { production: { locationId: 'main', items: [{ productId: pipe, qty: 1 }] } }), 'prodhim i artikullit pa recetë');
+  const pr = await mag.call('confirmProduction', { production: { locationId: 'main', items: [{ productId: adt, qty: 3 }] } });
+  assert.equal(await stockOf(mag.db, 'main', adt), 3);
+  assert.equal(await stockOf(mag.db, 'main', pipe), pipe0 - 6);
+  assert.equal(await stockOf(mag.db, 'main', chlor), chlor0 - 1.5);
+  const adtCost = (await getDoc(doc(admin.db, 'productCosts', adt))).data().avgCost;
+  assert.ok(adtCost > 0);
+  ok(`fleta e prodhimit ${pr.number}: materialet dalin, 3 kg aditiv hyjnë në stok (kosto ${adtCost} L/kg)`);
+
+  // Shitja e 4 kg: 3 nga gjendja, 1 prodhohet automatikisht.
   const short = await denied(admin.call('confirmSale', { sale: { clientId: client.id, locationId: 'main', paymentMethod: 'credit', lines: [{ productId: adt, qty: 100, unitPrice: 900 }] } }), 'prodhim pa materiale');
   assert.match(short.message, /pamjaftueshëm/);
   const adSale = await admin.call('confirmSale', { sale: { clientId: client.id, locationId: 'main', paymentMethod: 'credit', lines: [{ productId: adt, qty: 4, unitPrice: 900 }, { productId: chlor, qty: 1, unitPrice: 2500 }] } });
   assert.match(adSale.productionNumber, /^PRO-/);
+  assert.equal(await stockOf(mag.db, 'main', adt), 0);
   assert.equal(await stockOf(mag.db, 'main', pipe), pipe0 - 8);
   assert.equal(await stockOf(mag.db, 'main', chlor), chlor0 - 2 - 1);
-  assert.equal(await stockOf(mag.db, 'main', adt), 0);
   const adSaleDoc = (await getDoc(doc(admin.db, 'sales', adSale.id))).data();
   const prodMov = (await getDoc(doc(admin.db, 'movements', adSaleDoc.productionId))).data();
   assert.equal(prodMov.kind, 'production');
+  assert.equal(prodMov.produced[0].qty, 1);
   assert.equal(prodMov.invoiceNumber, adSaleDoc.invoiceNumber);
   assert.equal((await getDoc(doc(admin.db, 'products', chlor))).data().qtyMain, chlor0 - 3);
   await denied(mag.call('cancelMovement', { id: adSaleDoc.productionId, reason: 'x' }), 'anulim i prodhimit veç shitjes');
   await mag.call('cancelSale', { id: adSale.id, reason: 'test' });
+  assert.equal(await stockOf(mag.db, 'main', adt), 3);
+  assert.equal(await stockOf(mag.db, 'main', pipe), pipe0 - 6);
+  assert.equal((await getDoc(doc(admin.db, 'movements', adSaleDoc.productionId))).data().status, 'cancelled');
+  await mag.call('cancelMovement', { id: pr.id, reason: 'test' });
+  assert.equal(await stockOf(mag.db, 'main', adt), 0);
   assert.equal(await stockOf(mag.db, 'main', pipe), pipe0);
   assert.equal(await stockOf(mag.db, 'main', chlor), chlor0);
-  assert.equal((await getDoc(doc(admin.db, 'movements', adSaleDoc.productionId))).data().status, 'cancelled');
-  ok(`artikulli me recetë: shitja krijon ${adSale.productionNumber} që shkarkon materialet; anulimi i kthen`);
+  ok(`shitja përdor gjendjen e aditivit dhe prodhon vetëm sasinë që mungon (${adSale.productionNumber}); anulimet kthejnë gjithçka`);
 
   // --- Faturë manuale: paradhënie e projektit ---
   const adv = await addDoc(collection(admin.db, 'invoices'), {

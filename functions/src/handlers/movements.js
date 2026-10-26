@@ -16,7 +16,7 @@ const WAREHOUSE_KINDS = new Set(['purchase', 'adjustment', 'agent_issue', 'custo
 function assertCanCreate(user, kind) {
   requireCap(user, CAPS.MOVEMENTS_CREATE);
   if (kind === 'sale') fail('Shitjet regjistrohen nga moduli i shitjeve.', 'invalid-argument');
-  if (kind === 'production') fail('Fletëdaljet e prodhimit krijohen automatikisht nga shitja.', 'invalid-argument');
+  if (kind === 'production') fail('Prodhimi regjistrohet nga «Fletë prodhimi».', 'invalid-argument');
   if (WAREHOUSE_KINDS.has(kind)) requireCap(user, CAPS.INVENTORY_MANAGE, CAPS.MOVEMENTS_APPROVE);
   if (!user.caps.has(CAPS.MOVEMENTS_APPROVE) && !user.caps.has(CAPS.INVENTORY_MANAGE) && !FIELD_KINDS.has(kind)) {
     fail('Nuk keni të drejtë për këtë lloj lëvizjeje.', 'permission-denied');
@@ -220,7 +220,9 @@ export async function cancelMovementsTx(tx, user, ids, reason, { allowSale = fal
     if (!snap.exists) fail('Lëvizja nuk ekziston.', 'not-found');
     const existing = snap.data();
     if (existing.status === 'cancelled') fail('Lëvizja është anuluar më parë.');
-    if (['sale', 'production'].includes(existing.kind) && !allowSale) fail('Shitjet dhe prodhimi anulohen nga moduli i shitjeve.');
+    if ((existing.kind === 'sale' || (existing.kind === 'production' && existing.saleId)) && !allowSale) {
+      fail('Shitjet (dhe prodhimi i krijuar nga shitja) anulohen nga moduli i shitjeve.');
+    }
     const item = { id, ref, existing };
     if (existing.status === 'confirmed') {
       item.movement = sanitizeMovement(existing, { trusted: true });

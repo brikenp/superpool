@@ -215,7 +215,8 @@ export function writeEffects(tx, movementId, movement, ctx, plan, direction) {
     tx.set(db.doc(`productCosts/${productId}`), update, { merge: true });
   }
 
-  const total = round2(movement.lines.reduce((s, l, i) => s + l.qty * plan.lineCosts[i], 0));
+  // Te prodhimi, vlera e dokumentit = materialet që dalin (artikujt e prodhuar janë e njëjta vlerë që hyn).
+  const total = round2(movement.lines.reduce((s, l, i) => (l.sourceId === LOC.PRODUCTION ? s : s + l.qty * plan.lineCosts[i]), 0));
   if (direction === 1) {
     tx.set(db.doc(`movementCosts/${movementId}`), {
       kind: movement.kind,

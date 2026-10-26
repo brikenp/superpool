@@ -84,13 +84,16 @@ export function planMovement(movement, ctx, direction = 1) {
   };
 
   const srcKind = locations[movement.sourceId]?.kind;
+  // Malli që hyn me kosto të re: blerjet, kthimet nga klienti dhe artikujt e prodhuar.
+  const costIn = (line) => movement.kind === 'purchase' || movement.kind === 'customer_return'
+    || (movement.kind === 'production' && line.sourceId === LOC.PRODUCTION);
 
   for (const line of movement.lines) {
     const qty = Number(line.qty);
     const product = products[line.productId] || {};
     const dest = lineDestination(movement, line);
     let unitCost;
-    if (movement.kind === 'purchase' || movement.kind === 'customer_return') {
+    if (costIn(line)) {
       unitCost = Number(line.unitCost ?? product.avgCost ?? product.purchasePrice ?? 0) || 0;
     } else if (direction === -1 && line.unitCost != null) {
       unitCost = Number(line.unitCost);
@@ -135,9 +138,10 @@ export function planMovement(movement, ctx, direction = 1) {
 
   // Kosto mesatare e ponderuar: ndryshon vetëm kur hyn mall nga jashtë me kosto të re.
   const avgCosts = {};
-  if (movement.kind === 'purchase' || movement.kind === 'customer_return') {
+  if (movement.lines.some(costIn)) {
     const byProduct = {};
     movement.lines.forEach((line, i) => {
+      if (!costIn(line)) return;
       const b = (byProduct[line.productId] ||= { qty: 0, value: 0 });
       b.qty += Number(line.qty);
       b.value += Number(line.qty) * lineCosts[i];
@@ -220,6 +224,33 @@ export function explodeRecipes(lines, products) {
     }
   }
   return Object.entries(out).map(([productId, qty]) => ({ productId, qty }));
+}
+
+/**
+ * Rreshtat e një fletë prodhimi: materialet dalin nga vendi drejt "Prodhim",
+ * artikujt e prodhuar hyjnë nga "Prodhim" në të njëjtin vend, me koston e materialeve.
+ * items: [{ productId, qty }] (artikuj me recetë)
+ */
+export function productionLines(items, products, locationId) {
+  const components = explodeRecipes(items, products).map((c) => ({ productId: c.productId, qty: c.qty, condition: 'good', note: '' }));
+  const outputs = items.filter((i) => Number(i.qty) > 0).map((i) => ({
+    productId: i.productId,
+    qty: round3(Number(i.qty)),
+    condition: 'good',
+    note: '',
+    sourceId: LOC.PRODUCTION,
+    destId: locationId,
+    unitCost: recipeUnitCost(products[i.productId], products),
+  }));
+  return [...components, ...outputs];
+}
+
+/** Kosto e materialeve për 1 njësi të artikullit me recetë. */
+export function recipeUnitCost(product, products) {
+  return round2((product?.recipe || []).reduce((s, c) => {
+    const p = products[c.productId] || {};
+    return s + Number(c.qty || 0) * Number(p.avgCost || p.purchasePrice || 0);
+  }, 0));
 }
 
 export const isComposite = (product) => Array.isArray(product?.recipe) && product.recipe.some((c) => c.productId && Number(c.qty) > 0);

@@ -90,7 +90,7 @@ export default function ProductDetail() {
       </div>
       {product.recipe?.length > 0 && (
         <Card title={`Receta — materialet për 1 ${unit}`}>
-          <p className="muted" style={{ marginTop: 0 }}>Kur shitet ky artikull, materialet shkarkohen automatikisht nga magazina me fletëdalje prodhimi.</p>
+          <p className="muted" style={{ marginTop: 0 }}>Prodhohet me «Fletë prodhimi»; nëse në shitje nuk mjafton gjendja, sasia që mungon prodhohet automatikisht.</p>
           <ul className="list-plain">
             {product.recipe.map((c) => {
               const m = productsById[c.productId];

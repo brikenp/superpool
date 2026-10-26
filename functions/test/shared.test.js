@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { evaluateFormula, formulaError, poolVariables } from '../src/shared/formula.js';
 import { hasCap } from '../src/shared/roles.js';
 import {
-  explodeRecipes, isComposite, openReserved, planMovement, projectMaterialSummary, projectResult, stockKey, validateMovement,
+  explodeRecipes, isComposite, openReserved, productionLines, planMovement, projectMaterialSummary, projectResult, stockKey, validateMovement,
 } from '../src/shared/stock.js';
 
 const locations = {
@@ -170,9 +170,14 @@ test('receta: materialet e artikullit të përbërë dalin nga magazina, artikul
   assert.deepEqual(prod.errors.length, 1); // m2: 20 < 22
   assert.equal(prod.stockDeltas[stockKey('main', 'm1')], -5.5);
 
-  // Shitja: rreshti i përbërë vjen nga "Prodhim" (virtual), pa prekur stokun e magazinës.
-  const sale = planMovement({ kind: 'sale', sourceId: 'main', destId: 'v_customer', lines: [{ productId: 'adit', qty: 10, sourceId: 'v_production' }] },
-    { locations: locs, stock: {}, products }, 1);
-  assert.equal(sale.errors.length, 0);
-  assert.deepEqual(sale.stockDeltas, {});
+  // Fleta e prodhimit: materialet dalin, artikulli i prodhuar hyn në stok me koston e materialeve.
+  const lines = productionLines([{ productId: 'adit', qty: 4 }], products, 'main');
+  const pl = planMovement({ kind: 'production', sourceId: 'main', destId: 'v_production', lines },
+    { locations: locs, stock: { [stockKey('main', 'm1')]: 6, [stockKey('main', 'm2')]: 20 }, products: { ...products, adit: { ...products.adit, qtyTotal: 2, avgCost: 5 } } }, 1);
+  assert.equal(pl.errors.length, 0);
+  assert.equal(pl.stockDeltas[stockKey('main', 'adit')], 4);
+  assert.equal(pl.stockDeltas[stockKey('main', 'm2')], -8);
+  assert.equal(lines.at(-1).unitCost, 0.5 * 4 + 2 * 1);
+  assert.equal(pl.avgCosts.adit, round2((2 * 5 + 4 * 4) / 6));
 });
+const round2 = (n) => Math.round(n * 100) / 100;

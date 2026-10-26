@@ -157,7 +157,7 @@ export function ProductForm({ product, onClose, onSaved }) {
           {composite && (
             <>
               <p className="muted" style={{ margin: '8px 0', fontSize: '0.85rem' }}>
-                Sasia e çdo materiali për 1 {UNITS[v.unit] || v.unit} {v.name || 'artikull'}. Kur shitet ky artikull, materialet shkarkohen automatikisht nga magazina me një fletëdalje prodhimi të lidhur me faturën.
+                Sasia e çdo materiali për 1 {UNITS[v.unit] || v.unit} {v.name || 'artikull'}. Prodhimi regjistrohet me «Fletë prodhimi» (materialet dalin, artikulli hyn në stok). Kur shitet më shumë sesa ka gjendje, sasia që mungon prodhohet automatikisht me fletë prodhimi të lidhur me faturën.
               </p>
               <div className="table-wrap">
                 <table className="table">

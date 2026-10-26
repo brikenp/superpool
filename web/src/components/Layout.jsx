@@ -1,6 +1,6 @@
 import { collection, query, where } from 'firebase/firestore';
 import {
-  ArrowLeftRight, Banknote, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical,
+  ArrowLeftRight, Banknote, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
   FileCheck, FilePen, FilePlus, FileX, Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
   Scale, Search, Send, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
   Warehouse, Waves, Wrench,
@@ -39,6 +39,7 @@ export const NAV = [
     { to: '/levizjet?seksioni=perdorimi', label: 'Përdorimi në projekte', icon: Wrench, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
     { to: '/levizjet?seksioni=kthimet', label: 'Kthimet', icon: Undo2, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
     { to: '/levizjet?seksioni=transferimet', label: 'Transferimet', icon: ArrowLeftRight, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet?seksioni=prodhimi', label: 'Fletët e prodhimit', icon: FlaskRound, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
     { to: '/levizjet?seksioni=humbjet', label: 'Dëmtime & rregullime', icon: TriangleAlert, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
     { to: '/levizjet', label: 'Të gjitha lëvizjet', icon: List, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
   ] },

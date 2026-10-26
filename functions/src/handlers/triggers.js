@@ -76,7 +76,7 @@ function diff(before = {}, after = {}) {
     if (SKIP_FIELDS.has(k)) continue;
     const a = JSON.stringify(before[k] ?? null);
     const b = JSON.stringify(after[k] ?? null);
-    if (a !== b) out[k] = [before[k] ?? null, after[k] ?? null];
+    if (a !== b) out[k] = { para: before[k] ?? null, pas: after[k] ?? null }; // jo [a, b]: Firestore s'pranon lista brenda listave
   }
   return out;
 }

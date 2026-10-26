@@ -29,11 +29,12 @@ export const movementColumns = (extra = []) => [
 export const MOVEMENT_SECTIONS = {
   miratim: { title: 'Lëvizjet për miratim', subtitle: 'Daljet, kthimet, humbjet dhe transferimet e regjistruara nga terreni që presin miratimin.', kinds: null, status: 'pending' },
   hyrjet: { title: 'Hyrjet nga blerja', subtitle: 'Fletëhyrjet nga furnitorët (faturat e blerjes) dhe kthimet nga klientët.', kinds: ['purchase', 'customer_return'], create: 'purchase', createLabel: 'Fletëhyrje e re' },
-  daljet: { title: 'Daljet', subtitle: 'Materialet që dalin nga magazina drejt automjeteve, kantiereve, shitësit të kimikateve dhe për prodhim (receta).', kinds: ['issue', 'agent_issue', 'production'], create: 'issue', createLabel: 'Dalje e re' },
+  daljet: { title: 'Daljet', subtitle: 'Materialet që dalin nga magazina drejt automjeteve, kantiereve ose shitësit të kimikateve.', kinds: ['issue', 'agent_issue'], create: 'issue', createLabel: 'Dalje e re' },
   dorezimet: { title: 'Dorëzimet në kantier', subtitle: 'Materialet e shkarkuara nga automjeti në kantier.', kinds: ['delivery'], create: 'delivery', createLabel: 'Dorëzim i ri' },
   perdorimi: { title: 'Përdorimi në projekte', subtitle: 'Materialet e përdorura realisht në projekte.', kinds: ['consumption'], create: 'consumption', createLabel: 'Regjistro përdorim' },
   kthimet: { title: 'Kthimet', subtitle: 'Kthimet në magazinë nga automjetet/kantieret dhe kthimet te furnitorët.', kinds: ['return', 'supplier_return'], create: 'return', createLabel: 'Kthim i ri' },
   transferimet: { title: 'Transferimet', subtitle: 'Lëvizjet ndërmjet magazinave, automjeteve dhe kantiereve.', kinds: ['transfer'], create: 'transfer', createLabel: 'Transferim i ri' },
+  prodhimi: { title: 'Fletët e prodhimit', subtitle: 'Prodhimi i artikujve me recetë (p.sh. Aditivi): materialet dalin nga magazina dhe artikulli i prodhuar hyn në stok. Krijohen edhe automatikisht kur shitet më shumë sesa ka gjendje.', kinds: ['production'], createTo: '/prodhimi/i-ri', createLabel: 'Fletë prodhimi e re', createCaps: [CAPS.INVENTORY_MANAGE, CAPS.MOVEMENTS_APPROVE] },
   humbjet: { title: 'Dëmtime & rregullime', subtitle: 'Mallrat e dëmtuara ose të humbura dhe rregullimet e inventarit.', kinds: ['loss', 'adjustment'], create: 'loss', createLabel: 'Regjistro dëmtim' },
 };
 
@@ -75,8 +76,8 @@ function MovementsList({ section }) {
         breadcrumb={section && <Link to="/levizjet">Lëvizjet e mallit</Link>}
         title={section?.title || 'Të gjitha lëvizjet'}
         subtitle={section?.subtitle || 'Fletëhyrje, fletëdalje, dorëzime në kantier, përdorime, kthime, humbje dhe rregullime.'}
-        actions={can(CAPS.MOVEMENTS_CREATE) && (section?.create
-          ? <Link className="btn primary" to={`/levizjet/re/${section.create}`}><Plus size={16} /> {section.createLabel}</Link>
+        actions={can(...(section?.createCaps || [CAPS.MOVEMENTS_CREATE])) && (section?.create || section?.createTo
+          ? <Link className="btn primary" to={section.createTo || `/levizjet/re/${section.create}`}><Plus size={16} /> {section.createLabel}</Link>
           : (
             <select className="btn primary" value="" onChange={(e) => e.target.value && navigate(`/levizjet/re/${e.target.value}`)} style={{ width: 'auto' }}>
               <option value="">+ Dokument i ri…</option>

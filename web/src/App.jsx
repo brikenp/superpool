@@ -21,6 +21,7 @@ const Stock = page(() => import('./pages/inventory/Stock.jsx'));
 const Movements = page(() => import('./pages/inventory/Movements.jsx'));
 const MovementForm = page(() => import('./pages/inventory/MovementForm.jsx'));
 const MovementDetail = page(() => import('./pages/inventory/MovementDetail.jsx'));
+const ProductionForm = page(() => import('./pages/inventory/ProductionForm.jsx'));
 const Counts = page(() => import('./pages/inventory/Counts.jsx'));
 const CountDetail = page(() => import('./pages/inventory/CountDetail.jsx'));
 const Fiscal = page(() => import('./pages/inventory/Fiscal.jsx'));
@@ -67,6 +68,7 @@ const ROUTES = [
   ['/levizjet/re/:kind', MovementForm, [C.MOVEMENTS_CREATE]],
   ['/levizjet/:id', MovementDetail],
   ['/levizjet/:id/ndrysho', MovementForm, [C.MOVEMENTS_CREATE]],
+  ['/prodhimi/i-ri', ProductionForm, [C.INVENTORY_MANAGE, C.MOVEMENTS_APPROVE]],
   ['/inventarizim', Counts, [C.INVENTORY_MANAGE]],
   ['/inventarizim/:id', CountDetail, [C.INVENTORY_MANAGE]],
   ['/rakordimi', Fiscal, [C.INVENTORY_MANAGE]],

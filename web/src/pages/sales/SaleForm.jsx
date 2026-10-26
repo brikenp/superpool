@@ -41,18 +41,22 @@ export default function SaleForm() {
   const stock = useQuery(() => (form.locationId ? query(collection(db, 'stock'), where('locationId', '==', form.locationId)) : null), [form.locationId]);
   const available = useMemo(() => {
     const a = Object.fromEntries(stock.data.map((s) => [s.productId, Number(s.qty || 0)]));
-    // Artikujt me recetë: sa mund të prodhohen me materialet që ka ky stok.
+    // Artikujt me recetë: gjendja e prodhuar + sa mund të prodhohen me materialet që ka ky stok.
+    const base = { ...a };
     for (const p of products) {
       if (!isComposite(p)) continue;
       const parts = p.recipe.filter((c) => c.productId && Number(c.qty) > 0);
-      a[p.id] = Math.min(...parts.map((c) => Math.floor(((a[c.productId] || 0) / Number(c.qty)) * 1000) / 1000));
+      a[p.id] = (base[p.id] || 0) + Math.min(...parts.map((c) => Math.floor(((base[c.productId] || 0) / Number(c.qty)) * 1000) / 1000));
     }
-    return a;
+    return { all: a, base };
   }, [stock.data, products]);
-  const materials = useMemo(() => explodeRecipes(
-    form.lines.filter((l) => l.productId && toNumber(l.qty) > 0).map((l) => ({ productId: l.productId, qty: toNumber(l.qty) })),
-    productsById,
-  ), [form.lines, productsById]);
+  // Prodhohet vetëm sasia që nuk mbulohet nga gjendja e artikullit me recetë.
+  const materials = useMemo(() => {
+    const need = {};
+    for (const l of form.lines) if (l.productId && toNumber(l.qty) > 0) need[l.productId] = (need[l.productId] || 0) + toNumber(l.qty);
+    const shortfall = Object.entries(need).map(([productId, q]) => ({ productId, qty: q - (available.base[productId] || 0) })).filter((i) => i.qty > 0);
+    return explodeRecipes(shortfall, productsById);
+  }, [form.lines, productsById, available]);
   const total = form.lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.unitPrice), 0);
 
   const submit = () => run(async () => {
@@ -95,7 +99,7 @@ export default function SaleForm() {
         <LinesEditor
           lines={form.lines}
           onChange={(lines) => set('lines', lines)}
-          available={available}
+          available={available.all}
           priceField="unitPrice"
           priceLabel="Çmimi me TVSH"
           defaultPrice={(p) => Number(p.salePrice || 0)}
@@ -103,20 +107,20 @@ export default function SaleForm() {
         />
       </Card>
       {materials.length > 0 && (
-        <Card title="Materialet për prodhim (fletëdalje automatike)">
-          <p className="muted" style={{ marginTop: 0 }}>Disa artikuj prodhohen sipas recetës. Me konfirmimin e shitjes krijohet një fletëdalje prodhimi që shkarkon këto materiale nga stoku i zgjedhur, e lidhur me shitjen dhe faturën.</p>
+        <Card title="Materialet për prodhim (fletë prodhimi automatike)">
+          <p className="muted" style={{ marginTop: 0 }}>Gjendja e prodhuar nuk mjafton për disa artikuj me recetë. Me konfirmimin e shitjes krijohet automatikisht një fletë prodhimi për sasinë që mungon, e cila shkarkon këto materiale nga stoku i zgjedhur dhe lidhet me shitjen dhe faturën.</p>
           <div className="table-wrap">
             <table className="table">
               <thead><tr><th>Materiali</th><th className="r">Sasia</th><th className="r">Gjendja</th></tr></thead>
               <tbody>
                 {materials.map((m) => {
                   const p = productsById[m.productId] || {};
-                  const short = m.qty > (available[m.productId] || 0) + 0.0005;
+                  const short = m.qty > (available.base[m.productId] || 0) + 0.0005;
                   return (
                     <tr key={m.productId} className={short ? 'text-danger' : ''}>
                       <td>{p.code} · {p.name}</td>
                       <td className="r">{fmtQty(m.qty)} {UNITS[p.unit] || p.unit || ''}</td>
-                      <td className="r">{fmtQty(available[m.productId] || 0)}{short ? ' — nuk mjafton' : ''}</td>
+                      <td className="r">{fmtQty(available.base[m.productId] || 0)}{short ? ' — nuk mjafton' : ''}</td>
                     </tr>
                   );
                 })}

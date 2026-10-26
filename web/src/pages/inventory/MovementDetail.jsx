@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CONDITIONS, MOVEMENT_KINDS, MOVEMENT_STATUS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
-import { Card, Loading, PageHeader, StatusBadge, useAction, useUi } from '../../components/ui.jsx';
+import { Badge, Card, Loading, PageHeader, StatusBadge, useAction, useUi } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useDocument } from '../../lib/data.jsx';
 import { movementPdf } from '../../lib/docPdf.js';
@@ -72,7 +72,7 @@ export default function MovementDetail() {
             {editable && <button type="button" className="btn" onClick={() => navigate(`/levizjet/${id}/ndrysho`)}>Ndrysho</button>}
             {canApprove && ['pending', 'draft'].includes(m.status) && <button type="button" className="btn ok" disabled={busy} onClick={approve}>Mirato dhe konfirmo</button>}
             {canApprove && m.status === 'pending' && <button type="button" className="btn danger" disabled={busy} onClick={reject}>Refuzo</button>}
-            {!['sale', 'production'].includes(m.kind) && !['cancelled', 'rejected'].includes(m.status) && (canApprove || (editable && m.status !== 'confirmed')) && (
+            {m.kind !== 'sale' && !(m.kind === 'production' && m.saleId) && !['cancelled', 'rejected'].includes(m.status) && (canApprove || (editable && m.status !== 'confirmed')) && (
               <button type="button" className="btn danger" disabled={busy} onClick={cancel}>Anulo</button>
             )}
           </>
@@ -117,6 +117,7 @@ export default function MovementDetail() {
               <tr>
                 <th>Kodi</th><th>Artikulli</th><th className="r">Sasia</th>
                 {m.kind === 'return' && <th>Gjendja</th>}
+                {m.kind === 'production' && <th>Lëvizja</th>}
                 {m.kind === 'sale' && <th className="r">Çmimi</th>}
                 {showCosts && lineCosts && <><th className="r">Kosto</th><th className="r">Vlera</th></>}
                 <th>Shënim</th>
@@ -136,6 +137,9 @@ export default function MovementDetail() {
                         </select>
                       ) : CONDITIONS[l.condition || 'good']}
                     </td>
+                  )}
+                  {m.kind === 'production' && (
+                    <td data-label="Lëvizja">{l.sourceId === 'v_production' ? <Badge tone="ok">prodhuar · hyn në stok</Badge> : <Badge>material · del</Badge>}</td>
                   )}
                   {m.kind === 'sale' && <td data-label="Çmimi" className="r">{money(l.unitPrice)}</td>}
                   {showCosts && lineCosts && (

@@ -2,18 +2,17 @@ import { onCall } from 'firebase-functions/v2/https';
 
 import { LOC, PAYMENT_METHODS } from '../shared/constants.js';
 import { CAPS } from '../shared/roles.js';
-import { explodeRecipes, isComposite, validateMovement } from '../shared/stock.js';
-import { FieldValue, REGION, audit, db, fail, requireCap, reserveNumber, round2, userContext } from '../lib/context.js';
-import {
-  applyPlanToContext, loadContext, planOrFail, sanitizeLines, shareContexts, writeEffects,
-} from '../lib/movements.js';
+import { isComposite, stockKey, validateMovement } from '../shared/stock.js';
+import { FieldValue, REGION, audit, db, fail, requireCap, reserveNumber, round2, round3, userContext } from '../lib/context.js';
+import { loadContext, planOrFail, sanitizeLines, shareContexts, writeEffects } from '../lib/movements.js';
 import { cancelMovementsTx } from './movements.js';
+import { prepareProduction, writeProduction } from './production.js';
 
 /**
  * Regjistron dhe konfirmon një shitje (kimikate / pajisje).
  * Krijon: dokumentin e shitjes, lëvizjen e stokut drejt klientit, faturën në pritje të numrit fiskal
  * dhe pagesën (nëse nuk është me afat).
- * Për artikujt e përbërë (me recetë, p.sh. Aditivi) krijon edhe fletëdaljen e prodhimit (PRO-…),
+ * Për artikujt me recetë (p.sh. Aditivi) pa gjendje të mjaftueshme krijon edhe fletën e prodhimit (PRO-…),
  * që shkarkon materialet përbërëse nga i njëjti vend ku bëhet shitja.
  */
 export const confirmSale = onCall({ region: REGION }, async (request) => {
@@ -41,14 +40,6 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
     const clientSnap = movement.clientId ? await tx.get(db.doc(`clients/${movement.clientId}`)) : null;
     if (!clientSnap?.exists) fail('Zgjidhni klientin.', 'invalid-argument');
 
-    // Artikujt e përbërë nuk mbahen në stok: dalin nga "Prodhim", ndërsa materialet e tyre nga magazina.
-    const productIds = [...new Set(movement.lines.map((l) => l.productId))];
-    const productSnaps = productIds.length ? await tx.getAll(...productIds.map((id) => db.doc(`products/${id}`))) : [];
-    const recipes = Object.fromEntries(productSnaps.filter((p) => p.exists).map((p) => [p.id, p.data()]));
-    const compositeLines = movement.lines.filter((l) => isComposite(recipes[l.productId]));
-    for (const l of compositeLines) l.sourceId = LOC.PRODUCTION;
-    const components = explodeRecipes(compositeLines, recipes);
-
     const ctx = await loadContext(tx, movement);
     const errors = validateMovement(movement, ctx.locations);
     if (errors.length) fail(errors.join('\n'), 'invalid-argument');
@@ -61,45 +52,41 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
       if (nonChem) fail(`"${ctx.products[nonChem.productId].name}" nuk është kimikat.`, 'permission-denied');
     }
 
+    // Artikujt me recetë (p.sh. Aditivi): shitet fillimisht gjendja e prodhuar më parë;
+    // për sasinë që mungon krijohet automatikisht fletë prodhimi që shkarkon materialet.
+    const needed = {};
+    for (const l of movement.lines) {
+      if (isComposite(ctx.products[l.productId])) needed[l.productId] = round3((needed[l.productId] || 0) + l.qty);
+    }
+    const shortfall = Object.entries(needed)
+      .map(([productId, qty]) => ({ productId, qty: round3(qty - Math.max(0, ctx.stock[stockKey(movement.sourceId, productId)] || 0)) }))
+      .filter((i) => i.qty > 0);
     let production = null;
-    if (components.length) {
-      const prodNumbering = await reserveNumber(tx, 'PRO', date);
-      const prodMovement = {
-        kind: 'production',
-        date,
-        sourceId: movement.sourceId,
-        destId: LOC.PRODUCTION,
-        clientId: movement.clientId,
-        projectId: null,
-        lines: components.map((c) => ({ productId: c.productId, qty: c.qty, condition: 'good', note: '' })),
-        notes: '',
-      };
-      const prodCtx = await loadContext(tx, prodMovement);
-      shareContexts([ctx, prodCtx]);
-      production = { numbering: prodNumbering, movement: prodMovement, ctx: prodCtx, ref: db.collection('movements').doc() };
+    if (shortfall.length) {
+      production = await prepareProduction(tx, {
+        items: shortfall, locationId: movement.sourceId, date, extra: { clientId: movement.clientId },
+      });
+      shareContexts([ctx, production.ctx]);
     }
-
-    // Leximet mbaruan. Fillimisht prodhimi (shkruhet dhe përditëson gjendjen), pastaj shitja.
-    if (production) {
-      production.plan = planOrFail(production.movement, production.ctx, 1);
-      writeEffects(tx, production.ref.id, production.movement, production.ctx, production.plan, 1);
-      applyPlanToContext(ctx, production.plan);
-      // Kosto e artikullit të përbërë = shuma e materialeve sipas recetës.
-      for (const l of compositeLines) {
-        const unit = (recipes[l.productId].recipe || []).reduce(
-          (s, c) => s + Number(c.qty || 0) * Number(ctx.products[c.productId]?.avgCost || ctx.products[c.productId]?.purchasePrice || 0), 0,
-        );
-        ctx.products[l.productId].avgCost = round2(unit);
-        tx.set(db.doc(`productCosts/${l.productId}`), { avgCost: round2(unit), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      }
-    }
-    const plan = planOrFail(movement, ctx, 1);
-
-    const total = round2(movement.lines.reduce((s, l) => s + l.qty * l.unitPrice, 0));
     const client = clientSnap.data();
     const saleRef = db.collection('sales').doc();
     const movRef = db.collection('movements').doc();
     const invRef = db.collection('invoices').doc();
+
+    // Leximet mbaruan. Fillimisht prodhimi (shton artikullin në stok), pastaj shitja e zbret.
+    if (production) {
+      Object.assign(production.movement, {
+        saleId: saleRef.id,
+        saleNumber: numbering.number,
+        invoiceId: invRef.id,
+        invoiceNumber: invNumbering.number,
+        notes: `Prodhim për shitjen ${numbering.number} · fatura ${invNumbering.number} · ${client.name}`,
+      });
+      writeProduction(tx, production, user);
+    }
+    const plan = planOrFail(movement, ctx, 1);
+
+    const total = round2(movement.lines.reduce((s, l) => s + l.qty * l.unitPrice, 0));
 
     numbering.commit();
     invNumbering.commit();
@@ -111,41 +98,8 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
       qty: l.qty,
       unitPrice: l.unitPrice,
       total: round2(l.qty * l.unitPrice),
-      ...(l.sourceId ? { sourceId: l.sourceId, composite: true } : {}),
     }));
     writeEffects(tx, movRef.id, movement, ctx, plan, 1);
-    if (production) {
-      const p = production;
-      p.numbering.commit();
-      tx.set(p.ref, {
-        ...p.movement,
-        number: p.numbering.number,
-        lines: p.movement.lines.map((l) => ({
-          ...l,
-          code: ctx.products[l.productId].code || '',
-          name: ctx.products[l.productId].name || '',
-          unit: ctx.products[l.productId].unit || '',
-        })),
-        productIds: p.movement.lines.map((l) => l.productId),
-        // Për çfarë u prodhua: p.sh. "Aditivi 10 kg".
-        produced: compositeLines.map((l) => ({ productId: l.productId, name: ctx.products[l.productId].name || '', unit: ctx.products[l.productId].unit || '', qty: l.qty })),
-        sourceName: source.name,
-        destName: ctx.locations[LOC.PRODUCTION].name,
-        saleId: saleRef.id,
-        saleNumber: numbering.number,
-        invoiceId: invRef.id,
-        invoiceNumber: invNumbering.number,
-        notes: `Prodhim për shitjen ${numbering.number} · fatura ${invNumbering.number} · ${client.name}`,
-        status: 'confirmed',
-        participants: [user.uid],
-        createdBy: user.uid,
-        createdByName: user.name,
-        createdAt: FieldValue.serverTimestamp(),
-        confirmedBy: user.uid,
-        confirmedByName: user.name,
-        confirmedAt: FieldValue.serverTimestamp(),
-      });
-    }
     tx.set(movRef, {
       ...movement,
       number: numbering.number,
