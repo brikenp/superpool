@@ -8,7 +8,8 @@ import { FieldValue, db, fail, round2, round3 } from './context.js';
 
 const COST_KINDS = new Set(['consumption', 'loss']);
 
-export function sanitizeLines(lines, kind) {
+// trusted = rreshtat vijnë nga një dokument i shkruar nga serveri (mund të kenë vend burim/destinacion më vete).
+export function sanitizeLines(lines, kind, { trusted = false } = {}) {
   if (!Array.isArray(lines)) return [];
   return lines
     .filter((l) => l && l.productId)
@@ -21,6 +22,8 @@ export function sanitizeLines(lines, kind) {
       };
       if (kind === 'purchase' || kind === 'customer_return') line.unitCost = round2(Number(l.unitCost) || 0);
       if (kind === 'sale' || l.unitPrice != null) line.unitPrice = round2(Number(l.unitPrice) || 0);
+      if (trusted && l.sourceId) line.sourceId = String(l.sourceId);
+      if (trusted && l.destId) line.destId = String(l.destId);
       return line;
     });
 }
@@ -29,7 +32,7 @@ const STR_FIELDS = ['projectId', 'vehicleId', 'employeeId', 'authorizedBy', 'sup
   'purchaseOrderId', 'saleId', 'fiscalRef', 'notes'];
 
 /** Ndërton fushat e dokumentit të lëvizjes nga të dhënat e klientit. */
-export function sanitizeMovement(input) {
+export function sanitizeMovement(input, { trusted = false } = {}) {
   const kind = String(input.kind || '');
   if (!MOVEMENT_KINDS[kind]) fail(`Lloj lëvizjeje i panjohur: ${kind}`, 'invalid-argument');
   const m = {
@@ -37,7 +40,7 @@ export function sanitizeMovement(input) {
     date: /^\d{4}-\d{2}-\d{2}$/.test(input.date || '') ? input.date : new Date().toISOString().slice(0, 10),
     sourceId: String(input.sourceId || ''),
     destId: String(input.destId || ''),
-    lines: sanitizeLines(input.lines, kind),
+    lines: sanitizeLines(input.lines, kind, { trusted }),
   };
   for (const f of STR_FIELDS) m[f] = input[f] ? String(input[f]).slice(0, 2000) : null;
   return m;
@@ -60,6 +63,7 @@ async function readLocations(tx, ids) {
 export async function loadContext(tx, movement) {
   const locIds = new Set([movement.sourceId, movement.destId]);
   if (movement.kind === 'return') locIds.add(LOC.LOSS);
+  for (const l of movement.lines) { if (l.sourceId) locIds.add(l.sourceId); if (l.destId) locIds.add(l.destId); }
   const locations = await readLocations(tx, locIds);
 
   // Plotësim automatik: kantieri tregon projektin, nënmagazina e automjetit tregon automjetin.
@@ -117,6 +121,29 @@ export async function loadContext(tx, movement) {
     finance = finSnap.exists ? finSnap.data() : {};
   }
   return { locations, products, stock, materials, finance, project };
+}
+
+/**
+ * Kur disa lëvizje zbatohen në të njëjtin transaksion, ato duhet të ndajnë të njëjtat gjendje stoku
+ * dhe artikuj (përndryshe shkrimi i dytë fshin efektin e të parit).
+ */
+export function shareContexts(ctxs) {
+  const stock = Object.assign({}, ...ctxs.map((c) => c.stock));
+  const products = Object.assign({}, ...ctxs.map((c) => c.products));
+  const locations = Object.assign({}, ...ctxs.map((c) => c.locations));
+  for (const c of ctxs) { c.stock = stock; c.products = products; c.locations = locations; }
+  return ctxs;
+}
+
+/** Pasi janë shkruar efektet e një plani, gjendja në kontekst përditësohet për lëvizjen e radhës. */
+export function applyPlanToContext(ctx, plan) {
+  for (const [key, d] of Object.entries(plan.stockDeltas)) ctx.stock[key] = round3((ctx.stock[key] || 0) + d);
+  for (const [pid, d] of Object.entries(plan.productDeltas)) {
+    const p = ctx.products[pid];
+    if (!p) continue;
+    p.qtyTotal = round3(Number(p.qtyTotal || 0) + d.qtyTotal);
+    p.qtyMain = round3(Number(p.qtyMain || 0) + d.qtyMain);
+  }
 }
 
 /** Planifikon dhe hedh gabim nëse lëvizja nuk mund të zbatohet. */

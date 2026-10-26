@@ -88,6 +88,24 @@ export default function ProductDetail() {
           ) : <Empty>Nuk ka gjendje.</Empty>}
         </Card>
       </div>
+      {product.recipe?.length > 0 && (
+        <Card title={`Receta — materialet për 1 ${unit}`}>
+          <p className="muted" style={{ marginTop: 0 }}>Kur shitet ky artikull, materialet shkarkohen automatikisht nga magazina me fletëdalje prodhimi.</p>
+          <ul className="list-plain">
+            {product.recipe.map((c) => {
+              const m = productsById[c.productId];
+              return (
+                <li key={c.productId}>
+                  <Link to={`/artikuj/${c.productId}`} style={{ flex: 1 }}>{m ? `${m.code} · ${m.name}` : c.name || c.productId}</Link>
+                  {showCosts && <small className="muted">{money(Number(c.qty) * unitCostOf(costsById, c.productId))}</small>}
+                  <b>{qty(c.qty)} {UNITS[m?.unit] || m?.unit || ''}</b>
+                </li>
+              );
+            })}
+          </ul>
+          {showCosts && <p style={{ marginBottom: 0 }}><b>Kosto e materialeve:</b> {money(product.recipe.reduce((s, c) => s + Number(c.qty) * unitCostOf(costsById, c.productId), 0))} / {unit}</p>}
+        </Card>
+      )}
       {showCosts && prices.data.length > 0 && (
         <Card title="Çmimet e furnitorëve">
           <DataTable

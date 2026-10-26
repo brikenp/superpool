@@ -3,8 +3,9 @@ import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
-import { LOC, PAYMENT_METHODS } from '@shared/constants.js';
+import { LOC, PAYMENT_METHODS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
+import { explodeRecipes, isComposite } from '@shared/stock.js';
 
 import { EntityForm } from '../../components/EntityForm.jsx';
 import { LinesEditor, cleanLines, emptyLine } from '../../components/LinesEditor.jsx';
@@ -12,12 +13,12 @@ import { Card, Field, PageHeader, SearchSelect, useAction } from '../../componen
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
-import { money, todayISO, toNumber } from '../../lib/format.js';
+import { qty as fmtQty, money, todayISO, toNumber } from '../../lib/format.js';
 import { clientFields, normalizeClient } from '../partners/Clients.jsx';
 
 export default function SaleForm() {
   const { uid, can } = useAuth();
-  const { locations, clients } = useData();
+  const { locations, clients, products, productsById } = useData();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const seesAll = can(CAPS.CHEM_SALES_ALL);
@@ -38,7 +39,20 @@ export default function SaleForm() {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const stock = useQuery(() => (form.locationId ? query(collection(db, 'stock'), where('locationId', '==', form.locationId)) : null), [form.locationId]);
-  const available = useMemo(() => Object.fromEntries(stock.data.map((s) => [s.productId, Number(s.qty || 0)])), [stock.data]);
+  const available = useMemo(() => {
+    const a = Object.fromEntries(stock.data.map((s) => [s.productId, Number(s.qty || 0)]));
+    // Artikujt me recetë: sa mund të prodhohen me materialet që ka ky stok.
+    for (const p of products) {
+      if (!isComposite(p)) continue;
+      const parts = p.recipe.filter((c) => c.productId && Number(c.qty) > 0);
+      a[p.id] = Math.min(...parts.map((c) => Math.floor(((a[c.productId] || 0) / Number(c.qty)) * 1000) / 1000));
+    }
+    return a;
+  }, [stock.data, products]);
+  const materials = useMemo(() => explodeRecipes(
+    form.lines.filter((l) => l.productId && toNumber(l.qty) > 0).map((l) => ({ productId: l.productId, qty: toNumber(l.qty) })),
+    productsById,
+  ), [form.lines, productsById]);
   const total = form.lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.unitPrice), 0);
 
   const submit = () => run(async () => {
@@ -48,7 +62,7 @@ export default function SaleForm() {
     const res = await call('confirmSale', { sale: { ...form, lines } });
     navigate(`/kimikate/${res.id}`, { replace: true });
     return res;
-  }, (r) => `Shitja ${r.number} u regjistrua (${money(r.total)}).`);
+  }, (r) => `Shitja ${r.number} u regjistrua (${money(r.total)}).${r.productionNumber ? ` Fletëdalja e prodhimit: ${r.productionNumber}.` : ''}`);
 
   return (
     <>
@@ -88,6 +102,29 @@ export default function SaleForm() {
           productFilter={seesAll ? undefined : (p) => p.isChemical}
         />
       </Card>
+      {materials.length > 0 && (
+        <Card title="Materialet për prodhim (fletëdalje automatike)">
+          <p className="muted" style={{ marginTop: 0 }}>Disa artikuj prodhohen sipas recetës. Me konfirmimin e shitjes krijohet një fletëdalje prodhimi që shkarkon këto materiale nga stoku i zgjedhur, e lidhur me shitjen dhe faturën.</p>
+          <div className="table-wrap">
+            <table className="table">
+              <thead><tr><th>Materiali</th><th className="r">Sasia</th><th className="r">Gjendja</th></tr></thead>
+              <tbody>
+                {materials.map((m) => {
+                  const p = productsById[m.productId] || {};
+                  const short = m.qty > (available[m.productId] || 0) + 0.0005;
+                  return (
+                    <tr key={m.productId} className={short ? 'text-danger' : ''}>
+                      <td>{p.code} · {p.name}</td>
+                      <td className="r">{fmtQty(m.qty)} {UNITS[p.unit] || p.unit || ''}</td>
+                      <td className="r">{fmtQty(available[m.productId] || 0)}{short ? ' — nuk mjafton' : ''}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       <div className="form-actions">
         <span className="bold" style={{ marginRight: 'auto', fontSize: '1.1rem' }}>Totali: {money(total)}</span>
         <button type="button" className="btn" onClick={() => navigate(-1)}>Anulo</button>

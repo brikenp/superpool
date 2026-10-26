@@ -19,6 +19,7 @@ import { date, dateTime, money, qty, round2, todayISO, toNumber } from '../../li
 import { movementColumns } from '../inventory/Movements.jsx';
 import { createPurchaseOrder } from '../partners/PurchaseOrders.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
+import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -386,6 +387,8 @@ function Finance({ project }) {
   const { can } = useAuth();
   const { ask } = useUi();
   const [run] = useAction();
+  const [invoiceForm, setInvoiceForm] = useState(null);
+  const [paymentForm, setPaymentForm] = useState(false);
   const fin = useDocument(`projectFinance/${project.id}`);
   const expenses = useQuery(() => query(collection(db, 'projectFinance', project.id, 'expenses')), [project.id]);
   const invoices = useQuery(() => query(collection(db, 'invoices'), where('projectId', '==', project.id)), [project.id]);
@@ -440,11 +443,23 @@ function Finance({ project }) {
             <dt>Pa faturuar ende</dt><dd>{money(result.notInvoiced)}</dd>
           </dl>
           <ul className="list-plain">
-            {invoices.data.map((i) => <li key={i.id}><span style={{ flex: 1 }}>{i.fiscalNumber || i.internalNumber || 'pa numër'} · {date(i.date)}</span><b>{money(i.amount)}</b></li>)}
+            {invoices.data.map((i) => (
+              <li key={i.id} className={i.status === 'cancelled' ? 'muted' : ''} style={{ cursor: can(CAPS.FINANCE) ? 'pointer' : undefined }} onClick={() => can(CAPS.FINANCE) && setInvoiceForm(i)}>
+                <span style={{ flex: 1 }}>{invoiceTypeLabel(i)} · {i.fiscalNumber || i.internalNumber || 'pa numër'} · {date(i.date)}{i.status === 'cancelled' ? ' (anuluar)' : ''}</span>
+                <b>{money(i.amount)}</b>
+              </li>
+            ))}
           </ul>
-          {can(CAPS.FINANCE) && <Link to={`/klientet/${project.clientId}`} className="btn small">Regjistro faturë / pagesë</Link>}
+          {can(CAPS.FINANCE) && (
+            <div className="row">
+              <button type="button" className="btn small primary" onClick={() => setInvoiceForm({ clientId: project.clientId, projectId: project.id, type: 'advance' })}><Plus size={14} /> Paradhënie / faturë</button>
+              <button type="button" className="btn small" onClick={() => setPaymentForm(true)}><Plus size={14} /> Pagesë</button>
+            </div>
+          )}
         </Card>
       </div>
+      {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}
+      {paymentForm && <PaymentForm record={{ clientId: project.clientId }} invoices={invoices.data.filter((i) => i.status !== 'cancelled')} onClose={() => setPaymentForm(false)} />}
     </>
   );
 }

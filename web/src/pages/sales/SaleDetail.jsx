@@ -73,6 +73,7 @@ export default function SaleDetail() {
             <dt>Nga stoku</dt><dd>{sale.locationName}</dd>
             <dt>Pagesa</dt><dd>{PAYMENT_METHODS[sale.paymentMethod]}</dd>
             <dt>Lëvizja e stokut</dt><dd><Link to={`/levizjet/${sale.movementId}`}>shiko</Link></dd>
+            {sale.productionId && <><dt>Fletëdalje prodhimi</dt><dd><Link to={`/levizjet/${sale.productionId}`}>{sale.productionNumber}</Link> <small className="muted">(materialet e artikujve me recetë)</small></dd></>}
           </dl>
           {sale.notes && <p>{sale.notes}</p>}
         </Card>

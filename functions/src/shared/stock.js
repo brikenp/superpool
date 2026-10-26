@@ -12,6 +12,7 @@ export const isPhysicalKind = (kind) => !VIRTUAL_KINDS.includes(kind);
 
 /** Destinacioni efektiv i një rreshti: në kthim, mallrat e dëmtuara/humbura shkojnë te "Dëmtuar / humbur". */
 export function lineDestination(movement, line) {
+  if (line.destId) return line.destId; // përdoret vetëm nga serveri (p.sh. materialet e prodhimit)
   if (movement.kind === 'return' && line.condition && line.condition !== 'good') return LOC.LOSS;
   return movement.destId;
 }
@@ -99,7 +100,7 @@ export function planMovement(movement, ctx, direction = 1) {
     lineCosts.push(round2(unitCost));
 
     const q = qty * direction;
-    addStock(movement.sourceId, line.productId, -q);
+    addStock(line.sourceId || movement.sourceId, line.productId, -q);
     addStock(dest, line.productId, q);
 
     if (movement.projectId) {
@@ -204,3 +205,21 @@ export function projectResult({ contractValue = 0, plannedMaterialCost = 0, plan
     notInvoiced: round2(contractValue - invoiced),
   };
 }
+
+/**
+ * Materialet që duhen për sasinë e dhënë të artikujve të përbërë.
+ * lines: [{ productId, qty }], products: { id: { recipe: [{ productId, qty }] } }
+ * Kthen [{ productId, qty }] të grupuara sipas materialit.
+ */
+export function explodeRecipes(lines, products) {
+  const out = {};
+  for (const l of lines) {
+    for (const c of products[l.productId]?.recipe || []) {
+      if (!c.productId || !(Number(c.qty) > 0)) continue;
+      out[c.productId] = round3((out[c.productId] || 0) + Number(c.qty) * Number(l.qty));
+    }
+  }
+  return Object.entries(out).map(([productId, qty]) => ({ productId, qty }));
+}
+
+export const isComposite = (product) => Array.isArray(product?.recipe) && product.recipe.some((c) => c.productId && Number(c.qty) > 0);

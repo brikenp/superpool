@@ -1,4 +1,5 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import { Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
@@ -16,6 +17,7 @@ import { db } from '../../lib/firebase.js';
 import { date, firstOfMonth, round2, todayISO } from '../../lib/format.js';
 import { StockTable } from '../inventory/Stock.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
+import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
 
 const REPORTS = [
   { key: 'stock', label: 'Gjendja e magazinës', filters: [] },
@@ -306,28 +308,45 @@ function ProjectsReport({ f }) {
 }
 
 function InvoicesReport({ f }) {
+  const { can } = useAuth();
+  const canEdit = can(CAPS.FINANCE);
+  const [invoiceForm, setInvoiceForm] = useState(null);
+  const [paymentForm, setPaymentForm] = useState(null);
   const invoices = useQuery(() => query(collection(db, 'invoices'), where('date', '>=', f.from), where('date', '<=', f.to)), [f.from, f.to]);
   const payments = useQuery(() => query(collection(db, 'payments'), where('date', '>=', f.from), where('date', '<=', f.to)), [f.from, f.to]);
+  const openInvoices = useQuery(() => (paymentForm ? query(collection(db, 'invoices'), where('status', 'in', ['pending_fiscal', 'issued'])) : null), [Boolean(paymentForm)]);
   const rows = [
-    ...invoices.data.filter((i) => i.status !== 'cancelled').map((i) => ({ id: `i${i.id}`, date: i.date, type: 'Faturë', doc: i.fiscalNumber || i.internalNumber || '', clientId: i.clientId, clientName: i.clientName, projectId: i.projectId, debit: Number(i.amount || 0), credit: 0 })),
-    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, date: p.date, type: `Pagesë (${PAYMENT_METHODS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: null, debit: 0, credit: Number(p.amount || 0) })),
+    ...invoices.data.filter((i) => i.status !== 'cancelled').map((i) => ({ id: `i${i.id}`, record: i, date: i.date, type: `Faturë · ${invoiceTypeLabel(i)}`, doc: i.fiscalNumber || i.internalNumber || '', clientId: i.clientId, clientName: i.clientName, projectId: i.projectId, debit: Number(i.amount || 0), credit: 0 })),
+    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, date: p.date, type: `Pagesë (${PAYMENT_METHODS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: p.projectId || null, debit: 0, credit: Number(p.amount || 0) })),
   ]
     .filter((r) => (!f.client || r.clientId === f.client) && (!f.project || r.projectId === f.project))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const preset = { ...(f.client ? { clientId: f.client } : {}), ...(f.project ? { projectId: f.project, type: 'advance' } : {}) };
   return (
-    <DataTable
-      title="Faturat dhe pagesat e klientëve"
-      filtersText={periodText(f)}
-      rows={rows}
-      columns={[
-        { key: 'date', label: 'Data', render: (r) => date(r.date) },
-        { key: 'clientName', label: 'Klienti' },
-        { key: 'type', label: 'Dokumenti' },
-        { key: 'doc', label: 'Nr. / referenca' },
-        { key: 'debit', label: 'Faturuar', type: 'money', total: true },
-        { key: 'credit', label: 'Paguar', type: 'money', total: true },
-      ]}
-    />
+    <>
+      <DataTable
+        title="Faturat dhe pagesat e klientëve"
+        filtersText={periodText(f)}
+        rows={rows}
+        onRowClick={canEdit ? (r) => r.record && setInvoiceForm(r.record) : undefined}
+        toolbar={canEdit && (
+          <>
+            <button type="button" className="btn primary" onClick={() => setInvoiceForm(preset)}><Plus size={16} /> Faturë / paradhënie</button>
+            <button type="button" className="btn" onClick={() => setPaymentForm(f.client ? { clientId: f.client } : {})}><Plus size={16} /> Pagesë</button>
+          </>
+        )}
+        columns={[
+          { key: 'date', label: 'Data', render: (r) => date(r.date) },
+          { key: 'clientName', label: 'Klienti' },
+          { key: 'type', label: 'Dokumenti' },
+          { key: 'doc', label: 'Nr. / referenca' },
+          { key: 'debit', label: 'Faturuar', type: 'money', total: true },
+          { key: 'credit', label: 'Paguar', type: 'money', total: true },
+        ]}
+      />
+      {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}
+      {paymentForm && <PaymentForm record={paymentForm} invoices={openInvoices.data} onClose={() => setPaymentForm(null)} />}
+    </>
   );
 }
 

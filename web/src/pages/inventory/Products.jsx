@@ -1,5 +1,5 @@
 import { addDoc, collection, doc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
-import { Camera, Plus } from 'lucide-react';
+import { Camera, FlaskConical, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,6 +28,12 @@ export function ProductForm({ product, onClose, onSaved }) {
     ...(product || {}),
     purchasePrice: product ? costsById[product.id]?.purchasePrice ?? '' : '',
   }));
+  const [recipe, setRecipe] = useState(() => (product?.recipe || []).map((c) => ({ ...c })));
+  const [composite, setComposite] = useState(() => recipe.length > 0);
+  const materialOptions = useMemo(() => products
+    .filter((p) => p.id !== product?.id && !p.recipe?.length && p.active !== false)
+    .map((p) => ({ value: p.id, label: `${p.code} · ${p.name}`, sub: UNITS[p.unit] || p.unit })), [products, product]);
+  const setPart = (i, patch) => setRecipe((r) => r.map((c, k) => (k === i ? { ...c, ...patch } : c)));
   const [error, setError] = useState('');
   const [photo, setPhoto] = useState(null); // File e re, ose 'remove'
   const photoPreview = useMemo(() => (photo && photo !== 'remove' ? URL.createObjectURL(photo) : null), [photo]);
@@ -41,6 +47,10 @@ export function ProductForm({ product, onClose, onSaved }) {
     if (!code || !v.name.trim()) { setError('Kodi dhe emri janë të detyrueshëm.'); return; }
     const dup = products.find((p) => p.code?.toLowerCase() === code.toLowerCase() && p.id !== product?.id);
     if (dup) { setError(`Kodi ${code} përdoret nga "${dup.name}".`); return; }
+    const parts = composite ? recipe.filter((c) => c.productId).map((c) => ({ productId: c.productId, qty: round3(toNumber(c.qty)) })) : [];
+    if (composite && !parts.length) { setError('Shtoni materialet e recetës ose hiqni zgjedhjen «Artikull i përbërë».'); return; }
+    if (parts.some((c) => !(c.qty > 0))) { setError('Sasia e çdo materiali në recetë duhet të jetë më e madhe se zero.'); return; }
+    if (new Set(parts.map((c) => c.productId)).size !== parts.length) { setError('Një material është shtuar dy herë në recetë.'); return; }
     run(async () => {
       const category = categoriesById[v.categoryId];
       const supplier = suppliersById[v.supplierId];
@@ -60,6 +70,7 @@ export function ProductForm({ product, onClose, onSaved }) {
         minStock: toNumber(v.minStock),
         barcode: v.barcode || '',
         active: Boolean(v.active),
+        recipe: parts.map((c) => ({ ...c, code: products.find((p) => p.id === c.productId)?.code || '', name: products.find((p) => p.id === c.productId)?.name || '' })),
         updatedAt: serverTimestamp(),
       };
       let id = product?.id;
@@ -138,6 +149,39 @@ export function ProductForm({ product, onClose, onSaved }) {
         <Field className="span-all">
           <label className="checkbox"><input type="checkbox" checked={v.active} onChange={(e) => set('active', e.target.checked)} /> Aktiv</label>
         </Field>
+        <div className="span-all card" style={{ marginBottom: 0, padding: 14 }}>
+          <label className="checkbox" style={{ fontWeight: 600 }}>
+            <input type="checkbox" checked={composite} onChange={(e) => { setComposite(e.target.checked); if (e.target.checked && !recipe.length) setRecipe([{ productId: '', qty: '' }]); }} />
+            <FlaskConical size={16} /> Artikull i përbërë — prodhohet nga materiale (receta)
+          </label>
+          {composite && (
+            <>
+              <p className="muted" style={{ margin: '8px 0', fontSize: '0.85rem' }}>
+                Sasia e çdo materiali për 1 {UNITS[v.unit] || v.unit} {v.name || 'artikull'}. Kur shitet ky artikull, materialet shkarkohen automatikisht nga magazina me një fletëdalje prodhimi të lidhur me faturën.
+              </p>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead><tr><th>Materiali</th><th className="r" style={{ width: 150 }}>Sasia për 1 {UNITS[v.unit] || v.unit}</th><th style={{ width: 40 }} /></tr></thead>
+                  <tbody>
+                    {recipe.map((c, i) => (
+                      <tr key={i}>
+                        <td><SearchSelect options={materialOptions} value={c.productId} onChange={(val) => setPart(i, { productId: val })} /></td>
+                        <td><input className="num" type="number" step="any" min="0" value={c.qty} onChange={(e) => setPart(i, { qty: e.target.value })} /></td>
+                        <td><button type="button" className="btn ghost small" aria-label="Hiq" onClick={() => setRecipe((r) => r.filter((_, k) => k !== i))}><Trash2 size={16} /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="btn small" style={{ marginTop: 8 }} onClick={() => setRecipe((r) => [...r, { productId: '', qty: '' }])}><Plus size={14} /> Material</button>
+              {showCosts && recipe.some((c) => c.productId) && (
+                <span className="muted" style={{ marginLeft: 12, fontSize: '0.85rem' }}>
+                  Kosto e materialeve për 1 {UNITS[v.unit] || v.unit}: {recipe.reduce((sum, c) => sum + toNumber(c.qty) * unitCostOf(costsById, c.productId), 0).toFixed(2)} L
+                </span>
+              )}
+            </>
+          )}
+        </div>
       </form>
     </Modal>
   );

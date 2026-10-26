@@ -4,7 +4,9 @@ import { MOVEMENT_KINDS } from '../shared/constants.js';
 import { CAPS } from '../shared/roles.js';
 import { validateMovement } from '../shared/stock.js';
 import { FieldValue, REGION, audit, db, fail, requireCap, reserveNumber, userContext } from '../lib/context.js';
-import { loadContext, participantsFor, planOrFail, sanitizeMovement, writeEffects } from '../lib/movements.js';
+import {
+  applyPlanToContext, loadContext, participantsFor, planOrFail, sanitizeMovement, shareContexts, writeEffects,
+} from '../lib/movements.js';
 
 // Llojet që mund t'i regjistrojë një punonjës në terren (pa të drejta magazine).
 const FIELD_KINDS = new Set(['issue', 'delivery', 'consumption', 'return', 'loss']);
@@ -14,6 +16,7 @@ const WAREHOUSE_KINDS = new Set(['purchase', 'adjustment', 'agent_issue', 'custo
 function assertCanCreate(user, kind) {
   requireCap(user, CAPS.MOVEMENTS_CREATE);
   if (kind === 'sale') fail('Shitjet regjistrohen nga moduli i shitjeve.', 'invalid-argument');
+  if (kind === 'production') fail('Fletëdaljet e prodhimit krijohen automatikisht nga shitja.', 'invalid-argument');
   if (WAREHOUSE_KINDS.has(kind)) requireCap(user, CAPS.INVENTORY_MANAGE, CAPS.MOVEMENTS_APPROVE);
   if (!user.caps.has(CAPS.MOVEMENTS_APPROVE) && !user.caps.has(CAPS.INVENTORY_MANAGE) && !FIELD_KINDS.has(kind)) {
     fail('Nuk keni të drejtë për këtë lloj lëvizjeje.', 'permission-denied');
@@ -200,32 +203,53 @@ export const rejectMovement = onCall({ region: REGION }, async (request) => {
 });
 
 /** Anulon një lëvizje. Nëse ishte e konfirmuar, efekti mbi stokun kthehet mbrapsht. */
-export async function cancelMovementTx(tx, user, id, reason, { allowSale = false } = {}) {
-  const ref = db.doc(`movements/${id}`);
-  const snap = await tx.get(ref);
-  if (!snap.exists) fail('Lëvizja nuk ekziston.', 'not-found');
-  const existing = snap.data();
-  if (existing.status === 'cancelled') fail('Lëvizja është anuluar më parë.');
-  if (existing.kind === 'sale' && !allowSale) fail('Shitjet anulohen nga moduli i shitjeve.');
-
-  if (existing.status === 'confirmed') {
-    const movement = sanitizeMovement(existing);
-    const costs = await tx.get(db.doc(`movementCosts/${id}`));
-    const lineCosts = costs.exists ? costs.get('lineCosts') || [] : [];
-    movement.lines.forEach((l, i) => { l.unitCost = lineCosts[i] ?? 0; });
-    const ctx = await loadContext(tx, movement);
-    const plan = planOrFail(movement, ctx, -1);
-    writeEffects(tx, id, movement, ctx, plan, -1);
-  }
-  tx.update(ref, {
-    status: 'cancelled',
-    cancelReason: String(reason).slice(0, 500),
-    cancelledBy: user.uid,
-    cancelledByName: user.name,
-    cancelledAt: FieldValue.serverTimestamp(),
-  });
-  audit(tx, { user, action: 'cancel', collection: 'movements', id, label: existing.number, note: reason });
+export async function cancelMovementTx(tx, user, id, reason, opts = {}) {
+  const [existing] = await cancelMovementsTx(tx, user, [id], reason, opts);
   return existing;
+}
+
+/**
+ * Anulon disa lëvizje në të njëjtin transaksion (p.sh. shitjen dhe fletëdaljen e prodhimit).
+ * Të gjitha leximet bëhen para shkrimeve, dhe lëvizjet ndajnë të njëjtat gjendje stoku.
+ */
+export async function cancelMovementsTx(tx, user, ids, reason, { allowSale = false } = {}) {
+  const items = [];
+  for (const id of ids.filter(Boolean)) {
+    const ref = db.doc(`movements/${id}`);
+    const snap = await tx.get(ref);
+    if (!snap.exists) fail('Lëvizja nuk ekziston.', 'not-found');
+    const existing = snap.data();
+    if (existing.status === 'cancelled') fail('Lëvizja është anuluar më parë.');
+    if (['sale', 'production'].includes(existing.kind) && !allowSale) fail('Shitjet dhe prodhimi anulohen nga moduli i shitjeve.');
+    const item = { id, ref, existing };
+    if (existing.status === 'confirmed') {
+      item.movement = sanitizeMovement(existing, { trusted: true });
+      const costs = await tx.get(db.doc(`movementCosts/${id}`));
+      const lineCosts = costs.exists ? costs.get('lineCosts') || [] : [];
+      item.movement.lines.forEach((l, i) => { l.unitCost = lineCosts[i] ?? 0; });
+      item.ctx = await loadContext(tx, item.movement);
+    }
+    items.push(item);
+  }
+  const confirmed = items.filter((i) => i.ctx);
+  shareContexts(confirmed.map((i) => i.ctx));
+  // Leximet mbaruan: tani planifikohet dhe shkruhet secila me radhë mbi gjendjen e përbashkët.
+  for (const i of confirmed) {
+    const plan = planOrFail(i.movement, i.ctx, -1);
+    writeEffects(tx, i.id, i.movement, i.ctx, plan, -1);
+    applyPlanToContext(i.ctx, plan);
+  }
+  for (const { ref, id, existing } of items) {
+    tx.update(ref, {
+      status: 'cancelled',
+      cancelReason: String(reason).slice(0, 500),
+      cancelledBy: user.uid,
+      cancelledByName: user.name,
+      cancelledAt: FieldValue.serverTimestamp(),
+    });
+    audit(tx, { user, action: 'cancel', collection: 'movements', id, label: existing.number, note: reason });
+  }
+  return items.map((i) => i.existing);
 }
 
 export const cancelMovement = onCall({ region: REGION }, async (request) => {

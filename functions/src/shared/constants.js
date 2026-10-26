@@ -10,9 +10,10 @@ export const LOCATION_KINDS = {
   consumed: 'Përdorur në projekt (virtual)',
   loss: 'Dëmtuar / humbur (virtual)',
   adjust: 'Rregullim inventari (virtual)',
+  production: 'Prodhim (virtual)',
 };
 
-export const VIRTUAL_KINDS = ['supplier', 'customer', 'consumed', 'loss', 'adjust'];
+export const VIRTUAL_KINDS = ['supplier', 'customer', 'consumed', 'loss', 'adjust', 'production'];
 
 // ID fikse për vendet virtuale dhe për magazinën kryesore.
 export const LOC = {
@@ -22,6 +23,7 @@ export const LOC = {
   CONSUMED: 'v_consumed',
   LOSS: 'v_loss',
   ADJUST: 'v_adjust',
+  PRODUCTION: 'v_production',
 };
 
 export const VIRTUAL_LOCATIONS = {
@@ -30,6 +32,7 @@ export const VIRTUAL_LOCATIONS = {
   [LOC.CONSUMED]: { kind: 'consumed', name: 'Përdorur në projekte' },
   [LOC.LOSS]: { kind: 'loss', name: 'Dëmtuar / humbur' },
   [LOC.ADJUST]: { kind: 'adjust', name: 'Rregullime inventari' },
+  [LOC.PRODUCTION]: { kind: 'production', name: 'Prodhim' },
 };
 
 export const isVirtualLocation = (id) => Object.prototype.hasOwnProperty.call(VIRTUAL_LOCATIONS, id);
@@ -80,6 +83,11 @@ export const MOVEMENT_KINDS = {
   loss: {
     label: 'Dëmtim / humbje', prefix: 'HUM', from: ['main', 'vehicle', 'site', 'agent'], to: ['loss'],
     approval: true, required: ['notes'],
+  },
+  // Krijohet automatikisht kur shitet një artikull i përbërë (receta): materialet dalin nga magazina.
+  production: {
+    label: 'Prodhim (dalje materialesh)', prefix: 'PRO', from: ['main', 'agent', 'vehicle'], to: ['production'],
+    approval: false, required: [],
   },
   adjustment: {
     label: 'Rregullim inventari', prefix: 'INV', from: ['adjust', 'main', 'vehicle', 'site', 'agent'],

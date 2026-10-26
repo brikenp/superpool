@@ -72,7 +72,7 @@ export default function MovementDetail() {
             {editable && <button type="button" className="btn" onClick={() => navigate(`/levizjet/${id}/ndrysho`)}>Ndrysho</button>}
             {canApprove && ['pending', 'draft'].includes(m.status) && <button type="button" className="btn ok" disabled={busy} onClick={approve}>Mirato dhe konfirmo</button>}
             {canApprove && m.status === 'pending' && <button type="button" className="btn danger" disabled={busy} onClick={reject}>Refuzo</button>}
-            {m.kind !== 'sale' && !['cancelled', 'rejected'].includes(m.status) && (canApprove || (editable && m.status !== 'confirmed')) && (
+            {!['sale', 'production'].includes(m.kind) && !['cancelled', 'rejected'].includes(m.status) && (canApprove || (editable && m.status !== 'confirmed')) && (
               <button type="button" className="btn danger" disabled={busy} onClick={cancel}>Anulo</button>
             )}
           </>
@@ -96,7 +96,9 @@ export default function MovementDetail() {
             {m.clientId && <><dt>Klienti</dt><dd><Link to={`/klientet/${m.clientId}`}>{extra.client}</Link></dd></>}
             {m.fiscalRef && <><dt>Nr. fature / dok. fiskal</dt><dd>{m.fiscalRef}</dd></>}
             {m.purchaseOrderId && <><dt>Porosia</dt><dd><Link to={`/porosite/${m.purchaseOrderId}`}>shiko porosinë</Link></dd></>}
-            {m.saleId && <><dt>Shitja</dt><dd><Link to={`/kimikate/${m.saleId}`}>shiko shitjen</Link></dd></>}
+            {m.saleId && <><dt>Shitja</dt><dd><Link to={`/kimikate/${m.saleId}`}>{m.saleNumber || 'shiko shitjen'}</Link></dd></>}
+            {m.invoiceNumber && <><dt>Fatura</dt><dd>{m.invoiceNumber}</dd></>}
+            {m.produced?.length > 0 && <><dt>Prodhuar për</dt><dd>{m.produced.map((p) => `${p.name} ${p.qty} ${p.unit}`).join(', ')}</dd></>}
           </dl>
         </Card>
         <Card title="Gjurmët">

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { evaluateFormula, formulaError, poolVariables } from '../src/shared/formula.js';
 import { hasCap } from '../src/shared/roles.js';
 import {
-  openReserved, planMovement, projectMaterialSummary, projectResult, stockKey, validateMovement,
+  explodeRecipes, isComposite, openReserved, planMovement, projectMaterialSummary, projectResult, stockKey, validateMovement,
 } from '../src/shared/stock.js';
 
 const locations = {
@@ -151,4 +151,28 @@ test('firestore.rules është në sinkron me rolet', async () => {
   const { syncedRules } = await import('../scripts/sync-rules.js');
   const text = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
   assert.equal(syncedRules(text), text);
+});
+
+test('receta: materialet e artikullit të përbërë dalin nga magazina, artikulli vetë jo', () => {
+  const products = {
+    adit: { name: 'Aditivi', recipe: [{ productId: 'm1', qty: 0.5 }, { productId: 'm2', qty: 2 }, { productId: '', qty: 1 }] },
+    m1: { name: 'Material 1', avgCost: 4 },
+    m2: { name: 'Material 2', avgCost: 1 },
+  };
+  assert.ok(isComposite(products.adit));
+  assert.ok(!isComposite(products.m1));
+  const comps = explodeRecipes([{ productId: 'adit', qty: 10 }, { productId: 'adit', qty: 1 }], products);
+  assert.deepEqual(comps, [{ productId: 'm1', qty: 5.5 }, { productId: 'm2', qty: 22 }]);
+
+  const locs = { ...locations, v_production: { kind: 'production', name: 'Prodhim' } };
+  const prod = planMovement({ kind: 'production', sourceId: 'main', destId: 'v_production', lines: comps },
+    { locations: locs, stock: { [stockKey('main', 'm1')]: 6, [stockKey('main', 'm2')]: 20 }, products }, 1);
+  assert.deepEqual(prod.errors.length, 1); // m2: 20 < 22
+  assert.equal(prod.stockDeltas[stockKey('main', 'm1')], -5.5);
+
+  // Shitja: rreshti i përbërë vjen nga "Prodhim" (virtual), pa prekur stokun e magazinës.
+  const sale = planMovement({ kind: 'sale', sourceId: 'main', destId: 'v_customer', lines: [{ productId: 'adit', qty: 10, sourceId: 'v_production' }] },
+    { locations: locs, stock: {}, products }, 1);
+  assert.equal(sale.errors.length, 0);
+  assert.deepEqual(sale.stockDeltas, {});
 });

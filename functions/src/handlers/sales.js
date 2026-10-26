@@ -2,15 +2,19 @@ import { onCall } from 'firebase-functions/v2/https';
 
 import { LOC, PAYMENT_METHODS } from '../shared/constants.js';
 import { CAPS } from '../shared/roles.js';
-import { validateMovement } from '../shared/stock.js';
+import { explodeRecipes, isComposite, validateMovement } from '../shared/stock.js';
 import { FieldValue, REGION, audit, db, fail, requireCap, reserveNumber, round2, userContext } from '../lib/context.js';
-import { loadContext, planOrFail, sanitizeLines, writeEffects } from '../lib/movements.js';
-import { cancelMovementTx } from './movements.js';
+import {
+  applyPlanToContext, loadContext, planOrFail, sanitizeLines, shareContexts, writeEffects,
+} from '../lib/movements.js';
+import { cancelMovementsTx } from './movements.js';
 
 /**
  * Regjistron dhe konfirmon një shitje (kimikate / pajisje).
  * Krijon: dokumentin e shitjes, lëvizjen e stokut drejt klientit, faturën në pritje të numrit fiskal
  * dhe pagesën (nëse nuk është me afat).
+ * Për artikujt e përbërë (me recetë, p.sh. Aditivi) krijon edhe fletëdaljen e prodhimit (PRO-…),
+ * që shkarkon materialet përbërëse nga i njëjti vend ku bëhet shitja.
  */
 export const confirmSale = onCall({ region: REGION }, async (request) => {
   const user = await userContext(request);
@@ -36,6 +40,15 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
     const invNumbering = await reserveNumber(tx, 'FAT', date);
     const clientSnap = movement.clientId ? await tx.get(db.doc(`clients/${movement.clientId}`)) : null;
     if (!clientSnap?.exists) fail('Zgjidhni klientin.', 'invalid-argument');
+
+    // Artikujt e përbërë nuk mbahen në stok: dalin nga "Prodhim", ndërsa materialet e tyre nga magazina.
+    const productIds = [...new Set(movement.lines.map((l) => l.productId))];
+    const productSnaps = productIds.length ? await tx.getAll(...productIds.map((id) => db.doc(`products/${id}`))) : [];
+    const recipes = Object.fromEntries(productSnaps.filter((p) => p.exists).map((p) => [p.id, p.data()]));
+    const compositeLines = movement.lines.filter((l) => isComposite(recipes[l.productId]));
+    for (const l of compositeLines) l.sourceId = LOC.PRODUCTION;
+    const components = explodeRecipes(compositeLines, recipes);
+
     const ctx = await loadContext(tx, movement);
     const errors = validateMovement(movement, ctx.locations);
     if (errors.length) fail(errors.join('\n'), 'invalid-argument');
@@ -46,6 +59,39 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
     if (!seesAll) {
       const nonChem = movement.lines.find((l) => !ctx.products[l.productId].isChemical);
       if (nonChem) fail(`"${ctx.products[nonChem.productId].name}" nuk është kimikat.`, 'permission-denied');
+    }
+
+    let production = null;
+    if (components.length) {
+      const prodNumbering = await reserveNumber(tx, 'PRO', date);
+      const prodMovement = {
+        kind: 'production',
+        date,
+        sourceId: movement.sourceId,
+        destId: LOC.PRODUCTION,
+        clientId: movement.clientId,
+        projectId: null,
+        lines: components.map((c) => ({ productId: c.productId, qty: c.qty, condition: 'good', note: '' })),
+        notes: '',
+      };
+      const prodCtx = await loadContext(tx, prodMovement);
+      shareContexts([ctx, prodCtx]);
+      production = { numbering: prodNumbering, movement: prodMovement, ctx: prodCtx, ref: db.collection('movements').doc() };
+    }
+
+    // Leximet mbaruan. Fillimisht prodhimi (shkruhet dhe përditëson gjendjen), pastaj shitja.
+    if (production) {
+      production.plan = planOrFail(production.movement, production.ctx, 1);
+      writeEffects(tx, production.ref.id, production.movement, production.ctx, production.plan, 1);
+      applyPlanToContext(ctx, production.plan);
+      // Kosto e artikullit të përbërë = shuma e materialeve sipas recetës.
+      for (const l of compositeLines) {
+        const unit = (recipes[l.productId].recipe || []).reduce(
+          (s, c) => s + Number(c.qty || 0) * Number(ctx.products[c.productId]?.avgCost || ctx.products[c.productId]?.purchasePrice || 0), 0,
+        );
+        ctx.products[l.productId].avgCost = round2(unit);
+        tx.set(db.doc(`productCosts/${l.productId}`), { avgCost: round2(unit), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      }
     }
     const plan = planOrFail(movement, ctx, 1);
 
@@ -65,8 +111,41 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
       qty: l.qty,
       unitPrice: l.unitPrice,
       total: round2(l.qty * l.unitPrice),
+      ...(l.sourceId ? { sourceId: l.sourceId, composite: true } : {}),
     }));
     writeEffects(tx, movRef.id, movement, ctx, plan, 1);
+    if (production) {
+      const p = production;
+      p.numbering.commit();
+      tx.set(p.ref, {
+        ...p.movement,
+        number: p.numbering.number,
+        lines: p.movement.lines.map((l) => ({
+          ...l,
+          code: ctx.products[l.productId].code || '',
+          name: ctx.products[l.productId].name || '',
+          unit: ctx.products[l.productId].unit || '',
+        })),
+        productIds: p.movement.lines.map((l) => l.productId),
+        // Për çfarë u prodhua: p.sh. "Aditivi 10 kg".
+        produced: compositeLines.map((l) => ({ productId: l.productId, name: ctx.products[l.productId].name || '', unit: ctx.products[l.productId].unit || '', qty: l.qty })),
+        sourceName: source.name,
+        destName: ctx.locations[LOC.PRODUCTION].name,
+        saleId: saleRef.id,
+        saleNumber: numbering.number,
+        invoiceId: invRef.id,
+        invoiceNumber: invNumbering.number,
+        notes: `Prodhim për shitjen ${numbering.number} · fatura ${invNumbering.number} · ${client.name}`,
+        status: 'confirmed',
+        participants: [user.uid],
+        createdBy: user.uid,
+        createdByName: user.name,
+        createdAt: FieldValue.serverTimestamp(),
+        confirmedBy: user.uid,
+        confirmedByName: user.name,
+        confirmedAt: FieldValue.serverTimestamp(),
+      });
+    }
     tx.set(movRef, {
       ...movement,
       number: numbering.number,
@@ -75,6 +154,8 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
       sourceName: source.name,
       destName: client.name,
       saleId: saleRef.id,
+      invoiceNumber: invNumbering.number,
+      productionId: production?.ref.id || null,
       status: 'confirmed',
       participants: [user.uid],
       createdBy: user.uid,
@@ -100,7 +181,10 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
       total,
       status: 'confirmed',
       movementId: movRef.id,
+      productionId: production?.ref.id || null,
+      productionNumber: production?.numbering.number || null,
       invoiceId: invRef.id,
+      invoiceNumber: invNumbering.number,
       notes: movement.notes,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -116,6 +200,7 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
       amount: total,
       saleId: saleRef.id,
       saleNumber: numbering.number,
+      productionNumber: production?.numbering.number || null,
       projectId: null,
       source: 'superpool',
       createdBy: user.uid,
@@ -137,7 +222,7 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
       });
     }
     audit(tx, { user, action: 'confirm', collection: 'sales', id: saleRef.id, label: `${numbering.number} · ${client.name}`, changes: { total } });
-    return { id: saleRef.id, number: numbering.number, total };
+    return { id: saleRef.id, number: numbering.number, total, productionNumber: production?.numbering.number || null };
   });
 });
 
@@ -157,7 +242,7 @@ export const cancelSale = onCall({ region: REGION }, async (request) => {
       fail('Fatura është fiskalizuar. Anulojeni fillimisht në programin e faturimit dhe regjistroni kthimin nga klienti.');
     }
     const payments = await tx.get(db.collection('payments').where('saleId', '==', id));
-    await cancelMovementTx(tx, user, sale.get('movementId'), reason, { allowSale: true });
+    await cancelMovementsTx(tx, user, [sale.get('movementId'), sale.get('productionId')], reason, { allowSale: true });
     tx.update(saleRef, { status: 'cancelled', cancelReason: reason, cancelledBy: user.uid, cancelledAt: FieldValue.serverTimestamp() });
     if (inv?.exists) tx.update(invRef, { status: 'cancelled' });
     payments.forEach((p) => tx.update(p.ref, { status: 'cancelled' }));

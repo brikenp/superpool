@@ -257,6 +257,43 @@ async function main() {
   assert.equal(await stockOf(mag.db, 'main', pump), 7);
   ok('porosia pranohet pjesërisht dhe plotësisht');
 
+  // --- Artikull i përbërë (receta): shitja shkarkon materialet me fletëdalje prodhimi ---
+  const adt = (await addDoc(collection(mag.db, 'products'), {
+    code: 'ADT', name: 'Aditivi', unit: 'kg', categoryId: catChem.id, isChemical: true, salePrice: 900, active: true,
+    qtyTotal: 0, qtyMain: 0, qtyReserved: 0,
+    recipe: [{ productId: chlor, qty: 0.5 }, { productId: pipe, qty: 2 }],
+  })).id;
+  const [pipe0, chlor0] = [await stockOf(mag.db, 'main', pipe), await stockOf(mag.db, 'main', chlor)];
+  const short = await denied(admin.call('confirmSale', { sale: { clientId: client.id, locationId: 'main', paymentMethod: 'credit', lines: [{ productId: adt, qty: 100, unitPrice: 900 }] } }), 'prodhim pa materiale');
+  assert.match(short.message, /pamjaftueshëm/);
+  const adSale = await admin.call('confirmSale', { sale: { clientId: client.id, locationId: 'main', paymentMethod: 'credit', lines: [{ productId: adt, qty: 4, unitPrice: 900 }, { productId: chlor, qty: 1, unitPrice: 2500 }] } });
+  assert.match(adSale.productionNumber, /^PRO-/);
+  assert.equal(await stockOf(mag.db, 'main', pipe), pipe0 - 8);
+  assert.equal(await stockOf(mag.db, 'main', chlor), chlor0 - 2 - 1);
+  assert.equal(await stockOf(mag.db, 'main', adt), 0);
+  const adSaleDoc = (await getDoc(doc(admin.db, 'sales', adSale.id))).data();
+  const prodMov = (await getDoc(doc(admin.db, 'movements', adSaleDoc.productionId))).data();
+  assert.equal(prodMov.kind, 'production');
+  assert.equal(prodMov.invoiceNumber, adSaleDoc.invoiceNumber);
+  assert.equal((await getDoc(doc(admin.db, 'products', chlor))).data().qtyMain, chlor0 - 3);
+  await denied(mag.call('cancelMovement', { id: adSaleDoc.productionId, reason: 'x' }), 'anulim i prodhimit veç shitjes');
+  await mag.call('cancelSale', { id: adSale.id, reason: 'test' });
+  assert.equal(await stockOf(mag.db, 'main', pipe), pipe0);
+  assert.equal(await stockOf(mag.db, 'main', chlor), chlor0);
+  assert.equal((await getDoc(doc(admin.db, 'movements', adSaleDoc.productionId))).data().status, 'cancelled');
+  ok(`artikulli me recetë: shitja krijon ${adSale.productionNumber} që shkarkon materialet; anulimi i kthen`);
+
+  // --- Faturë manuale: paradhënie e projektit ---
+  const adv = await addDoc(collection(admin.db, 'invoices'), {
+    type: 'advance', kind: 'project', projectId, clientId: client.id, clientName: 'Vila Golem', amount: 50000,
+    date: '2026-10-22', dueDate: '2026-10-22', fiscalNumber: '', status: 'pending_fiscal', source: 'superpool', createdBy: admin.uid,
+  });
+  await addDoc(collection(admin.db, 'payments'), { invoiceId: adv.id, projectId, clientId: client.id, amount: 50000, method: 'bank', date: '2026-10-22', status: 'active', source: 'superpool' });
+  await denied(addDoc(collection(mag.db, 'invoices'), { type: 'advance', amount: 1, source: 'superpool' }), 'magazinieri shton faturë');
+  const projInv = await getDocs(query(collection(admin.db, 'invoices'), where('projectId', '==', projectId)));
+  assert.equal(projInv.docs.find((d) => d.id === adv.id).data().type, 'advance');
+  ok('fatura manuale (paradhënie) e lidhur me projektin, me pagesën e saj');
+
   // --- Roli i personalizuar (leje të zgjedhura me dorë) ---
   const custom = await admin.call('createUser', {
     email: 'custom@superpool.al', password: 'Fjalekalim123', name: 'custom', role: 'custom', caps: ['inventory_view', 'movements_create', 'nuk_ekziston'],

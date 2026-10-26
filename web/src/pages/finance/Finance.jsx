@@ -14,6 +14,14 @@ import { db } from '../../lib/firebase.js';
 import { addDays, date, money, todayISO, toNumber } from '../../lib/format.js';
 
 export const INVOICE_STATUS = { pending_fiscal: 'Pa numër fiskal', issued: 'E lëshuar', cancelled: 'Anuluar' };
+// Lloji i faturës manuale (fusha "type"); faturat e shitjeve krijohen nga moduli i shitjeve.
+export const INVOICE_TYPES = {
+  advance: 'Paradhënie',
+  partial: 'Situacion / faturë e pjesshme',
+  final: 'Faturë përfundimtare',
+  other: 'Tjetër',
+};
+export const invoiceTypeLabel = (i) => (i.saleId ? 'Shitje' : INVOICE_TYPES[i.type] || (i.projectId ? 'Projekt' : 'Tjetër'));
 
 export function InvoiceForm({ record, onClose }) {
   const { clients, clientsById } = useData();
@@ -21,11 +29,20 @@ export function InvoiceForm({ record, onClose }) {
   const projects = useQuery(() => query(collection(db, 'projects')), []);
   const isNew = !record.id;
   const [v, setV] = useState({
-    fiscalNumber: '', date: todayISO(), dueDate: addDays(todayISO(), 15), amount: '', projectId: '', notes: '', ...record,
+    fiscalNumber: '', date: todayISO(), dueDate: addDays(todayISO(), 15), amount: '', projectId: '', notes: '',
+    type: record.projectId ? 'advance' : 'other', ...record,
   });
   const [run, busy] = useAction();
   const set = (k, val) => setV((s) => ({ ...s, [k]: val }));
-  const clientProjects = projects.data.filter((p) => p.clientId === v.clientId);
+  // Pa klient të zgjedhur shfaqen të gjitha projektet; zgjedhja e projektit plotëson klientin.
+  const clientProjects = projects.data.filter((p) => !v.clientId || p.clientId === v.clientId);
+  const pickProject = (id) => {
+    const p = projects.data.find((x) => x.id === id);
+    setV((s) => ({ ...s, projectId: id, ...(p?.clientId && isNew ? { clientId: p.clientId } : {}) }));
+  };
+  const pickClient = (id) => setV((s) => ({
+    ...s, clientId: id, projectId: projects.data.find((p) => p.id === s.projectId)?.clientId === id ? s.projectId : '',
+  }));
 
   const save = () => run(async () => {
     if (!v.clientId) throw new Error('Zgjidhni klientin.');
@@ -42,8 +59,16 @@ export function InvoiceForm({ record, onClose }) {
       notes: v.notes || '',
       updatedAt: serverTimestamp(),
     };
+    if (!record.saleId) data.type = INVOICE_TYPES[v.type] ? v.type : 'other';
     if (isNew) {
-      await addDoc(collection(db, 'invoices'), { ...data, kind: v.projectId ? 'project' : 'other', source: 'superpool', createdBy: uid, createdAt: serverTimestamp() });
+      const ref = await addDoc(collection(db, 'invoices'), { ...data, kind: v.projectId ? 'project' : 'other', source: 'superpool', createdBy: uid, createdAt: serverTimestamp() });
+      if (v.paidNow) {
+        await addDoc(collection(db, 'payments'), {
+          date: v.date, clientId: v.clientId, clientName: data.clientName, invoiceId: ref.id, projectId: data.projectId,
+          amount: data.amount, method: v.paidMethod || 'bank', reference: data.fiscalNumber || INVOICE_TYPES[data.type],
+          status: 'active', source: 'superpool', createdBy: uid, createdAt: serverTimestamp(),
+        });
+      }
     } else {
       if (record.saleId) delete data.amount; // vlera e shitjes vjen nga dokumenti i shitjes
       await setDoc(doc(db, 'invoices', record.id), data, { merge: true });
@@ -52,26 +77,46 @@ export function InvoiceForm({ record, onClose }) {
   }, 'Fatura u ruajt.');
 
   return (
-    <Modal title={isNew ? 'Regjistro faturë' : `Fatura ${record.fiscalNumber || record.internalNumber || ''}`} onClose={onClose}
+    <Modal title={isNew ? 'Shto faturë manuale' : `Fatura ${record.fiscalNumber || record.internalNumber || ''}`} onClose={onClose}
       footer={<><button type="button" className="btn" onClick={onClose}>Anulo</button><button type="button" className="btn primary" disabled={busy} onClick={save}>Ruaj</button></>}>
       <p className="muted" style={{ marginTop: 0 }}>Fatura fiskale lëshohet në programin e faturimit; këtu regjistrohet numri dhe vlera për ndjekjen e detyrimeve.</p>
       <div className="form-grid">
         <Field label="Klienti" required className="span-2">
-          <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={v.clientId || ''} onChange={(val) => set('clientId', val)} disabled={!isNew} />
+          <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={v.clientId || ''} onChange={pickClient} disabled={!isNew} />
         </Field>
+        {!record.saleId && (
+          <Field label="Lloji">
+            <select value={v.type} onChange={(e) => set('type', e.target.value)}>
+              {Object.entries(INVOICE_TYPES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Nr. fiskal i faturës"><input value={v.fiscalNumber} onChange={(e) => set('fiscalNumber', e.target.value)} /></Field>
         <Field label="Vlera me TVSH (L)" required><input className="num" type="number" step="any" value={v.amount} disabled={Boolean(record.saleId)} onChange={(e) => set('amount', e.target.value)} /></Field>
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
         <Field label="Afati i pagesës"><input type="date" value={v.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
         {!record.saleId && (
-          <Field label="Projekti" className="span-2">
-            <select value={v.projectId || ''} onChange={(e) => set('projectId', e.target.value)}>
-              <option value="">—</option>
-              {clientProjects.map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}
-            </select>
+          <Field label="Projekti" className="span-2" hint={v.type === 'advance' ? 'Paradhënia regjistrohet te faturuara e projektit.' : undefined}>
+            <SearchSelect
+              options={[{ value: '', label: '— pa projekt —' }, ...clientProjects.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}`, sub: p.clientName }))]}
+              value={v.projectId || ''}
+              onChange={pickProject}
+            />
           </Field>
         )}
         <Field label="Shënime" className="span-all"><input value={v.notes || ''} onChange={(e) => set('notes', e.target.value)} /></Field>
+        {isNew && (
+          <label className="checkbox span-all">
+            <input type="checkbox" checked={Boolean(v.paidNow)} onChange={(e) => set('paidNow', e.target.checked)} /> Është paguar tani (regjistro edhe pagesën me të njëjtën vlerë)
+          </label>
+        )}
+        {isNew && v.paidNow && (
+          <Field label="Mënyra e pagesës">
+            <select value={v.paidMethod || 'bank'} onChange={(e) => set('paidMethod', e.target.value)}>
+              {Object.entries(PAYMENT_METHODS).filter(([k]) => k !== 'credit').map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </Field>
+        )}
         {!isNew && !record.saleId && (
           <label className="checkbox span-all"><input type="checkbox" checked={v.status === 'cancelled'} onChange={(e) => set('status', e.target.checked ? 'cancelled' : '')} /> Fatura është anuluar</label>
         )}
@@ -202,6 +247,7 @@ function FinanceSection({ section }) {
           filtersText={[`Nga ${date(from)}`]}
           columns={[
             { key: 'date', label: 'Data', render: (i) => date(i.date) },
+            { key: 'type', label: 'Lloji', value: invoiceTypeLabel },
             { key: 'fiscalNumber', label: 'Nr. fiskal' },
             { key: 'internalNumber', label: 'Nr. i brendshëm', value: (i) => i.internalNumber || i.saleNumber || '' },
             { key: 'clientName', label: 'Klienti' },

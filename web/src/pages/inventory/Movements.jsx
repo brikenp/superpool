@@ -29,7 +29,7 @@ export const movementColumns = (extra = []) => [
 export const MOVEMENT_SECTIONS = {
   miratim: { title: 'Lëvizjet për miratim', subtitle: 'Daljet, kthimet, humbjet dhe transferimet e regjistruara nga terreni që presin miratimin.', kinds: null, status: 'pending' },
   hyrjet: { title: 'Hyrjet nga blerja', subtitle: 'Fletëhyrjet nga furnitorët (faturat e blerjes) dhe kthimet nga klientët.', kinds: ['purchase', 'customer_return'], create: 'purchase', createLabel: 'Fletëhyrje e re' },
-  daljet: { title: 'Daljet', subtitle: 'Materialet që dalin nga magazina drejt automjeteve, kantiereve ose shitësit të kimikateve.', kinds: ['issue', 'agent_issue'], create: 'issue', createLabel: 'Dalje e re' },
+  daljet: { title: 'Daljet', subtitle: 'Materialet që dalin nga magazina drejt automjeteve, kantiereve, shitësit të kimikateve dhe për prodhim (receta).', kinds: ['issue', 'agent_issue', 'production'], create: 'issue', createLabel: 'Dalje e re' },
   dorezimet: { title: 'Dorëzimet në kantier', subtitle: 'Materialet e shkarkuara nga automjeti në kantier.', kinds: ['delivery'], create: 'delivery', createLabel: 'Dorëzim i ri' },
   perdorimi: { title: 'Përdorimi në projekte', subtitle: 'Materialet e përdorura realisht në projekte.', kinds: ['consumption'], create: 'consumption', createLabel: 'Regjistro përdorim' },
   kthimet: { title: 'Kthimet', subtitle: 'Kthimet në magazinë nga automjetet/kantieret dhe kthimet te furnitorët.', kinds: ['return', 'supplier_return'], create: 'return', createLabel: 'Kthim i ri' },
@@ -66,7 +66,7 @@ function MovementsList({ section }) {
   const inSection = (m) => !section?.kinds || section.kinds.includes(m.kind);
   const kindOptions = Object.entries(MOVEMENT_KINDS).filter(([k]) => !section?.kinds || section.kinds.includes(k));
 
-  const newKinds = Object.entries(MOVEMENT_KINDS).filter(([k]) => k !== 'sale'
+  const newKinds = Object.entries(MOVEMENT_KINDS).filter(([k]) => k !== 'sale' && k !== 'production'
     && (can(CAPS.INVENTORY_MANAGE, CAPS.MOVEMENTS_APPROVE) || ['issue', 'delivery', 'consumption', 'return', 'loss'].includes(k)));
 
   return (
