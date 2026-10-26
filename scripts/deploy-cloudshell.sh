@@ -49,25 +49,43 @@ fi
 echo "▶ Vendosja e rregullave/indekseve të Firestore…"
 $FIREBASE deploy --only firestore --project "$PROJECT" --force
 
-# Google kufizon sa funksione përditësohen njëherësh; ato që dështojnë provohen sërish vetëm (deri 4 herë).
+# Google kufizon sa funksione përditësohen njëherësh (kuota për minutë). Prandaj: një deploy i plotë,
+# pastaj funksionet që dështuan vendosen me grupe të vogla (3 nga 3), me pushim mes grupeve.
+failed_from() {
+  # Emrat nga "…following functions: emri(europe-west1)" dhe "Failed to … function projects/…/functions/emri".
+  { grep -oE '^[[:space:]]+[A-Za-z][A-Za-z0-9_]*\(europe-west1\)' "$1" | tr -d ' \t' | sed 's/(.*//';
+    grep -oE "Failed to (update|create) function [^ ]+" "$1" | awk '{print $NF}' | sed 's#.*/##'; } \
+    | grep -E '^[A-Za-z][A-Za-z0-9_]*$' | grep -v '^projects$' | sort -u || true
+}
+deploy_only() { # $1 = lista "functions:a,functions:b"; kthen 0 nëse s'ka dështime
+  $FIREBASE deploy --only "$1" --project "$PROJECT" --force 2>&1 | tee "$LOG" || true
+  ! grep -q "Failed to update function\|Failed to create function\|There was an error deploying" "$LOG"
+}
+
 echo "▶ Vendosja e Cloud Functions (disa minuta)…"
 LOG=$(mktemp)
-ONLY="functions"
-for TRY in 1 2 3 4; do
-  if $FIREBASE deploy --only "$ONLY" --project "$PROJECT" --force 2>&1 | tee "$LOG"; then
-    if ! grep -q "Failed to update function\|Failed to create function" "$LOG"; then break; fi
+if ! deploy_only functions; then
+  PENDING=$(failed_from "$LOG")
+  if [ -z "$PENDING" ]; then echo "⚠ Deploy-i dështoi për një arsye tjetër — shihni mesazhet më sipër."; exit 1; fi
+  LEFT=""
+  for BATCH in $(echo "$PENDING" | paste -d, - - - | sed 's/,,*$//'); do
+    ONLY=$(echo "$BATCH" | tr ',' '\n' | grep . | sed 's/^/functions:/' | paste -sd, -)
+    for TRY in 1 2 3; do
+      echo "↻ Pres 60 sekonda (kufiri i Google) dhe vendos: $ONLY (prova $TRY)"
+      sleep 60
+      if deploy_only "$ONLY"; then ONLY=""; break; fi
+      F=$(failed_from "$LOG")
+      [ -z "$F" ] && break
+      ONLY=$(echo "$F" | sed 's/^/functions:/' | paste -sd, -)
+    done
+    [ -n "$ONLY" ] && LEFT="$LEFT $ONLY"
+  done
+  if [ -n "$LEFT" ]; then
+    echo "⚠ Këto funksione nuk u vendosën:$LEFT"
+    echo "  Prisni 5 minuta dhe ekzekutoni sërish skriptin (funksionet e tjera janë gati)."
+    exit 1
   fi
-  # Emrat merren nga lista "Functions deploy had errors with the following functions: emri(europe-west1)"
-  # dhe nga "Failed to create function projects/…/functions/emri" (vetëm pjesa e fundit e shtegut).
-  FAILED=$( { grep -oE '^[[:space:]]+[A-Za-z][A-Za-z0-9_]*\(europe-west1\)' "$LOG" | tr -d ' \t' | sed 's/(.*//';
-              grep -oE "Failed to (update|create) function [^ ]+" "$LOG" | awk '{print $NF}' | sed 's#.*/##'; } \
-            | grep -E '^[A-Za-z][A-Za-z0-9_]*$' | grep -v '^projects$' | sort -u || true)
-  if [ -z "$FAILED" ]; then echo "⚠ Deploy-i dështoi për një arsye tjetër — shihni mesazhet më sipër."; exit 1; fi
-  if [ "$TRY" = 4 ]; then echo "⚠ Këto funksione nuk u vendosën pas 4 provash: $FAILED"; exit 1; fi
-  ONLY=$(echo "$FAILED" | sed 's/^/functions:/' | paste -sd, -)
-  echo "↻ Pres 90 sekonda dhe provoj sërish: $ONLY"
-  sleep 90
-done
+fi
 rm -f "$LOG"
 
 # Funksionet onCall duhet të jenë të thirrshme nga shfletuesi (kontrolli i identitetit bëhet brenda kodit).
