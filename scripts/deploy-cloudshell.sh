@@ -57,7 +57,11 @@ for TRY in 1 2 3 4; do
   if $FIREBASE deploy --only "$ONLY" --project "$PROJECT" --force 2>&1 | tee "$LOG"; then
     if ! grep -q "Failed to update function\|Failed to create function" "$LOG"; then break; fi
   fi
-  FAILED=$(grep -oE "Failed to (update|create) function [A-Za-z0-9_]+" "$LOG" | awk '{print $NF}' | sort -u || true)
+  # Emrat merren nga lista "Functions deploy had errors with the following functions: emri(europe-west1)"
+  # dhe nga "Failed to create function projects/…/functions/emri" (vetëm pjesa e fundit e shtegut).
+  FAILED=$( { grep -oE '^[[:space:]]+[A-Za-z][A-Za-z0-9_]*\(europe-west1\)' "$LOG" | tr -d ' \t' | sed 's/(.*//';
+              grep -oE "Failed to (update|create) function [^ ]+" "$LOG" | awk '{print $NF}' | sed 's#.*/##'; } \
+            | grep -E '^[A-Za-z][A-Za-z0-9_]*$' | grep -v '^projects$' | sort -u || true)
   if [ -z "$FAILED" ]; then echo "⚠ Deploy-i dështoi për një arsye tjetër — shihni mesazhet më sipër."; exit 1; fi
   if [ "$TRY" = 4 ]; then echo "⚠ Këto funksione nuk u vendosën pas 4 provash: $FAILED"; exit 1; fi
   ONLY=$(echo "$FAILED" | sed 's/^/functions:/' | paste -sd, -)
