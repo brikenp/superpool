@@ -512,3 +512,6 @@ button.nav-group-title .chev { transition: transform 0.15s; opacity: 0.7; }
 .btn.warn { color: var(--warn); border-color: var(--warn-border, var(--border)); background: var(--warn-bg, transparent); }
 .show-sm { display: none; }
 @media (max-width: 640px) { .hide-sm { display: none; } .show-sm { display: inline; } }
+
+/* Zona e rrezikut te Cilësimet */
+.card.danger-zone { border-color: var(--danger-border, #fecaca); }

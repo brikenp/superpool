@@ -507,6 +507,22 @@ async function main() {
   await denied(getDocs(collection(mag.db, 'auditLog')), 'magazinieri lexon gjurmët');
   ok(`gjurmët e veprimeve (${audit.size} regjistrime), të dukshme vetëm për administratorin`);
 
+  // --- Zona e rrezikut: fshirja e të dhënave të punës, konfigurimi mbetet ---
+  await denied(mag.call('resetData', { groups: ['transactions'], confirm: 'FSHI' }), 'magazinieri fshin të dhënat');
+  await denied(admin.call('resetData', { groups: ['transactions'], confirm: 'po' }), 'pa konfirmim');
+  const rr = await admin.call('resetData', { groups: ['transactions', 'clients'], confirm: 'fshi' });
+  assert.ok(rr.deleted.movements > 0 && rr.deleted.invoices > 0);
+  for (const c of ['movements', 'stock', 'invoices', 'payments', 'projects', 'offers', 'sales', 'clients']) {
+    assert.equal((await getDocs(collection(admin.db, c))).size, 0, `${c} duhej fshirë`);
+  }
+  assert.equal((await getDoc(doc(admin.db, 'products', pipe))).data().qtyMain, 0);
+  assert.ok((await getDoc(doc(admin.db, 'users', users.mag))).exists());
+  assert.ok((await getDoc(doc(admin.db, 'settings', 'company'))).exists());
+  assert.ok((await getDoc(doc(admin.db, 'locations', 'main'))).exists());
+  assert.ok((await getDoc(doc(admin.db, 'locations', vehLoc))).exists());
+  assert.equal((await admin.call('allocateNumber', { prefix: 'OF' })).number.slice(-4), '0001');
+  ok('zona e rrezikut: lëvizjet, dokumentet dhe klientët u fshinë; përdoruesit, cilësimet, artikujt dhe magazinat mbetën');
+
   for (const s of [admin, mag, gerti, worker, ofer]) await deleteApp(s.app);
   console.log(`\nTë gjitha ${step} kontrollet kaluan.`);
 }

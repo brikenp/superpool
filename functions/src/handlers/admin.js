@@ -4,7 +4,7 @@ import { LOC, VIRTUAL_LOCATIONS } from '../shared/constants.js';
 import { CAPS, CUSTOM_ROLE, ROLES, sanitizeCaps } from '../shared/roles.js';
 import { FieldValue, REGION, audit, auth, db, fail, requireCap, reserveNumber, userContext } from '../lib/context.js';
 
-async function ensureBaseData() {
+export async function ensureBaseData() {
   const batch = db.batch();
   for (const [id, loc] of Object.entries(VIRTUAL_LOCATIONS)) {
     batch.set(db.doc(`locations/${id}`), { ...loc, active: true, virtual: true }, { merge: true });

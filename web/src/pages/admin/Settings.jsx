@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, Field, PageHeader, useAction } from '../../components/ui.jsx';
 import { useData } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
+import { DangerZone } from './DangerZone.jsx';
 import { toNumber } from '../../lib/format.js';
 
 const FIELDS = [
@@ -53,6 +54,7 @@ export default function Settings() {
           {TEXTS.map(([k, l]) => <Field key={k} label={l}><textarea value={v[k] || ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></Field>)}
         </div>
       </Card>
+      <DangerZone />
     </>
   );
 }
