@@ -139,6 +139,7 @@ const NUMBER_PREFIXES = {
   NUM: CAPS.INVENTORY_MANAGE,
   FAT: CAPS.FINANCE,
   KON: [CAPS.FINANCE, CAPS.PROJECTS_MANAGE],
+  MA: CAPS.FINANCE, // mandat arkëtimi
 };
 
 /** Jep numrin e radhës për dokumentet që krijohen nga aplikacioni (oferta, porosi, projekte...). */

@@ -7,10 +7,12 @@ import { PAYMENT_METHODS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
+import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
+import { invoicePdf } from '../../lib/printDocs.js';
 import { Field, Modal, PageHeader, SearchSelect, StatusBadge, useAction } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
-import { db } from '../../lib/firebase.js';
+import { call, db } from '../../lib/firebase.js';
 import { addDays, date, money, todayISO, toNumber } from '../../lib/format.js';
 
 export const INVOICE_STATUS = { pending_fiscal: 'Pa numër fiskal', issued: 'E lëshuar', cancelled: 'Anuluar' };
@@ -24,7 +26,7 @@ export const INVOICE_TYPES = {
 export const invoiceTypeLabel = (i) => (i.saleId ? 'Shitje' : INVOICE_TYPES[i.type] || (i.projectId ? 'Projekt' : 'Tjetër'));
 
 export function InvoiceForm({ record, onClose }) {
-  const { clients, clientsById } = useData();
+  const { clients, clientsById, company } = useData();
   const { uid } = useAuth();
   const projects = useQuery(() => query(collection(db, 'projects')), []);
   const isNew = !record.id;
@@ -62,11 +64,14 @@ export function InvoiceForm({ record, onClose }) {
     if (!record.saleId) data.type = INVOICE_TYPES[v.type] ? v.type : 'other';
     if (isNew && record.contractId) Object.assign(data, { contractId: record.contractId, contractNumber: record.contractNumber || '', installmentKey: record.installmentKey || null });
     if (isNew) {
-      const ref = await addDoc(collection(db, 'invoices'), { ...data, kind: v.projectId ? 'project' : 'other', source: 'superpool', createdBy: uid, createdAt: serverTimestamp() });
+      const { number: internalNumber } = await call('allocateNumber', { prefix: 'FAT' });
+      const ref = await addDoc(collection(db, 'invoices'), { ...data, internalNumber, kind: v.projectId ? 'project' : 'other', source: 'superpool', createdBy: uid, createdAt: serverTimestamp() });
       if (v.paidNow) {
+        const { number } = await call('allocateNumber', { prefix: 'MA' });
         await addDoc(collection(db, 'payments'), {
+          number,
           date: v.date, clientId: v.clientId, clientName: data.clientName, invoiceId: ref.id, projectId: data.projectId,
-          amount: data.amount, method: v.paidMethod || 'bank', reference: data.fiscalNumber || INVOICE_TYPES[data.type],
+          amount: data.amount, method: v.paidMethod || 'bank', reference: data.fiscalNumber || internalNumber,
           status: 'active', source: 'superpool', createdBy: uid, createdAt: serverTimestamp(),
         });
       }
@@ -79,7 +84,13 @@ export function InvoiceForm({ record, onClose }) {
 
   return (
     <Modal title={isNew ? 'Shto faturë manuale' : `Fatura ${record.fiscalNumber || record.internalNumber || ''}`} onClose={onClose}
-      footer={<><button type="button" className="btn" onClick={onClose}>Anulo</button><button type="button" className="btn primary" disabled={busy} onClick={save}>Ruaj</button></>}>
+      footer={(
+        <>
+          {!isNew && <button type="button" className="btn" style={{ marginRight: 'auto' }} disabled={busy} onClick={() => run(() => invoicePdf(record, { company, clientsById }))}>PDF / Printo</button>}
+          <button type="button" className="btn" onClick={onClose}>Anulo</button>
+          <button type="button" className="btn primary" disabled={busy} onClick={save}>Ruaj</button>
+        </>
+      )}>
       {record.contractNumber && <div className="alert info">Kësti i kontratës {record.contractNumber} — fatura lidhet me kontratën.</div>}
       <p className="muted" style={{ marginTop: 0 }}>Fatura fiskale lëshohet në programin e faturimit; këtu regjistrohet numri dhe vlera për ndjekjen e detyrimeve.</p>
       <div className="form-grid">
@@ -138,7 +149,9 @@ export function PaymentForm({ record, invoices = [], onClose }) {
   const save = () => run(async () => {
     if (!v.clientId) throw new Error('Zgjidhni klientin.');
     if (!(toNumber(v.amount) > 0)) throw new Error('Shkruani shumën.');
+    const { number } = await call('allocateNumber', { prefix: 'MA' });
     await addDoc(collection(db, 'payments'), {
+      number,
       date: v.date, clientId: v.clientId, clientName: clientsById[v.clientId]?.name || '', invoiceId: v.invoiceId || null,
       amount: toNumber(v.amount), method: v.method, reference: v.reference || '', status: 'active', source: 'superpool',
       createdBy: uid, createdAt: serverTimestamp(),
@@ -256,6 +269,7 @@ function FinanceSection({ section }) {
             { key: 'dueDate', label: 'Afati', render: (i) => date(i.dueDate) },
             { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : i.amount) },
             { key: 'status', label: 'Statusi', value: (i) => INVOICE_STATUS[i.status], render: (i) => <StatusBadge status={i.status} labels={INVOICE_STATUS} /> },
+            printColumn((i) => <PrintInvoiceButton invoice={i} />),
           ]}
         />
       )}
@@ -266,10 +280,12 @@ function FinanceSection({ section }) {
           filtersText={[`Nga ${date(from)}`]}
           columns={[
             { key: 'date', label: 'Data', render: (p) => date(p.date) },
+            { key: 'number', label: 'Nr. mandati' },
             { key: 'clientName', label: 'Klienti' },
             { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHODS[p.method] || p.method },
             { key: 'reference', label: 'Referenca' },
             { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : p.amount) },
+            printColumn((p) => <PrintPaymentButton payment={p} />),
           ]}
         />
       )}

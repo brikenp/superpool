@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MOVEMENT_KINDS, MOVEMENT_STATUS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
+import { PrintMovementButton, printColumn } from '../../components/PrintButton.jsx';
 import { DataTable } from '../../components/DataTable.jsx';
 import { Field, PageHeader, StatusBadge, Tabs } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -23,6 +24,7 @@ export const movementColumns = (extra = []) => [
   { key: 'lines', label: 'Artikuj', type: 'number', value: (m) => (m.lines || []).length },
   { key: 'createdByName', label: 'Regjistroi' },
   { key: 'status', label: 'Statusi', value: (m) => MOVEMENT_STATUS[m.status], render: (m) => <StatusBadge status={m.status} labels={MOVEMENT_STATUS} /> },
+  printColumn((m) => <PrintMovementButton movement={m} />),
 ];
 
 // Seksionet e menysë "Lëvizjet e mallit": secili tregon vetëm llojet e veta.

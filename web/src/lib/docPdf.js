@@ -15,7 +15,9 @@ export async function movementPdf({ movement, company, costs, extra = {} }) {
   const { jsPDF, autoTable } = await loadPdf();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const def = MOVEMENT_KINDS[movement.kind];
-  let y = companyHeader(doc, company, def?.label || 'Dokument', `${movement.number} · ${date(movement.date)}`);
+  // Emri i dokumentit siç printohet: fletëhyrje për çdo hyrje në magazinë, fletëdalje për çdo dalje.
+  const title = { purchase: 'FLETËHYRJE', customer_return: 'FLETËHYRJE', return: 'FLETËHYRJE (KTHIM)', issue: 'FLETËDALJE', agent_issue: 'FLETËDALJE', production: 'FLETË PRODHIMI', supplier_return: 'FLETËDALJE (KTHIM TE FURNITORI)', transfer: 'FLETË TRANSFERIMI' }[movement.kind];
+  let y = companyHeader(doc, company, title || def?.label || 'Dokument', `${title ? `${def?.label} · ` : ''}${movement.number} · ${date(movement.date)}`);
 
   const meta = [
     ['Nga', movement.sourceName],
@@ -56,6 +58,8 @@ export async function movementPdf({ movement, company, costs, extra = {} }) {
     startY: y,
     head: [head],
     body,
+    foot: showCost ? [head.map((h, i) => (i === 0 ? 'Totali' : h === 'Vlera' ? money((movement.lines || []).reduce((s, l, k) => s + (costs[k] || 0) * l.qty, 0)) : ''))] : undefined,
+    footStyles: { fillColor: [235, 242, 247], textColor: 20, fontStyle: 'bold' },
     styles: { fontSize: 8.5, cellPadding: 1.5 },
     headStyles: { fillColor: [25, 46, 65] },
   });

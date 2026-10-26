@@ -8,6 +8,7 @@ import { OFFER_STATUS, PAYMENT_METHODS, PROJECT_STATUS } from '@shared/constants
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
+import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
 import { EntityForm } from '../../components/EntityForm.jsx';
 import { Card, Field, Loading, PageHeader, Stat, StatusBadge, Tabs, useAction } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -152,6 +153,7 @@ export default function ClientCard() {
                 { key: 'dueDate', label: 'Afati', render: (i) => date(i.dueDate) },
                 { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : i.amount) },
                 { key: 'status', label: 'Statusi', value: (i) => INVOICE_STATUS[i.status], render: (i) => <StatusBadge status={i.status} labels={INVOICE_STATUS} /> },
+                printColumn((i) => <PrintInvoiceButton invoice={i} />),
               ]}
             />
           </Card>
@@ -165,6 +167,7 @@ export default function ClientCard() {
                 { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHODS[p.method] || p.method },
                 { key: 'reference', label: 'Referenca' },
                 { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : p.amount) },
+                printColumn((p) => <PrintPaymentButton payment={p} />),
               ]}
             />
           </Card>

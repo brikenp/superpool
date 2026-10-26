@@ -212,6 +212,8 @@ async function main() {
   assert.equal(mySales.size, 1);
   const inv = await getDocs(query(collection(gerti.db, 'invoices'), where('createdBy', '==', users.gerti)));
   assert.equal(inv.docs[0].data().status, 'pending_fiscal');
+  const salePay = await getDocs(query(collection(admin.db, 'payments'), where('saleId', '==', sale.id)));
+  assert.match(salePay.docs[0].data().number, /^MA-/);
   await denied(getDocs(collection(gerti.db, 'sales')), 'Gerti lexon të gjitha shitjet');
   ok('Gerti merr kimikate, shet nga nënmagazina; fatura në pritje të nr. fiskal; s\'sheh kosto as shitje të të tjerëve');
 
@@ -340,6 +342,7 @@ async function main() {
   await denied(getDoc(doc(gerti.db, 'contracts', contract.id)), 'Gerti lexon kontratat');
   await denied(addDoc(collection(mag.db, 'contracts'), { number: 'X' }), 'magazinieri krijon kontratë');
   await denied(gerti.call('allocateNumber', { prefix: 'KON' }), 'Gerti merr numër kontrate');
+  assert.match((await admin.call('allocateNumber', { prefix: 'MA' })).number, /^MA-/);
   ok(`kontrata ${kon} me këste; fatura e këstit lidhet me kontratën; aksesi i kufizuar`);
 
   // --- Modelet e pishinave ---

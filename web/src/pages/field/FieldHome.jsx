@@ -10,6 +10,7 @@ import { useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { date, qty } from '../../lib/format.js';
 import { ProductThumb } from '../../components/ProductImage.jsx';
+import { PrintMovementButton } from '../../components/PrintButton.jsx';
 
 /** Ndërfaqja e thjeshtë për telefon: automjeti im, projektet e mia, veprimet e shpejta. */
 export default function FieldHome() {
@@ -84,6 +85,7 @@ export default function FieldHome() {
                   {MOVEMENT_KINDS[m.kind]?.label}<br /><small className="muted">{m.number} · {date(m.date)} · {m.destName}</small>
                 </Link>
                 <StatusBadge status={m.status} labels={MOVEMENT_STATUS} />
+                <PrintMovementButton movement={m} />
               </li>
             ))}
           </ul>

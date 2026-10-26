@@ -18,6 +18,7 @@ import { date, firstOfMonth, round2, todayISO } from '../../lib/format.js';
 import { StockTable } from '../inventory/Stock.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
+import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
 
 const REPORTS = [
   { key: 'stock', label: 'Gjendja e magazinës', filters: [] },
@@ -317,7 +318,7 @@ function InvoicesReport({ f }) {
   const openInvoices = useQuery(() => (paymentForm ? query(collection(db, 'invoices'), where('status', 'in', ['pending_fiscal', 'issued'])) : null), [Boolean(paymentForm)]);
   const rows = [
     ...invoices.data.filter((i) => i.status !== 'cancelled').map((i) => ({ id: `i${i.id}`, record: i, date: i.date, type: `Faturë · ${invoiceTypeLabel(i)}`, doc: i.fiscalNumber || i.internalNumber || '', clientId: i.clientId, clientName: i.clientName, projectId: i.projectId, debit: Number(i.amount || 0), credit: 0 })),
-    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, date: p.date, type: `Pagesë (${PAYMENT_METHODS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: p.projectId || null, debit: 0, credit: Number(p.amount || 0) })),
+    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, payment: p, date: p.date, type: `Pagesë (${PAYMENT_METHODS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: p.projectId || null, debit: 0, credit: Number(p.amount || 0) })),
   ]
     .filter((r) => (!f.client || r.clientId === f.client) && (!f.project || r.projectId === f.project))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -342,6 +343,7 @@ function InvoicesReport({ f }) {
           { key: 'doc', label: 'Nr. / referenca' },
           { key: 'debit', label: 'Faturuar', type: 'money', total: true },
           { key: 'credit', label: 'Paguar', type: 'money', total: true },
+          printColumn((r) => (r.record ? <PrintInvoiceButton invoice={r.record} /> : <PrintPaymentButton payment={r.payment} />)),
         ]}
       />
       {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}

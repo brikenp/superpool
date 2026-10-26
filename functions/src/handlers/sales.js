@@ -37,6 +37,7 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
   return db.runTransaction(async (tx) => {
     const numbering = await reserveNumber(tx, 'SHT', date);
     const invNumbering = await reserveNumber(tx, 'FAT', date);
+    const payNumbering = paymentMethod !== 'credit' ? await reserveNumber(tx, 'MA', date) : null;
     const clientSnap = movement.clientId ? await tx.get(db.doc(`clients/${movement.clientId}`)) : null;
     if (!clientSnap?.exists) fail('Zgjidhni klientin.', 'invalid-argument');
 
@@ -90,6 +91,7 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
 
     numbering.commit();
     invNumbering.commit();
+    payNumbering?.commit();
     const lines = movement.lines.map((l) => ({
       productId: l.productId,
       code: ctx.products[l.productId].code || '',
@@ -162,6 +164,7 @@ export const confirmSale = onCall({ region: REGION }, async (request) => {
     });
     if (paymentMethod !== 'credit') {
       tx.set(db.collection('payments').doc(), {
+        number: payNumbering.number,
         date,
         clientId: movement.clientId,
         clientName: client.name,
