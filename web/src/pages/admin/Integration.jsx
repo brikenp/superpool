@@ -7,6 +7,7 @@ import { useData, useQuery } from '../../lib/data.jsx';
 import { downloadCsv, downloadTemplate, readTableWithImages } from '../../lib/export.js';
 import { linkProductImage, uploadProductImage } from '../../lib/images.js';
 import { call, db } from '../../lib/firebase.js';
+import { FiscalSettings } from './FiscalSettings.jsx';
 import { date } from '../../lib/format.js';
 
 // Kolonat e pranuara për çdo lloj importi (titujt në rreshtin e parë të skedarit).
@@ -166,8 +167,9 @@ export default function Integration() {
     <>
       <PageHeader
         title="Integrimi me programin e faturimit"
-        subtitle="Programi i faturimit mbetet burimi i faturave fiskale. Shkëmbimi bëhet me skedarë Excel/CSV derisa të konfirmohet API-ja e tij."
+        subtitle="Fiskalizimi direkt me POS.AL dhe shkëmbimi i të dhënave me skedarë Excel/CSV."
       />
+      <FiscalSettings />
       <div className="grid grid-2">
         <Card title="1. Import nga programi i faturimit / Excel">
           <div className="form-grid">

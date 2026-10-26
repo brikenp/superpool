@@ -181,3 +181,39 @@ test('receta: materialet e artikullit të përbërë dalin nga magazina, artikul
   assert.equal(pl.avgCosts.adit, round2((2 * 5 + 4 * 4) / 6));
 });
 const round2 = (n) => Math.round(n * 100) / 100;
+
+test('fiskalizimi: kërkesa për POS.AL nga shitja, fatura përfundimtare dhe korrigjimi', async () => {
+  const { buildFiscalRequest, buildCorrectionRequest, defaultFiscalOptions } = await import('../src/shared/fiscal.js');
+  const config = { shopId: 'demo', vatPayer: true, vatPct: 20, bankAccounts: [{ bank: 'BKT', iban: 'AL1', swift: 'NCBA', description: 'BKT', principal: true }] };
+  assert.deepEqual(defaultFiscalOptions({ client: { nipt: 'L12345678A' } }), { invoiceType: 'EINVOICE', paymentMethod: 'ACCOUNT' });
+  assert.deepEqual(defaultFiscalOptions({ client: {}, sale: { paymentMethod: 'cash' } }), { invoiceType: 'CASH', paymentMethod: 'BANKNOTE' });
+
+  // Shitje me çmim me TVSH: 3 × 120 L me TVSH → 100 L pa TVSH.
+  const sale = { lines: [{ name: 'Klor', code: 'KLR', unit: 'pako', qty: 3, unitPrice: 120 }] };
+  const b = buildFiscalRequest({ config, invoice: { internalNumber: 'FAT-1', clientName: 'X' }, sale, client: { name: 'Ana' }, options: { invoiceType: 'CASH', paymentMethod: 'BANKNOTE' } });
+  assert.equal(b.shopId, 'demo');
+  assert.equal(b.orderId, 'FAT-1');
+  const it = b.order.items[0];
+  assert.deepEqual([it.quantity, it.priceWithoutTax, it.taxRate, it.taxType, it.totalWithTax, it.unit], [3, 100, 20, '20', 360, 'XPK']);
+  assert.equal(b.order.options.isEinvoice, false);
+  assert.equal(b.order.options.bankAccounts, undefined);
+
+  // Fatura përfundimtare si e-faturë: rreshtat pa TVSH, paradhëniet si prepaidAmount.
+  const final = {
+    internalNumber: 'FAT-9', type: 'final', vatPct: 20, dueDate: '2026-11-10', amount: 70000,
+    lines: [{ description: 'Pishinë', unit: 'set', qty: 1, unitPrice: 100000 }], deductions: [{ label: 'Paradhënie', amount: 50000 }],
+  };
+  const e = buildFiscalRequest({ config, invoice: final, client: { name: 'Biz', nipt: 'L12345678A', address: 'Rr. 1', city: 'Tiranë' }, options: { invoiceType: 'EINVOICE', paymentMethod: 'ACCOUNT' } });
+  assert.equal(e.order.items[0].totalWithTax, 120000);
+  assert.equal(e.order.options.eInvoiceOptions.prepaidAmount, 50000);
+  assert.equal(e.order.options.customer.typeOfId, 'NUIS');
+  assert.equal(e.order.options.bankAccounts.length, 1);
+  // E njëjta si jo-cash: paradhënia zbritet me rresht negativ.
+  const n = buildFiscalRequest({ config, invoice: final, client: { name: 'Biz' }, options: { invoiceType: 'NONCASH', paymentMethod: 'ACCOUNT' } });
+  assert.equal(n.order.items.reduce((s, x) => s + x.totalWithTax, 0), 70000);
+
+  const corr = buildCorrectionRequest({ config, invoice: { internalNumber: 'FAT-1', fiscal: { iic: 'ABC', issueDateTime: 'T' } }, original: b });
+  assert.equal(corr.order.items[0].quantity, -3);
+  assert.equal(corr.order.items[0].totalWithTax, -360);
+  assert.deepEqual(corr.order.options.correction, { iic: 'ABC', issueDateTime: 'T' });
+});

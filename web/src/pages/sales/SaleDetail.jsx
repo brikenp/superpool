@@ -13,6 +13,8 @@ import { date, money, qty } from '../../lib/format.js';
 import { INVOICE_STATUS } from '../finance/Finance.jsx';
 import { SALE_STATUS } from './Sales.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
+import { EinvoicePdfButton, FiscalizeButton } from '../../components/Fiscal.jsx';
+import { PrintInvoiceButton } from '../../components/PrintButton.jsx';
 
 export default function SaleDetail() {
   const id = useRouteId();
@@ -82,12 +84,20 @@ export default function SaleDetail() {
           {invoice.data ? (
             <dl className="props">
               <dt>Statusi</dt><dd><StatusBadge status={invoice.data.status} labels={INVOICE_STATUS} /></dd>
-              <dt>Nr. fiskal</dt><dd>{invoice.data.fiscalNumber || <span className="text-warn">në pritje — lëshojeni në programin e faturimit</span>}</dd>
+              <dt>Nr. fiskal</dt><dd>{invoice.data.fiscalNumber || <span className="text-warn">në pritje</span>}</dd>
+              {invoice.data.fiscal?.iic && <><dt>NIVF</dt><dd><small>{invoice.data.fiscal.iic}</small></dd></>}
               <dt>Nr. i brendshëm</dt><dd>{invoice.data.internalNumber}</dd>
               <dt>Vlera</dt><dd>{money(invoice.data.amount)}</dd>
             </dl>
           ) : <span className="muted">—</span>}
-          {can(CAPS.FINANCE) && <p><Link to={`/klientet/${sale.clientId}`}>Regjistro numrin fiskal te kartela e klientit → Faturat</Link></p>}
+          {invoice.data && (
+            <div className="row" style={{ marginTop: 8 }}>
+              <FiscalizeButton invoice={invoice.data} sale={sale} small={false} />
+              {(invoice.data.fiscal?.fic || invoice.data.fiscalNumber) && <PrintInvoiceButton invoice={invoice.data} />}
+              <EinvoicePdfButton invoice={invoice.data} />
+            </div>
+          )}
+          {can(CAPS.FINANCE) && !company.fiscalEnabled && <p><Link to={`/klientet/${sale.clientId}`}>Regjistro numrin fiskal te kartela e klientit → Faturat</Link></p>}
         </Card>
       </div>
       <Card title="Produktet">

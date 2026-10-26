@@ -195,7 +195,7 @@ export const cancelSale = onCall({ region: REGION }, async (request) => {
     if (sale.get('status') !== 'confirmed') fail('Shitja është anuluar më parë.');
     const invRef = sale.get('invoiceId') ? db.doc(`invoices/${sale.get('invoiceId')}`) : null;
     const inv = invRef ? await tx.get(invRef) : null;
-    if (inv?.exists && inv.get('fiscalNumber')) {
+    if (inv?.exists && inv.get('fiscalNumber') && !inv.get('correction')) {
       fail('Fatura është fiskalizuar. Anulojeni fillimisht në programin e faturimit dhe regjistroni kthimin nga klienti.');
     }
     const payments = await tx.get(db.collection('payments').where('saleId', '==', id));

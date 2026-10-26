@@ -88,7 +88,7 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
 
   const { jsPDF, autoTable } = await loadPdf();
   const d = new jsPDF({ unit: 'mm', format: 'a4' });
-  const kind = invoice.saleId ? 'Faturë shitjeje' : INVOICE_TYPES[invoice.type] || 'Faturë';
+  const kind = invoice.fiscal?.invoiceType === 'EINVOICE' ? 'E-faturë' : invoice.saleId ? 'Faturë shitjeje' : INVOICE_TYPES[invoice.type] || 'Faturë';
   const number = invoice.fiscalNumber || invoice.internalNumber || invoice.saleNumber || '';
   let y = brandHeader(d, company, kind.toUpperCase(), `${number ? `Nr. ${number}` : 'Nr. në pritje'} · ${date(invoice.date)}`);
 
@@ -149,6 +149,40 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
     y += 6;
   }
   if (invoice.notes && (sale?.lines?.length || detailed)) { d.text(d.splitTextToSize(`Shënime: ${invoice.notes}`, 180), 14, y); y += 8; }
+  // Të dhënat fiskale (POS.AL): kodi QR i verifikimit dhe kodet NIVF / NSLF / NIVE.
+  const fiscal = invoice.fiscal?.fic || invoice.fiscal?.iic ? invoice.fiscal : null;
+  if (fiscal) {
+    if (y > d.internal.pageSize.getHeight() - 75) { d.addPage(); y = 20; }
+    d.setDrawColor(210);
+    d.roundedRect(14, y, 182, 40, 2, 2);
+    if (fiscal.url) {
+      try {
+        const { default: QRCode } = await import('qrcode');
+        d.addImage(await QRCode.toDataURL(fiscal.url, { margin: 0, width: 300 }), 'PNG', 17, y + 3, 34, 34);
+      } catch { /* pa QR */ }
+    }
+    d.setFontSize(8.5);
+    d.setTextColor(20);
+    // Ora siç e ka regjistruar sistemi fiskal (pa e kthyer në zonën e kompjuterit).
+    const m = String(fiscal.issueDateTime || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})/);
+    const issued = m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}` : fiscal.issueDateTime || '';
+    d.text([
+      `Nr. i faturës fiskale: ${fiscal.invNum || invoice.fiscalNumber || ''}`,
+      `NIVF: ${fiscal.iic || ''}`,
+      `NSLF: ${fiscal.fic || ''}`,
+      fiscal.eic ? `NIVE: ${fiscal.eic}` : '',
+      `Data dhe ora e lëshimit: ${issued}`,
+      [fiscal.businessUnitCode && `Njësia: ${fiscal.businessUnitCode}`, fiscal.tcrCode && `TCR: ${fiscal.tcrCode}`, fiscal.operatorCode && `Operatori: ${fiscal.operatorCode}`].filter(Boolean).join('   '),
+      `Lloji: ${{ CASH: 'Cash', NONCASH: 'Jo-cash', EINVOICE: 'E-faturë' }[fiscal.invoiceType] || ''}${fiscal.env === 'test' ? '   (MJEDIS TESTI — pa vlerë tatimore)' : ''}`,
+    ].filter(Boolean), 56, y + 7);
+    y += 46;
+    if (invoice.correction?.invNum) {
+      d.setTextColor(200, 30, 30);
+      d.text(`Anuluar me faturën korrigjuese ${invoice.correction.invNum} (NIVF ${invoice.correction.iic})`, 14, y);
+      d.setTextColor(20);
+      y += 6;
+    }
+  }
   if (invoice.status === 'cancelled') {
     d.setTextColor(200, 30, 30);
     d.setFontSize(28);
@@ -158,7 +192,7 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
   }
   d.setFontSize(7.5);
   d.setTextColor(110);
-  if (!invoice.fiscalNumber) d.text('Dokument shoqërues — fatura tatimore lëshohet nga programi i faturimit.', 14, y + 2);
+  if (!invoice.fiscalNumber && !fiscal) d.text('Dokument shoqërues — pa numër fiskal ende.', 14, y + 2);
   signatures(d, y + 6, ['Lëshoi', 'Mori klienti']);
   d.brandFooterText = company.invoiceFooter || company.offerFooter || '';
   d.save(`${number || 'Fatura'}.pdf`.replace(/[\\/:*?"<>|]/g, '-'));

@@ -8,6 +8,7 @@ import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
 import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
+import { CorrectInvoiceButton, EinvoicePdfButton, FiscalBadge, FiscalizeButton } from '../../components/Fiscal.jsx';
 import { invoicePdf } from '../../lib/printDocs.js';
 import { Field, Modal, PageHeader, SearchSelect, StatusBadge, useAction } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -76,7 +77,8 @@ export function InvoiceForm({ record, onClose }) {
         });
       }
     } else {
-      if (record.saleId || record.lines) delete data.amount; // vlera vjen nga shitja / rreshtat e faturës përfundimtare // vlera e shitjes vjen nga dokumenti i shitjes
+      if (record.saleId || record.lines || record.fiscal) delete data.amount;
+    if (record.fiscal) { delete data.fiscalNumber; delete data.status; } // i fiskalizuar: kodet nuk ndryshohen me dorë // vlera vjen nga shitja / rreshtat e faturës përfundimtare // vlera e shitjes vjen nga dokumenti i shitjes
       await setDoc(doc(db, 'invoices', record.id), data, { merge: true });
     }
     onClose();
@@ -86,13 +88,22 @@ export function InvoiceForm({ record, onClose }) {
     <Modal title={isNew ? 'Shto faturë manuale' : `Fatura ${record.fiscalNumber || record.internalNumber || ''}`} onClose={onClose}
       footer={(
         <>
-          {!isNew && <button type="button" className="btn" style={{ marginRight: 'auto' }} disabled={busy} onClick={() => run(() => invoicePdf(record, { company, clientsById }))}>PDF / Printo</button>}
+          {!isNew && (
+            <span className="row" style={{ marginRight: 'auto', gap: 6 }}>
+              <button type="button" className="btn" disabled={busy} onClick={() => run(() => invoicePdf(record, { company, clientsById }))}>PDF / Printo</button>
+              <EinvoicePdfButton invoice={record} />
+              <FiscalizeButton invoice={record} small={false} onDone={onClose} />
+              <CorrectInvoiceButton invoice={record} onDone={onClose} />
+            </span>
+          )}
           <button type="button" className="btn" onClick={onClose}>Anulo</button>
           <button type="button" className="btn primary" disabled={busy} onClick={save}>Ruaj</button>
         </>
       )}>
       {record.contractNumber && <div className="alert info">Kësti i kontratës {record.contractNumber} — fatura lidhet me kontratën.</div>}
-      <p className="muted" style={{ marginTop: 0 }}>Fatura fiskale lëshohet në programin e faturimit; këtu regjistrohet numri dhe vlera për ndjekjen e detyrimeve.</p>
+      {record.fiscal?.fic
+        ? <div className="alert ok">E fiskalizuar: {record.fiscal.invNum} · NIVF {record.fiscal.iic}{record.correction?.invNum ? ` · anuluar me faturën korrigjuese ${record.correction.invNum}` : ''}</div>
+        : <p className="muted" style={{ marginTop: 0 }}>{company.fiscalEnabled ? 'Pas ruajtjes, fiskalizojeni me butonin «Fiskalizo» (POS.AL).' : 'Fatura fiskale lëshohet në programin e faturimit; këtu regjistrohet numri dhe vlera për ndjekjen e detyrimeve.'}</p>}
       <div className="form-grid">
         <Field label="Klienti" required className="span-2">
           <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={v.clientId || ''} onChange={pickClient} disabled={!isNew} />
@@ -104,7 +115,7 @@ export function InvoiceForm({ record, onClose }) {
             </select>
           </Field>
         )}
-        <Field label="Nr. fiskal i faturës"><input value={v.fiscalNumber} onChange={(e) => set('fiscalNumber', e.target.value)} /></Field>
+        <Field label="Nr. fiskal i faturës"><input value={v.fiscalNumber} disabled={Boolean(record.fiscal?.fic)} onChange={(e) => set('fiscalNumber', e.target.value)} /></Field>
         <Field label="Vlera me TVSH (L)" required><input className="num" type="number" step="any" value={v.amount} disabled={Boolean(record.saleId || record.lines)} onChange={(e) => set('amount', e.target.value)} /></Field>
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
         <Field label="Afati i pagesës"><input type="date" value={v.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
@@ -187,7 +198,7 @@ export function PaymentForm({ record, invoices = [], onClose }) {
 
 const FINANCE_SECTIONS = {
   detyrimet: { tab: 'debts', title: 'Detyrimet e klientëve', subtitle: 'Klientët me fatura të papaguara, sipas detyrimit dhe afatit.' },
-  faturat: { tab: 'invoices', title: 'Faturat', subtitle: 'Faturat lëshohen në programin e faturimit; këtu ndiqen numrat fiskalë, vlerat dhe afatet.' },
+  faturat: { tab: 'invoices', title: 'Faturat', subtitle: 'Faturat e klientëve: fiskalizimi (POS.AL), numrat fiskalë, vlerat dhe afatet.' },
   pagesat: { tab: 'payments', title: 'Pagesat', subtitle: 'Pagesat e arkëtuara nga klientët (cash, bankë, kartë).' },
 };
 
@@ -263,13 +274,13 @@ function FinanceSection({ section }) {
           columns={[
             { key: 'date', label: 'Data', render: (i) => date(i.date) },
             { key: 'type', label: 'Lloji', value: invoiceTypeLabel },
-            { key: 'fiscalNumber', label: 'Nr. fiskal' },
+            { key: 'fiscalNumber', label: 'Nr. fiskal', render: (i) => <>{i.fiscalNumber}<FiscalBadge invoice={i} /></> },
             { key: 'internalNumber', label: 'Nr. i brendshëm', value: (i) => i.internalNumber || i.saleNumber || '' },
             { key: 'clientName', label: 'Klienti' },
             { key: 'dueDate', label: 'Afati', render: (i) => date(i.dueDate) },
             { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : i.amount) },
             { key: 'status', label: 'Statusi', value: (i) => INVOICE_STATUS[i.status], render: (i) => <StatusBadge status={i.status} labels={INVOICE_STATUS} /> },
-            printColumn((i) => <PrintInvoiceButton invoice={i} />),
+            printColumn((i) => <span className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}><FiscalizeButton invoice={i} /><PrintInvoiceButton invoice={i} /></span>),
           ]}
         />
       )}

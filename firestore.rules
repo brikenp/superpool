@@ -155,8 +155,10 @@ service cloud.firestore {
     match /invoices/{id} {
       allow read: if can_reports() || can_finance()
         || (can_chem_sales() && resource.data.createdBy == request.auth.uid);
-      allow create: if can_finance() && request.resource.data.source == 'superpool';
-      allow update: if can_finance() && untouched(['saleId', 'kind']);
+      // Kodet fiskale (fiscal, correction) i shkruan vetëm serveri pas fiskalizimit te POS.AL.
+      allow create: if can_finance() && request.resource.data.source == 'superpool'
+        && !request.resource.data.keys().hasAny(['fiscal', 'correction', 'fiscalizing']);
+      allow update: if can_finance() && untouched(['saleId', 'kind', 'fiscal', 'correction', 'fiscalizing']);
       allow delete: if false;
     }
 
@@ -165,6 +167,11 @@ service cloud.firestore {
       allow read: if can_finance() || can_projects_manage() || can_reports();
       allow create, update: if can_finance() || can_projects_manage();
       allow delete: if false; // anulohen, nuk fshihen
+    }
+
+    // Konfigurimi i programit fiskal (çelësi API): vetëm serveri.
+    match /private/{id} {
+      allow read, write: if false;
     }
 
     match /payments/{id} {

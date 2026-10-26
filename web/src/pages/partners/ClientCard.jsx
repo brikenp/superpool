@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, query, serverTimestamp, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import { Paperclip, X, Plus } from 'lucide-react';
@@ -9,6 +9,7 @@ import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
 import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
+import { FiscalizeButton, TaxpayerLookupButton } from '../../components/Fiscal.jsx';
 import { EntityForm } from '../../components/EntityForm.jsx';
 import { Card, Field, Loading, PageHeader, Stat, StatusBadge, Tabs, useAction } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -66,6 +67,7 @@ export default function ClientCard() {
         subtitle={[client.nipt && `NIPT ${client.nipt}`, client.contactPerson, client.phone, client.email, client.city].filter(Boolean).join(' · ')}
         actions={(
           <>
+            {can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <TaxpayerLookupButton client={client} onApply={(data) => updateDoc(doc(db, 'clients', id), data)} />}
             {can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <button type="button" className="btn" onClick={() => setEditing(true)}>Ndrysho</button>}
             {seeOffers && <Link className="btn" to={`/ofertat/re?klienti=${id}`}><Plus size={16} /> Ofertë</Link>}
             {can(CAPS.CHEM_SALES) && <Link className="btn primary" to={`/kimikate/shitje-e-re?klienti=${id}`}><Plus size={16} /> Shitje</Link>}
@@ -154,7 +156,7 @@ export default function ClientCard() {
                 { key: 'dueDate', label: 'Afati', render: (i) => date(i.dueDate) },
                 { key: 'amount', label: 'Vlera', type: 'money', total: true, value: (i) => (i.status === 'cancelled' ? 0 : i.amount) },
                 { key: 'status', label: 'Statusi', value: (i) => INVOICE_STATUS[i.status], render: (i) => <StatusBadge status={i.status} labels={INVOICE_STATUS} /> },
-                printColumn((i) => <PrintInvoiceButton invoice={i} />),
+                printColumn((i) => <span className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}><FiscalizeButton invoice={i} /><PrintInvoiceButton invoice={i} /></span>),
               ]}
             />
           </Card>

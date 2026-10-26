@@ -5,6 +5,7 @@
 // → shitje kimikatesh → inventarizim → porosi, dhe kontrollon rregullat e aksesit për çdo rol.
 
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 
 import { deleteApp, initializeApp } from 'firebase/app';
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
@@ -349,6 +350,98 @@ async function main() {
   await addDoc(collection(ofer.db, 'poolModels'), { name: 'Import test', poolType: 'skimmer', items: [{ section: 'piping', description: 'Tub', unit: 'm', formula: 'ceil(P)' }] });
   await denied(addDoc(collection(mag.db, 'poolModels'), { name: 'x', items: [] }), 'magazinieri krijon model');
   ok('modelet e pishinave krijohen nga roli i ofertave');
+
+  // --- Fiskalizimi me POS.AL (server i simuluar në vend të pos-al.ew.r.appspot.com) ---
+  const posal = { requests: [] };
+  const mock = createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      const body = raw ? JSON.parse(raw) : null;
+      posal.requests.push({ method: req.method, url: req.url, key: req.headers['x-api-key'], body });
+      res.setHeader('content-type', 'application/json');
+      if (req.headers['x-api-key'] !== 'k123') { res.statusCode = 401; res.end(JSON.stringify({ status: 'FAILED', message: 'Unauthorized' })); return; }
+      if (req.url.startsWith('/integrations/tax-payer')) {
+        res.end(JSON.stringify({ status: 'SUCCESS', data: { Address: 'Tiranë, Rr. Kavajës', Country: 'ALB', Name: 'VILA GOLEM SHPK', Tin: 'L12345678A' } }));
+        return;
+      }
+      if (req.url.startsWith('/integrations/invoice/einvoice/')) {
+        res.end(JSON.stringify({ status: 'SUCCESS', data: { invoice: { data: { eInvoices: [{ DocNumber: '9/2026', Status: 'DELIVERED', PDF: Buffer.from('%PDF-1.4 test').toString('base64') }] } } } }));
+        return;
+      }
+      const n = posal.requests.filter((r) => r.method === 'POST').length;
+      const o = body.order.options;
+      res.end(JSON.stringify({
+        order: body.order,
+        fisc: {
+          iic: `IIC${n}`, fic: `fic-${n}`, eic: o.isEinvoice ? `eic-${n}` : undefined, invNum: `${n}/2026/tc001`,
+          url: `https://efiskalizimi-app.tatime.gov.al/invoicecheck/#/verify?iic=IIC${n}`, issueDateTime: '2026-10-26T10:00:00+01:00', tcrCode: 'tc001',
+          totPrice: body.order.items.reduce((s, i) => s + i.totalWithTax, 0),
+        },
+      }));
+    });
+  });
+  await new Promise((r) => mock.listen(5055, '127.0.0.1', r));
+  await admin.call('saveFiscalConfig', { enabled: true, env: 'custom', baseUrl: 'http://127.0.0.1:5055', shopId: 'demo', apiKey: 'k123', vatPayer: true, vatPct: 20, bankAccounts: [{ bank: 'BKT', iban: 'AL47 2121', swift: 'NCBAALTX' }] });
+  const fc = await admin.call('getFiscalConfig');
+  assert.equal(fc.apiKeyMasked, '••••••k123');
+  await denied(getDoc(doc(admin.db, 'private', 'posal')), 'shfletuesi lexon çelësin API');
+  await denied(gerti.call('saveFiscalConfig', { enabled: false }), 'Gerti ndryshon POS.AL');
+  assert.equal((await getDoc(doc(admin.db, 'settings', 'company'))).data().fiscalEnabled, true);
+
+  const tp = await admin.call('lookupTaxpayer', { nipt: 'L12345678A' });
+  assert.equal(tp.taxpayers[0].name, 'VILA GOLEM SHPK');
+
+  // Faturë jo-cash (klient pa NIPT): rreshti me TVSH ndahet saktë, kodet ruhen në faturë.
+  const fInv = await addDoc(collection(admin.db, 'invoices'), {
+    type: 'partial', internalNumber: 'FAT-T1', clientId: client.id, clientName: 'Vila Golem', amount: 12000, date: '2026-10-26', dueDate: '2026-11-05',
+    fiscalNumber: '', status: 'pending_fiscal', source: 'superpool', createdBy: admin.uid,
+  });
+  await denied(admin.call('fiscalizeInvoice', { invoiceId: fInv.id, invoiceType: 'EINVOICE', paymentMethod: 'ACCOUNT' }), 'e-faturë pa NIPT');
+  const fr = await admin.call('fiscalizeInvoice', { invoiceId: fInv.id, invoiceType: 'NONCASH', paymentMethod: 'ACCOUNT' });
+  const sent = posal.requests.filter((r) => r.method === 'POST').at(-1);
+  assert.equal(sent.key, 'k123');
+  assert.equal(sent.body.shopId, 'demo');
+  assert.equal(sent.body.orderId, 'FAT-T1');
+  assert.deepEqual([sent.body.order.items[0].priceWithoutTax, sent.body.order.items[0].totalWithTax, sent.body.order.items[0].taxType], [10000, 12000, '20']);
+  assert.equal(sent.body.order.options.bankAccounts[0].iban, 'AL472121');
+  const fd = (await getDoc(doc(admin.db, 'invoices', fInv.id))).data();
+  assert.deepEqual([fd.status, fd.fiscalNumber, fd.fiscal.iic, fd.fiscalizing], ['issued', fr.fiscalNumber, fr.iic, undefined]);
+  await denied(admin.call('fiscalizeInvoice', { invoiceId: fInv.id }), 'fiskalizim i dyfishtë');
+  await denied(updateDoc(doc(admin.db, 'invoices', fInv.id), { fiscal: { fic: 'x' } }), 'ndryshim me dorë i kodeve fiskale');
+
+  // Faturë korrigjuese.
+  const cr = await admin.call('correctFiscalInvoice', { invoiceId: fInv.id, reason: 'gabim' });
+  const corr = posal.requests.filter((r) => r.method === 'POST').at(-1).body;
+  assert.equal(corr.order.items[0].quantity, -1);
+  assert.equal(corr.order.options.correction.iic, fr.iic);
+  const cd = (await getDoc(doc(admin.db, 'invoices', fInv.id))).data();
+  assert.deepEqual([cd.status, cd.correction.invNum], ['cancelled', cr.fiscalNumber]);
+
+  // E-faturë për biznes me NIPT dhe PDF-ja nga tatimet.
+  await updateDoc(doc(admin.db, 'clients', client.id), { nipt: 'L12345678A', type: 'business' });
+  const eInv = await addDoc(collection(admin.db, 'invoices'), {
+    type: 'final', internalNumber: 'FAT-T2', clientId: client.id, clientName: 'Vila Golem', amount: 70000, vatPct: 20, date: '2026-10-26', dueDate: '2026-11-10',
+    lines: [{ description: 'Pishinë', unit: 'set', qty: 1, unitPrice: 100000 }], net: 100000, vat: 20000, gross: 120000, deductions: [{ label: 'Paradhënie', amount: 50000 }],
+    fiscalNumber: '', status: 'pending_fiscal', source: 'superpool', createdBy: admin.uid,
+  });
+  const er = await admin.call('fiscalizeInvoice', { invoiceId: eInv.id });
+  const eSent = posal.requests.filter((r) => r.method === 'POST').at(-1).body.order.options;
+  assert.deepEqual([eSent.invoiceType, eSent.isEinvoice, eSent.customer.typeOfId, eSent.eInvoiceOptions.prepaidAmount], ['EINVOICE', true, 'NUIS', 50000]);
+  assert.ok(er.eic);
+  const ep = await admin.call('fiscalInvoicePdf', { invoiceId: eInv.id });
+  assert.equal(Buffer.from(ep.pdf, 'base64').toString().slice(0, 8), '%PDF-1.4');
+
+  // Gerti fiskalizon faturën e shitjes së vet (cash).
+  await updateDoc(doc(admin.db, 'clients', client.id), { nipt: '', type: 'individual' });
+  const gs = await gerti.call('confirmSale', { sale: { clientId: client.id, locationId: 'agent_gerti', paymentMethod: 'cash', lines: [{ productId: chlor, qty: 1, unitPrice: 2400 }] } });
+  const gInv = (await getDoc(doc(gerti.db, 'sales', gs.id))).data().invoiceId;
+  const gr = await gerti.call('fiscalizeInvoice', { invoiceId: gInv });
+  const gSent = posal.requests.filter((r) => r.method === 'POST').at(-1).body;
+  assert.deepEqual([gSent.order.options.invoiceType, gSent.order.options.paymentMethod, gSent.order.items[0].totalWithTax], ['CASH', 'BANKNOTE', 2400]);
+  assert.ok(gr.fiscalNumber);
+  await new Promise((r) => mock.close(r));
+  ok('fiskalizimi me POS.AL: jo-cash, e-faturë me paradhënie, PDF nga tatimet, korrigjim, NIPT; çelësi API mbetet në server');
 
   // --- Roli i personalizuar (leje të zgjedhura me dorë) ---
   const custom = await admin.call('createUser', {

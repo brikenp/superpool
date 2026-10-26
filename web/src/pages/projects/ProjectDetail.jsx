@@ -22,6 +22,7 @@ import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
 import { ContractsCard } from '../finance/Contracts.jsx';
 import { PrintInvoiceButton } from '../../components/PrintButton.jsx';
+import { FiscalizeButton } from '../../components/Fiscal.jsx';
 import { FinalInvoiceForm } from './FinalInvoice.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
 
@@ -459,6 +460,7 @@ function Finance({ project }) {
               <li key={i.id} className={i.status === 'cancelled' ? 'muted' : ''} style={{ cursor: can(CAPS.FINANCE) ? 'pointer' : undefined }} onClick={() => can(CAPS.FINANCE) && setInvoiceForm(i)}>
                 <span style={{ flex: 1 }}>{invoiceTypeLabel(i)} · {i.fiscalNumber || i.internalNumber || 'pa numër'} · {date(i.date)}{i.status === 'cancelled' ? ' (anuluar)' : ''}</span>
                 <b>{money(i.amount)}</b>
+                <FiscalizeButton invoice={i} />
                 <PrintInvoiceButton invoice={i} />
               </li>
             ))}
