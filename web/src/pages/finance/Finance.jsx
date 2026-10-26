@@ -101,6 +101,17 @@ export function InvoiceForm({ record, onClose }) {
         </>
       )}>
       {record.contractNumber && <div className="alert info">Kësti i kontratës {record.contractNumber} — fatura lidhet me kontratën.</div>}
+      {!record.fiscal?.fic && record.fiscalError && (
+        <div className="alert error" style={{ display: 'block' }}>
+          <b>Fiskalizimi i fundit dështoi:</b> {record.fiscalError}
+          {record.fiscalDebug?.response && (
+            <details style={{ marginTop: 6 }}>
+              <summary>Përgjigja e plotë e POS.AL (për ta dërguar te mbështetja)</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem', maxHeight: 220, overflow: 'auto' }}>{record.fiscalDebug.response}{'\n\n— Kërkesa —\n'}{JSON.stringify(record.fiscalDebug.request, null, 2)}</pre>
+            </details>
+          )}
+        </div>
+      )}
       {record.fiscal?.fic
         ? <div className="alert ok">E fiskalizuar: {record.fiscal.invNum} · NIVF {record.fiscal.iic}{record.correction?.invNum ? ` · anuluar me faturën korrigjuese ${record.correction.invNum}` : ''}</div>
         : <p className="muted" style={{ marginTop: 0 }}>{company.fiscalEnabled ? 'Pas ruajtjes, fiskalizojeni me butonin «Fiskalizo» (POS.AL).' : 'Fatura fiskale lëshohet në programin e faturimit; këtu regjistrohet numri dhe vlera për ndjekjen e detyrimeve.'}</p>}

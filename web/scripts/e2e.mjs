@@ -360,6 +360,11 @@ async function main() {
       const body = raw ? JSON.parse(raw) : null;
       posal.requests.push({ method: req.method, url: req.url, key: req.headers['x-api-key'], body });
       res.setHeader('content-type', 'application/json');
+      if (posal.reject && req.method === 'POST') {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ status: 'FAILED', message: 'Error adding order', data: { error: 'customer.id is required' } }));
+        return;
+      }
       if (req.headers['x-api-key'] !== 'k123') { res.statusCode = 401; res.end(JSON.stringify({ status: 'FAILED', message: 'Unauthorized' })); return; }
       if (req.url.startsWith('/integrations/tax-payer')) {
         res.end(JSON.stringify({ status: 'SUCCESS', data: { Address: 'Tiranë, Rr. Kavajës', Country: 'ALB', Name: 'VILA GOLEM SHPK', Tin: 'L12345678A' } }));
@@ -440,6 +445,23 @@ async function main() {
   const gSent = posal.requests.filter((r) => r.method === 'POST').at(-1).body;
   assert.deepEqual([gSent.order.options.invoiceType, gSent.order.options.paymentMethod, gSent.order.items[0].totalWithTax], ['CASH', 'BANKNOTE', 2400]);
   assert.ok(gr.fiscalNumber);
+  // Jo-cash pa IBAN: mesazh i qartë para se të dërgohet; refuzim nga POS.AL: detajet ruhen te fatura.
+  await admin.call('saveFiscalConfig', { enabled: true, env: 'custom', baseUrl: 'http://127.0.0.1:5055', shopId: 'demo', vatPayer: true, vatPct: 20, bankAccounts: [] });
+  const nInv = await addDoc(collection(admin.db, 'invoices'), {
+    type: 'other', internalNumber: 'FAT-T3', clientId: client.id, clientName: 'Vila Golem', amount: 1200, date: '2026-10-26', dueDate: '2026-10-26',
+    fiscalNumber: '', status: 'pending_fiscal', source: 'superpool', createdBy: admin.uid,
+  });
+  const noIban = await denied(admin.call('fiscalizeInvoice', { invoiceId: nInv.id, invoiceType: 'NONCASH', paymentMethod: 'ACCOUNT' }), 'jo-cash pa IBAN');
+  assert.match(noIban.message, /IBAN/);
+  posal.reject = true;
+  const rej = await denied(admin.call('fiscalizeInvoice', { invoiceId: nInv.id, invoiceType: 'CASH', paymentMethod: 'BANKNOTE' }), 'POS.AL refuzon');
+  assert.match(rej.message, /Error adding order — .*customer/);
+  const nd = (await getDoc(doc(admin.db, 'invoices', nInv.id))).data();
+  assert.match(nd.fiscalDebug.response, /customer/);
+  posal.reject = false;
+  const okRetry = await admin.call('fiscalizeInvoice', { invoiceId: nInv.id, invoiceType: 'CASH', paymentMethod: 'BANKNOTE' });
+  assert.ok(okRetry.fiscalNumber);
+  assert.equal(posal.requests.filter((r) => r.method === 'POST').at(-1).body.orderId, 'FAT-T3-2');
   await new Promise((r) => mock.close(r));
   ok('fiskalizimi me POS.AL: jo-cash, e-faturë me paradhënie, PDF nga tatimet, korrigjim, NIPT; çelësi API mbetet në server');
 

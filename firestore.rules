@@ -157,8 +157,8 @@ service cloud.firestore {
         || (can_chem_sales() && resource.data.createdBy == request.auth.uid);
       // Kodet fiskale (fiscal, correction) i shkruan vetëm serveri pas fiskalizimit te POS.AL.
       allow create: if can_finance() && request.resource.data.source == 'superpool'
-        && !request.resource.data.keys().hasAny(['fiscal', 'correction', 'fiscalizing']);
-      allow update: if can_finance() && untouched(['saleId', 'kind', 'fiscal', 'correction', 'fiscalizing']);
+        && !request.resource.data.keys().hasAny(['fiscal', 'correction', 'fiscalizing', 'fiscalAttempts', 'fiscalDebug']);
+      allow update: if can_finance() && untouched(['saleId', 'kind', 'fiscal', 'correction', 'fiscalizing', 'fiscalAttempts', 'fiscalDebug']);
       allow delete: if false;
     }
 

@@ -6,7 +6,7 @@ import { onCall } from 'firebase-functions/v2/https';
 
 import { buildCorrectionRequest, buildFiscalRequest, defaultFiscalOptions } from '../shared/fiscal.js';
 import { CAPS } from '../shared/roles.js';
-import { FieldValue, REGION, audit, db, fail, requireCap, userContext } from '../lib/context.js';
+import { FieldValue, HttpsError, REGION, audit, db, fail, requireCap, userContext } from '../lib/context.js';
 
 const CONFIG_DOC = 'private/posal';
 export const POSAL_URLS = { prod: 'https://pos-al.ew.r.appspot.com', test: 'https://pos-al-dev.ew.r.appspot.com' };
@@ -45,7 +45,14 @@ async function posal(config, method, path, body) {
   try { json = text ? JSON.parse(text) : {}; } catch { json = { message: text.slice(0, 300) }; }
   if (!res.ok || json?.status === 'FAILED' || json?.status === 'ERROR') {
     const msg = json?.message || json?.error?.message || json?.code || `HTTP ${res.status}`;
-    fail(`POS.AL: ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`.slice(0, 600));
+    // Detajet (nëse POS.AL i kthen) ndihmojnë të kuptohet pse u refuzua fatura.
+    const detail = [json?.data, json?.errors, json?.error?.details, json?.details]
+      .filter((d) => d && (typeof d === 'string' || Object.keys(d).length))
+      .map((d) => (typeof d === 'string' ? d : JSON.stringify(d))).join(' · ');
+    console.error('POS.AL refuzoi', method, path, res.status, text.slice(0, 2000), body ? JSON.stringify(body).slice(0, 4000) : '');
+    const err = new HttpsError('failed-precondition', `POS.AL: ${typeof msg === 'string' ? msg : JSON.stringify(msg)}${detail ? ` — ${detail}` : ''}`.slice(0, 900));
+    err.posal = { status: res.status, response: text.slice(0, 3000), request: body || null };
+    throw err;
   }
   return json;
 }
@@ -144,7 +151,14 @@ export const fiscalizeInvoice = onCall({ region: REGION }, async (request) => {
     const defaults = defaultFiscalOptions({ client, sale, invoice });
     const options = { invoiceType: invoiceType || defaults.invoiceType, paymentMethod: paymentMethod || defaults.paymentMethod };
     if (options.invoiceType === 'EINVOICE' && !client.nipt) fail('E-fatura kërkon NIPT-in e klientit. Plotësojeni te kartela e klientit.', 'invalid-argument');
+    if (options.invoiceType !== 'CASH' && !(config.bankAccounts || []).length) {
+      fail('Faturat jo-cash dhe e-faturat kërkojnë llogarinë bankare të SuperPool. Plotësoni IBAN-in te Integrimi → POS.AL dhe ruani.', 'invalid-argument');
+    }
     const body = buildFiscalRequest({ config, invoice, sale, client, options });
+    // Pas një prove të dërguar që dështoi, POS.AL mund ta ketë regjistruar porosinë: prova e radhës merr ID të re.
+    const sent = Number(invoice.fiscalAttempts || 0);
+    if (sent > 0) body.orderId = `${body.orderId}-${sent + 1}`;
+    await ref.update({ fiscalAttempts: FieldValue.increment(1) });
     const res = await posal(config, 'POST', '/integrations/invoice', body);
     const fisc = res.fisc || res.data?.fisc || {};
     if (!fisc.iic && !fisc.fic) fail('POS.AL nuk ktheu kodet fiskale (NIVF/NSLF). Kontrolloni faturën te POS.AL para se të provoni sërish.');
@@ -163,7 +177,12 @@ export const fiscalizeInvoice = onCall({ region: REGION }, async (request) => {
     const { request: _request, ...publicFiscal } = fiscal;
     return { fiscalNumber: fiscal.invNum, iic: fiscal.iic, fic: fiscal.fic, eic: fiscal.eic, url: fiscal.url, fiscal: publicFiscal };
   } catch (err) {
-    await ref.update({ fiscalizing: FieldValue.delete(), fiscalError: String(err.message || err).slice(0, 500) }).catch(() => {});
+    await ref.update({
+      fiscalizing: FieldValue.delete(),
+      fiscalError: String(err.message || err).slice(0, 900),
+      // Kërkesa dhe përgjigja e fundit (pa çelësin API), për të parë pse u refuzua.
+      fiscalDebug: err.posal ? JSON.parse(JSON.stringify({ at: new Date().toISOString(), ...err.posal })) : FieldValue.delete(),
+    }).catch(() => {});
     throw err;
   }
 });
