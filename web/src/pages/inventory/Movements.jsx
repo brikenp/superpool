@@ -1,6 +1,7 @@
 import { collection, orderBy, query, where } from 'firebase/firestore';
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { MOVEMENT_KINDS, MOVEMENT_STATUS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
@@ -24,11 +25,29 @@ export const movementColumns = (extra = []) => [
   { key: 'status', label: 'Statusi', value: (m) => MOVEMENT_STATUS[m.status], render: (m) => <StatusBadge status={m.status} labels={MOVEMENT_STATUS} /> },
 ];
 
+// Seksionet e menysë "Lëvizjet e mallit": secili tregon vetëm llojet e veta.
+export const MOVEMENT_SECTIONS = {
+  miratim: { title: 'Lëvizjet për miratim', subtitle: 'Daljet, kthimet, humbjet dhe transferimet e regjistruara nga terreni që presin miratimin.', kinds: null, status: 'pending' },
+  hyrjet: { title: 'Hyrjet nga blerja', subtitle: 'Fletëhyrjet nga furnitorët (faturat e blerjes) dhe kthimet nga klientët.', kinds: ['purchase', 'customer_return'], create: 'purchase', createLabel: 'Fletëhyrje e re' },
+  daljet: { title: 'Daljet', subtitle: 'Materialet që dalin nga magazina drejt automjeteve, kantiereve ose shitësit të kimikateve.', kinds: ['issue', 'agent_issue'], create: 'issue', createLabel: 'Dalje e re' },
+  dorezimet: { title: 'Dorëzimet në kantier', subtitle: 'Materialet e shkarkuara nga automjeti në kantier.', kinds: ['delivery'], create: 'delivery', createLabel: 'Dorëzim i ri' },
+  perdorimi: { title: 'Përdorimi në projekte', subtitle: 'Materialet e përdorura realisht në projekte.', kinds: ['consumption'], create: 'consumption', createLabel: 'Regjistro përdorim' },
+  kthimet: { title: 'Kthimet', subtitle: 'Kthimet në magazinë nga automjetet/kantieret dhe kthimet te furnitorët.', kinds: ['return', 'supplier_return'], create: 'return', createLabel: 'Kthim i ri' },
+  transferimet: { title: 'Transferimet', subtitle: 'Lëvizjet ndërmjet magazinave, automjeteve dhe kantiereve.', kinds: ['transfer'], create: 'transfer', createLabel: 'Transferim i ri' },
+  humbjet: { title: 'Dëmtime & rregullime', subtitle: 'Mallrat e dëmtuara ose të humbura dhe rregullimet e inventarit.', kinds: ['loss', 'adjustment'], create: 'loss', createLabel: 'Regjistro dëmtim' },
+};
+
 export default function Movements() {
+  const [params] = useSearchParams();
+  const section = MOVEMENT_SECTIONS[params.get('seksioni')] || null;
+  return <MovementsList key={params.get('seksioni') || 'all'} section={section} />;
+}
+
+function MovementsList({ section }) {
   const navigate = useNavigate();
   const { can } = useAuth();
   const { locations } = useData();
-  const [tab, setTab] = useState('all');
+  const [tab, setTab] = useState(section?.status || 'all');
   const [from, setFrom] = useState(addDays(todayISO(), -30));
   const [to, setTo] = useState(todayISO());
   const [kind, setKind] = useState('');
@@ -42,8 +61,10 @@ export default function Movements() {
 
   const source = tab === 'pending' ? pending : tab === 'draft' ? drafts : ranged;
   const rows = useMemo(() => source.data
-    .filter((m) => (!kind || m.kind === kind) && (!location || m.sourceId === location || m.destId === location))
-    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || String(b.number).localeCompare(String(a.number))), [source.data, kind, location]);
+    .filter((m) => (!section?.kinds || section.kinds.includes(m.kind)) && (!kind || m.kind === kind) && (!location || m.sourceId === location || m.destId === location))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || String(b.number).localeCompare(String(a.number))), [source.data, kind, location, section]);
+  const inSection = (m) => !section?.kinds || section.kinds.includes(m.kind);
+  const kindOptions = Object.entries(MOVEMENT_KINDS).filter(([k]) => !section?.kinds || section.kinds.includes(k));
 
   const newKinds = Object.entries(MOVEMENT_KINDS).filter(([k]) => k !== 'sale'
     && (can(CAPS.INVENTORY_MANAGE, CAPS.MOVEMENTS_APPROVE) || ['issue', 'delivery', 'consumption', 'return', 'loss'].includes(k)));
@@ -51,24 +72,29 @@ export default function Movements() {
   return (
     <>
       <PageHeader
-        title="Lëvizjet e mallit"
-        subtitle="Fletëhyrje, fletëdalje, dorëzime në kantier, përdorime, kthime, humbje dhe rregullime."
-        actions={can(CAPS.MOVEMENTS_CREATE) && (
-          <select className="btn primary" value="" onChange={(e) => e.target.value && navigate(`/levizjet/re/${e.target.value}`)} style={{ width: 'auto' }}>
-            <option value="">+ Dokument i ri…</option>
-            {newKinds.map(([k, d]) => <option key={k} value={k}>{d.label}</option>)}
-          </select>
-        )}
+        breadcrumb={section && <Link to="/levizjet">Lëvizjet e mallit</Link>}
+        title={section?.title || 'Të gjitha lëvizjet'}
+        subtitle={section?.subtitle || 'Fletëhyrje, fletëdalje, dorëzime në kantier, përdorime, kthime, humbje dhe rregullime.'}
+        actions={can(CAPS.MOVEMENTS_CREATE) && (section?.create
+          ? <Link className="btn primary" to={`/levizjet/re/${section.create}`}><Plus size={16} /> {section.createLabel}</Link>
+          : (
+            <select className="btn primary" value="" onChange={(e) => e.target.value && navigate(`/levizjet/re/${e.target.value}`)} style={{ width: 'auto' }}>
+              <option value="">+ Dokument i ri…</option>
+              {newKinds.map(([k, d]) => <option key={k} value={k}>{d.label}</option>)}
+            </select>
+          ))}
       />
-      <Tabs
-        active={tab}
-        onChange={setTab}
-        tabs={[
-          { key: 'all', label: 'Sipas periudhës' },
-          { key: 'pending', label: `Në pritje të miratimit (${pending.data.length})` },
-          { key: 'draft', label: `Draft (${drafts.data.length})` },
-        ]}
-      />
+      {section?.status !== 'pending' && (
+        <Tabs
+          active={tab}
+          onChange={setTab}
+          tabs={[
+            { key: 'all', label: 'Sipas periudhës' },
+            { key: 'pending', label: `Në pritje të miratimit (${pending.data.filter(inSection).length})` },
+            { key: 'draft', label: `Draft (${drafts.data.filter(inSection).length})` },
+          ]}
+        />
+      )}
       <div className="form-grid" style={{ marginBottom: 12 }}>
         {tab === 'all' && (
           <>
@@ -76,12 +102,14 @@ export default function Movements() {
             <Field label="Deri më"><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
           </>
         )}
-        <Field label="Lloji">
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="">Të gjitha</option>
-            {Object.entries(MOVEMENT_KINDS).map(([k, d]) => <option key={k} value={k}>{d.label}</option>)}
-          </select>
-        </Field>
+        {kindOptions.length > 1 && (
+          <Field label="Lloji">
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="">Të gjitha</option>
+              {kindOptions.map(([k, d]) => <option key={k} value={k}>{d.label}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Vendi">
           <select value={location} onChange={(e) => setLocation(e.target.value)}>
             <option value="">Të gjitha</option>
@@ -90,7 +118,7 @@ export default function Movements() {
         </Field>
       </div>
       <DataTable
-        title="Lëvizjet e mallit"
+        title={section?.title || 'Lëvizjet e mallit'}
         filtersText={tab === 'all' ? [`Periudha: ${date(from)} – ${date(to)}`] : [MOVEMENT_STATUS[tab]]}
         rows={rows}
         onRowClick={(m) => navigate(`/levizjet/${m.id}`)}

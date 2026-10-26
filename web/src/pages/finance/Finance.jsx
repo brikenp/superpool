@@ -1,13 +1,13 @@
 import { addDoc, collection, doc, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
 import { PAYMENT_METHODS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
-import { Field, Modal, PageHeader, SearchSelect, StatusBadge, Tabs, useAction } from '../../components/ui.jsx';
+import { Field, Modal, PageHeader, SearchSelect, StatusBadge, useAction } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
@@ -125,9 +125,21 @@ export function PaymentForm({ record, invoices = [], onClose }) {
   );
 }
 
+const FINANCE_SECTIONS = {
+  detyrimet: { tab: 'debts', title: 'Detyrimet e klientëve', subtitle: 'Klientët me fatura të papaguara, sipas detyrimit dhe afatit.' },
+  faturat: { tab: 'invoices', title: 'Faturat', subtitle: 'Faturat lëshohen në programin e faturimit; këtu ndiqen numrat fiskalë, vlerat dhe afatet.' },
+  pagesat: { tab: 'payments', title: 'Pagesat', subtitle: 'Pagesat e arkëtuara nga klientët (cash, bankë, kartë).' },
+};
+
 export default function Finance() {
+  const { section: key = 'detyrimet' } = useParams();
+  const section = FINANCE_SECTIONS[key] || FINANCE_SECTIONS.detyrimet;
+  return <FinanceSection key={section.tab} section={section} />;
+}
+
+function FinanceSection({ section }) {
   const { can } = useAuth();
-  const [tab, setTab] = useState('debts');
+  const tab = section.tab;
   const [from, setFrom] = useState(addDays(todayISO(), -90));
   const [invoiceForm, setInvoiceForm] = useState(null);
   const [paymentForm, setPaymentForm] = useState(null);
@@ -155,20 +167,15 @@ export default function Finance() {
   return (
     <>
       <PageHeader
-        title="Faturat dhe pagesat"
-        subtitle="Faturat lëshohen në programin e faturimit; këtu ndiqen numrat fiskalë, pagesat dhe detyrimet e klientëve."
+        title={section.title}
+        subtitle={section.subtitle}
         actions={canEdit && (
           <>
-            <button type="button" className="btn" onClick={() => setInvoiceForm({})}><Plus size={16} /> Faturë</button>
-            <button type="button" className="btn primary" onClick={() => setPaymentForm({})}><Plus size={16} /> Pagesë</button>
+            {tab !== 'payments' && <button type="button" className={`btn ${tab === 'invoices' ? 'primary' : ''}`} onClick={() => setInvoiceForm({})}><Plus size={16} /> Faturë</button>}
+            {tab !== 'invoices' && <button type="button" className="btn primary" onClick={() => setPaymentForm({})}><Plus size={16} /> Pagesë</button>}
           </>
         )}
       />
-      <Tabs active={tab} onChange={setTab} tabs={[
-        { key: 'debts', label: 'Detyrimet e papaguara' },
-        { key: 'invoices', label: 'Faturat' },
-        { key: 'payments', label: 'Pagesat' },
-      ]} />
       {tab !== 'debts' && (
         <Field label="Nga data"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ maxWidth: 200, marginBottom: 12 }} /></Field>
       )}

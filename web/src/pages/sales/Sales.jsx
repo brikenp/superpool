@@ -1,13 +1,13 @@
 import { collection, query, where } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { PAYMENT_METHODS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
-import { Card, Field, PageHeader, Stat, StatusBadge, Tabs } from '../../components/ui.jsx';
+import { Card, Empty, Field, PageHeader, Stat, StatusBadge } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
@@ -18,11 +18,16 @@ import { StockTable } from '../inventory/Stock.jsx';
 export const SALE_STATUS = { confirmed: 'Konfirmuar', cancelled: 'Anuluar' };
 
 export default function Sales() {
+  const { pathname } = useLocation();
+  const tab = pathname.endsWith('/nenmagazina') ? 'agent' : 'sales';
+  return <SalesSection key={tab} tab={tab} />;
+}
+
+function SalesSection({ tab }) {
   const { uid, can } = useAuth();
   const { locations, users } = useData();
   const navigate = useNavigate();
   const seesAll = can(CAPS.CHEM_SALES_ALL, CAPS.REPORTS);
-  const [tab, setTab] = useState('sales');
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(todayISO());
   const [seller, setSeller] = useState('');
@@ -59,14 +64,15 @@ export default function Sales() {
   return (
     <>
       <PageHeader
-        title="Shitjet e kimikateve"
-        subtitle="Shitjet nga nënmagazina e shitësit ose nga magazina kryesore. Fatura fiskale lëshohet në programin e faturimit."
+        title={tab === 'agent' ? 'Nënmagazina e shitësit' : 'Shitjet e kimikateve'}
+        subtitle={tab === 'agent'
+          ? 'Gjendja e kimikateve te shitësi dhe rakordimi marrë / shitur / kthyer.'
+          : 'Shitjet nga nënmagazina e shitësit ose nga magazina kryesore. Fatura fiskale lëshohet në programin e faturimit.'}
         actions={<Link className="btn primary" to="/kimikate/shitje-e-re"><Plus size={16} /> Shitje e re</Link>}
       />
-      <Tabs active={tab} onChange={setTab} tabs={[
-        { key: 'sales', label: 'Shitjet' },
-        agentLocations.length > 0 && { key: 'agent', label: 'Gjendja e nënmagazinës' },
-      ]} />
+      {tab === 'agent' && !agentLocations.length && (
+        <Empty>Nuk ka nënmagazinë shitësi. Krijojeni te Magazina → Magazinat (lloji "Nënmagazinë shitësi").</Empty>
+      )}
       {tab === 'sales' && (
         <>
           <div className="form-grid" style={{ marginBottom: 12 }}>

@@ -334,7 +334,6 @@ function InvoicesReport({ f }) {
 export default function Reports() {
   const { key = 'stock' } = useParams();
   const { can } = useAuth();
-  const navigate = useNavigate();
   const [f, setF] = useState({ from: firstOfMonth(), to: todayISO(), kind: '', product: '', project: '', vehicle: '', employee: '', supplier: '', client: '' });
   const available = REPORTS.filter((r) => !r.caps || can(...r.caps));
   const report = available.find((r) => r.key === key) || available[0];
@@ -342,12 +341,7 @@ export default function Reports() {
 
   return (
     <>
-      <PageHeader title="Raportet" subtitle="Të gjitha raportet filtrohen dhe eksportohen në Excel ose PDF." />
-      <div className="row" style={{ marginBottom: 12 }}>
-        <select value={report.key} onChange={(e) => navigate(`/raportet/${e.target.value}`)} style={{ maxWidth: 360 }}>
-          {available.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
-        </select>
-      </div>
+      <PageHeader breadcrumb="Raportet" title={report.label} subtitle="Filtroni sipas nevojës dhe eksportoni në Excel ose PDF." />
       <Filters report={report} f={f} setF={setF} />
       <Card title={report.label}>
         {report.key === 'stock' && <StockTable locationIds={null} title="Gjendja e magazinës (të gjitha vendet)" showLocation />}

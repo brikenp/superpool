@@ -1,11 +1,12 @@
 import { collection, query, where } from 'firebase/firestore';
 import {
-  ArrowLeftRight, Boxes, Building2, ClipboardList, Factory, FileText, FlaskConical, Handshake, HardHat, History,
-  House, LogOut, Menu, Moon, Package, Pin, Plug, Receipt, Scale, Search, Settings, ShieldCheck, ShoppingCart, Smartphone,
-  Sun, TrendingUp, Truck, Warehouse, Waves,
+  ArrowLeftRight, Banknote, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical,
+  Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
+  Scale, Search, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
+  Warehouse, Waves, Wrench,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 
 import { CAPS } from '@shared/roles.js';
 
@@ -17,6 +18,7 @@ import { CommandPalette } from './CommandPalette.jsx';
 
 const C = CAPS;
 
+// Çdo hyrje mund të ketë `to` me ?seksioni=… (p.sh. llojet e lëvizjeve); aktivizimi krahason edhe seksionin.
 export const NAV = [
   { title: null, items: [
     { to: '/', label: 'Paneli', icon: House, end: true },
@@ -25,32 +27,58 @@ export const NAV = [
   { title: 'Magazina', items: [
     { to: '/artikuj', label: 'Artikujt', icon: Package, caps: [C.INVENTORY_VIEW] },
     { to: '/stoku', label: 'Gjendja e stokut', icon: Boxes, caps: [C.INVENTORY_VIEW] },
-    { to: '/levizjet', label: 'Lëvizjet', icon: ArrowLeftRight, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE], badge: 'pending' },
     { to: '/inventarizim', label: 'Inventarizimi', icon: ClipboardList, caps: [C.INVENTORY_MANAGE] },
     { to: '/rakordimi', label: 'Rakordimi fiskal', icon: Scale, caps: [C.INVENTORY_MANAGE] },
     { to: '/vendet', label: 'Magazinat', icon: Warehouse, caps: [C.INVENTORY_MANAGE] },
+  ] },
+  { title: 'Lëvizjet e mallit', items: [
+    { to: '/levizjet?seksioni=miratim', label: 'Për miratim', icon: ClipboardCheck, caps: [C.MOVEMENTS_APPROVE], badge: 'pending' },
+    { to: '/levizjet?seksioni=hyrjet', label: 'Hyrjet nga blerja', icon: PackagePlus, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet?seksioni=daljet', label: 'Daljet', icon: PackageMinus, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet?seksioni=dorezimet', label: 'Dorëzimet në kantier', icon: Truck, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet?seksioni=perdorimi', label: 'Përdorimi në projekte', icon: Wrench, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet?seksioni=kthimet', label: 'Kthimet', icon: Undo2, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet?seksioni=transferimet', label: 'Transferimet', icon: ArrowLeftRight, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet?seksioni=humbjet', label: 'Dëmtime & rregullime', icon: TriangleAlert, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
+    { to: '/levizjet', label: 'Të gjitha lëvizjet', icon: List, caps: [C.INVENTORY_VIEW, C.MOVEMENTS_APPROVE] },
   ] },
   { title: 'Flota', items: [
     { to: '/automjetet', label: 'Automjetet', icon: Truck, caps: [C.INVENTORY_VIEW, C.FLEET] },
     { to: '/punonjesit', label: 'Punonjësit', icon: HardHat, caps: [C.FLEET] },
   ] },
-  { title: 'Tregtia', items: [
+  { title: 'Klientët & ofertat', items: [
     { to: '/klientet', label: 'Klientët', icon: Handshake, caps: [C.CLIENTS_VIEW] },
-    { to: '/kimikate', label: 'Shitjet e kimikateve', icon: FlaskConical, caps: [C.CHEM_SALES] },
     { to: '/ofertat', label: 'Ofertat', icon: FileText, caps: [C.OFFERS] },
     { to: '/modelet', label: 'Modelet e pishinave', icon: Waves, caps: [C.POOL_MODELS] },
-    { to: '/financa', label: 'Faturat & pagesat', icon: Receipt, caps: [C.FINANCE, C.REPORTS] },
+  ] },
+  { title: 'Kimikatet', items: [
+    { to: '/kimikate', label: 'Shitjet e kimikateve', icon: FlaskConical, caps: [C.CHEM_SALES], end: true },
+    { to: '/kimikate/nenmagazina', label: 'Nënmagazina e shitësit', icon: Warehouse, caps: [C.CHEM_SALES] },
+  ] },
+  { title: 'Financa', items: [
+    { to: '/financa/detyrimet', label: 'Detyrimet e klientëve', icon: Wallet, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/faturat', label: 'Faturat', icon: Receipt, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/pagesat', label: 'Pagesat', icon: Banknote, caps: [C.FINANCE, C.REPORTS] },
   ] },
   { title: 'Furnizimi', items: [
     { to: '/furnitoret', label: 'Furnitorët', icon: Factory, caps: [C.SUPPLIERS] },
-    { to: '/porosite', label: 'Porositë', icon: ShoppingCart, caps: [C.SUPPLIERS] },
+    { to: '/porosite', label: 'Porositë', icon: ShoppingCart, caps: [C.SUPPLIERS], end: true },
     { to: '/porosite/nevojat', label: 'Lista e nevojave', icon: Pin, caps: [C.SUPPLIERS] },
   ] },
   { title: 'Projektet', items: [
     { to: '/projektet', label: 'Projektet', icon: Building2, caps: [C.PROJECTS_VIEW, C.FIELD] },
   ] },
-  { title: 'Analiza', items: [
-    { to: '/raportet', label: 'Raportet', icon: TrendingUp, caps: [C.REPORTS] },
+  { title: 'Raportet', items: [
+    { to: '/raportet/stock', label: 'Gjendja e magazinës', icon: Boxes, caps: [C.REPORTS], end: true },
+    { to: '/raportet/movements', label: 'Hyrjet dhe daljet', icon: ArrowLeftRight, caps: [C.REPORTS], end: true },
+    { to: '/raportet/vehicles', label: 'Materialet në automjete', icon: Truck, caps: [C.REPORTS], end: true },
+    { to: '/raportet/sites', label: 'Materialet në kantiere', icon: Building2, caps: [C.REPORTS], end: true },
+    { to: '/raportet/returns', label: 'Kthimet dhe diferencat', icon: Undo2, caps: [C.REPORTS], end: true },
+    { to: '/raportet/chem', label: 'Shitjet e kimikateve', icon: FlaskConical, caps: [C.REPORTS], end: true },
+    { to: '/raportet/orders', label: 'Porositë e furnitorëve', icon: ShoppingCart, caps: [C.REPORTS], end: true },
+    { to: '/raportet/offers', label: 'Ofertat dhe statusi', icon: FileText, caps: [C.REPORTS], end: true },
+    { to: '/raportet/projects', label: 'Kostot e projekteve', icon: TrendingUp, caps: [C.VIEW_COSTS], end: true },
+    { to: '/raportet/invoices', label: 'Faturat dhe pagesat', icon: Receipt, caps: [C.REPORTS], end: true },
   ] },
   { title: 'Administrimi', items: [
     { to: '/integrimi', label: 'Integrimi / importi', icon: Plug, caps: [C.INTEGRATION] },
@@ -60,6 +88,22 @@ export const NAV = [
   ] },
 ];
 
+const sectionOf = (search) => new URLSearchParams(search).get('seksioni') || '';
+
+/** Hyrja është aktive kur përputhet rruga dhe seksioni (?seksioni=…). */
+function isItemActive(item, location) {
+  const [path, search = ''] = item.to.split('?');
+  const pathOk = item.end || path === '/'
+    ? location.pathname === path
+    : location.pathname === path || location.pathname.startsWith(`${path}/`);
+  return pathOk && sectionOf(search) === sectionOf(location.search);
+}
+
+const NAV_STATE_KEY = 'superpool-nav-collapsed';
+function loadCollapsed() {
+  try { return JSON.parse(localStorage.getItem(NAV_STATE_KEY)) || {}; } catch { return {}; }
+}
+
 export const initials = (name = '') => name.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
 
 export function Layout() {
@@ -68,7 +112,13 @@ export function Layout() {
   const [palette, setPalette] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const location = useLocation();
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => setOpen(false), [location.pathname, location.search]);
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const toggleGroup = (title) => setCollapsed((c) => {
+    const next = { ...c, [title]: !c[title] };
+    try { localStorage.setItem(NAV_STATE_KEY, JSON.stringify(next)); } catch { /* pa localStorage */ }
+    return next;
+  });
 
   useEffect(() => {
     const onKey = (e) => {
@@ -99,15 +149,22 @@ export function Layout() {
         {NAV.map((group) => {
           const items = group.items.filter((i) => !i.caps || can(...i.caps));
           if (!items.length) return null;
+          const hasActive = items.some((i) => isItemActive(i, location));
+          const isCollapsed = group.title && collapsed[group.title] && !hasActive;
           return (
-            <nav className="nav-group" key={group.title || 'main'} aria-label={group.title || 'Kryesore'}>
-              {group.title && <div className="nav-group-title">{group.title}</div>}
-              {items.map((i) => (
-                <NavLink key={i.to} to={i.to} end={i.end || i.to === '/porosite'}>
+            <nav className={`nav-group ${isCollapsed ? 'collapsed' : ''}`} key={group.title || 'main'} aria-label={group.title || 'Kryesore'}>
+              {group.title && (
+                <button type="button" className="nav-group-title" aria-expanded={!isCollapsed} onClick={() => toggleGroup(group.title)}>
+                  {group.title}
+                  <ChevronDown size={14} className="chev" />
+                </button>
+              )}
+              {!isCollapsed && items.map((i) => (
+                <Link key={i.to} to={i.to} className={isItemActive(i, location) ? 'active' : ''} aria-current={isItemActive(i, location) ? 'page' : undefined}>
                   <i.icon size={18} strokeWidth={1.9} aria-hidden="true" />
                   {i.label}
                   {i.badge && badges[i.badge] > 0 && <span className="badge">{badges[i.badge]}</span>}
-                </NavLink>
+                </Link>
               ))}
             </nav>
           );

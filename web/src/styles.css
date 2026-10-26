@@ -483,3 +483,12 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
   .content { padding: 0; }
   .card, .stat { box-shadow: none; }
 }
+
+/* ---------- Grupet e menysë (hapen/mbyllen) ---------- */
+button.nav-group-title {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; border: none; background: none;
+  font-family: inherit; cursor: pointer; border-radius: 6px; text-align: left;
+}
+button.nav-group-title:hover { color: var(--sidebar-text-strong); }
+button.nav-group-title .chev { transition: transform 0.15s; opacity: 0.7; }
+.nav-group.collapsed button.nav-group-title .chev { transform: rotate(-90deg); }
