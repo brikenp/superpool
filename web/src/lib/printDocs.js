@@ -201,7 +201,7 @@ export async function invoicePdf(invoice, { company, clientsById = {} }) {
     ['Vlera pa TVSH', m(invoice.net ?? net)],
     ...Object.entries(byVat).map(([v, a]) => [`TVSH ${v}%`, m(invoice.vat ?? a)]),
     ['Totali me TVSH', m(gross), true],
-    ...(invoice.deductions || []).map((x) => [`Minus: ${x.label}`, `-${m(x.amount)}`]),
+    ...(invoice.deductions || []).map((x) => [`Parapagim · ${x.label}`, `-${m(x.amount)}`]),
   ];
   const tx = 120;
   const tw = 76;

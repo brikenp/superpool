@@ -61,7 +61,7 @@ export function FinalInvoiceForm({ project, onClose }) {
           const sub = out.reduce((s, l) => s + l.qty * l.unitPrice, 0);
           out.push({ description: `Zbritje ${offer.discountPct}%`, unit: 'set', qty: 1, unitPrice: -round2((sub * toNumber(offer.discountPct)) / 100) });
         }
-        if (alive) setV((s) => ({ ...s, vatPct: offer.vatPct ?? s.vatPct }));
+        if (alive) setV((s) => ({ ...s, vatPct: offer.vatPct ?? s.vatPct, ...(offer.currency === 'EUR' ? { currency: 'EUR', exchangeRate: offer.exchangeRate } : {}) }));
       }
       // Pa ofertë: një rresht me vlerën e kontratës.
       if (!out.length) {

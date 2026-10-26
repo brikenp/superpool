@@ -10,7 +10,7 @@ import { Card, PageHeader, Stat, StatusBadge } from '../components/ui.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { unitCostOf, useData, useQuery } from '../lib/data.jsx';
 import { db } from '../lib/firebase.js';
-import { date, firstOfMonth, money, todayISO } from '../lib/format.js';
+import { date, firstOfMonth, money, todayISO, offerAll } from '../lib/format.js';
 import FieldHome from './field/FieldHome.jsx';
 import { freeQty } from './inventory/Products.jsx';
 
@@ -63,7 +63,7 @@ function ManagementDashboard() {
         {inv && <Stat icon={PackageX} label="Artikuj nën stokun minimal" value={low.length} tone={low.length ? 'danger' : 'ok'} to="/porosite/nevojat" />}
         {inv && can(CAPS.VIEW_COSTS) && <Stat icon={Wallet} label="Vlera e stokut" value={money(stockValue)} sub={`${active.length} artikuj aktivë`} to="/stoku?vendi=all" />}
         {projectsCap && <Stat icon={HardHat} label="Projekte aktive" value={projects.data.length} sub={`${projects.data.filter((p) => (p.shortages || []).length).length} me mungesa materialesh`} to="/projektet" />}
-        {offersCap && <Stat icon={FileText} label="Oferta të hapura" value={offers.data.length} sub={expiring.length ? `${expiring.length} të skaduara` : money(offers.data.reduce((s, o) => s + Number(o.totals?.total || 0), 0))} to="/ofertat" />}
+        {offersCap && <Stat icon={FileText} label="Oferta të hapura" value={offers.data.length} sub={expiring.length ? `${expiring.length} të skaduara` : money(offers.data.reduce((s, o) => s + offerAll(o), 0))} to="/ofertat" />}
         {(salesAll || salesOwn) && <Stat icon={FlaskConical} label="Shitje kimikatesh këtë muaj" value={money(monthSales.reduce((s, x) => s + Number(x.total || 0), 0))} sub={`${monthSales.length} shitje`} to="/kimikate" />}
       </div>
 
@@ -98,7 +98,7 @@ function ManagementDashboard() {
               {[...offers.data].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 8).map((o) => (
                 <li key={o.id}>
                   <Link to={`/ofertat/${o.id}`} style={{ flex: 1 }}>{o.number} · {o.clientName}<br /><small className="muted">{o.projectName}</small></Link>
-                  <span>{money(o.totals?.total)}</span>
+                  <span>{money(o.totals?.total, o.currency)}</span>
                   <StatusBadge status={o.status} labels={OFFER_STATUS} />
                 </li>
               ))}

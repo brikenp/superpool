@@ -4,7 +4,7 @@ import { POOL_SECTIONS, POOL_TYPES, UNITS } from '@shared/constants.js';
 
 import { BRAND_NAVY, brandHeader } from './brand.js';
 import { loadPdf } from './export.js';
-import { date, money, qty } from './format.js';
+import { date, money as fmtMoney, qty } from './format.js';
 import { offerTotals, offerVariables } from './offerCalc.js';
 
 // Koka dhe fundi me logon SuperPool; fundi vizatohet automatikisht te doc.save().
@@ -41,6 +41,8 @@ const sectionsOf = (lines) => Object.keys(POOL_SECTIONS).filter((s) => lines.som
 
 /** (A) Oferta për klientin — pa kosto, pa marzh. */
 export async function clientOfferPdf(offer, company, client) {
+  // Shumat në monedhën e ofertës (L ose €).
+  const money = (v) => fmtMoney(v, offer.currency === 'EUR' ? 'EUR' : 'ALL');
   const { jsPDF, autoTable } = await loadPdf();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const t = offerTotals(offer);
@@ -152,6 +154,8 @@ export async function clientOfferPdf(offer, company, client) {
 
 /** (B) Preventivi i brendshëm — kosto, furnitorë, nevojat për porosi dhe marzhi. */
 export async function internalEstimatePdf(offer, company, { productsById, suppliersById, freeQtyOf }) {
+  // Shumat në monedhën e ofertës (L ose €).
+  const money = (v) => fmtMoney(v, offer.currency === 'EUR' ? 'EUR' : 'ALL');
   const { jsPDF, autoTable } = await loadPdf();
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
   const t = offerTotals(offer);

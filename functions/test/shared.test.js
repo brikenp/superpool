@@ -205,7 +205,10 @@ test('fiskalizimi: kërkesa për POS.AL nga shitja, fatura përfundimtare dhe ko
   };
   const e = buildFiscalRequest({ config, invoice: final, client: { name: 'Biz', nipt: 'L12345678A', address: 'Rr. 1', city: 'Tiranë' }, options: { invoiceType: 'EINVOICE', paymentMethod: 'ACCOUNT' } });
   assert.equal(e.order.items[0].totalWithTax, 120000);
-  assert.equal(e.order.options.eInvoiceOptions.prepaidAmount, 50000);
+  // Parapagimi si rresht −1: totali i faturës = 120.000 − 50.000.
+  assert.deepEqual([e.order.items[1].quantity, e.order.items[1].totalWithTax, e.order.items[1].name], [-1, -50000, 'Parapagim — Paradhënie']);
+  assert.equal(e.order.items.reduce((s, x) => s + x.totalWithTax, 0), 70000);
+  assert.equal(e.order.options.eInvoiceOptions.prepaidAmount, 0);
   assert.equal(e.order.options.customer.typeOfId, 'NUIS');
   assert.equal(e.order.options.bankAccounts.length, 1);
   // E njëjta si jo-cash: paradhënia zbritet me rresht negativ.

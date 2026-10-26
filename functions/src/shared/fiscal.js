@@ -70,14 +70,15 @@ export function buildFiscalRequest({ config, invoice, sale = null, client = {}, 
   const items = fiscalItems({ invoice, sale, vatPayer: config.vatPayer !== false, vatPct: config.vatPct ?? 20 });
   const prepaid = r2((invoice.deductions || []).reduce((s, d) => s + Number(d.amount || 0), 0));
   const isEinvoice = invoiceType === 'EINVOICE';
-  // Pa e-faturë, paradhëniet e faturuara më parë zbriten si rreshta negativë.
-  if (prepaid > 0 && !isEinvoice) {
+  // Paradhëniet e faturuara më parë zbriten si rreshta "Parapagim" me sasi −1 (si në programin fiskal):
+  // p.sh. Punime 1 × 250.000 dhe Parapagim −1 × 250.000 → totali 0. Vlen për të gjitha llojet e faturave.
+  if (prepaid > 0) {
     const rate = config.vatPayer !== false ? Number(invoice.vatPct ?? config.vatPct ?? 20) : 0;
     for (const d of invoice.deductions) {
       items.push({
         quantity: -1, priceWithoutTax: r8(Number(d.amount) / (1 + rate / 100)), tax: config.vatPayer !== false, taxRate: rate,
         taxType: config.vatPayer !== false ? String(rate) : 'TAX_FREE', totalWithTax: -r2(d.amount),
-        name: `Zbritje: ${d.label || 'paradhënie'}`.slice(0, 200), unit: 'XPP', discount: 0,
+        name: `Parapagim${d.label ? ` — ${d.label}` : ''}`.slice(0, 200), unit: 'XPP', discount: 0,
       });
     }
   }
@@ -106,7 +107,7 @@ export function buildFiscalRequest({ config, invoice, sale = null, client = {}, 
         ...(Array.isArray(config.bankAccounts) && config.bankAccounts.length && invoiceType !== 'CASH' ? { bankAccounts: config.bankAccounts } : {}),
         ...(isEinvoice ? {
           eInvoiceOptions: {
-            prepaidAmount: prepaid,
+            prepaidAmount: 0, // parapagimi është tashmë si rresht negativ
             payDeadline: invoice.dueDate || invoice.date,
             profileID: 'P1',
             type: EINVOICE_TYPE[invoice.type] || 'COMMERCIAL',

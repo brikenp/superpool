@@ -16,7 +16,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { ContractsCard } from '../finance/Contracts.jsx';
 import { db, storage } from '../../lib/firebase.js';
-import { date, dateTime, inAll, money, moneyWithAll } from '../../lib/format.js';
+import { date, dateTime, inAll, money, moneyWithAll, offerAll } from '../../lib/format.js';
 import { InvoiceForm, PaymentForm, INVOICE_STATUS } from '../finance/Finance.jsx';
 import { clientFields, normalizeClient } from './Clients.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
@@ -107,7 +107,7 @@ export default function ClientCard() {
             { key: 'date', label: 'Data', render: (o) => date(o.date) },
             { key: 'number', label: 'Nr.' },
             { key: 'projectName', label: 'Projekti' },
-            { key: 'total', label: 'Vlera me TVSH', type: 'money', value: (o) => o.totals?.total || 0 },
+            { key: 'total', label: 'Vlera me TVSH', type: 'money', value: (o) => offerAll(o), render: (o) => money(o.totals?.total, o.currency) },
             { key: 'status', label: 'Statusi', value: (o) => OFFER_STATUS[o.status], render: (o) => <StatusBadge status={o.status} labels={OFFER_STATUS} /> },
           ]}
         />

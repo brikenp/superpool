@@ -72,13 +72,16 @@ export const acceptOffer = onCall({ region: REGION }, async (request) => {
     if (!['draft', 'sent'].includes(o.status)) fail('Vetëm ofertat draft ose të dërguara mund të pranohen.');
     if (!o.clientId) fail('Oferta nuk ka klient.');
     const numbering = await reserveNumber(tx, 'PRJ');
+    // Ofertat në euro: financat e projektit mbahen në lekë, me kursin e ofertës.
+    const rate = o.currency === 'EUR' ? Number(o.exchangeRate) || 0 : 1;
+    if (!(rate > 0)) fail('Oferta në euro nuk ka kursin e këmbimit.');
 
     const planned = {};
     let plannedMaterialCost = 0;
     let plannedOtherCost = 0;
     for (const l of o.lines || []) {
       const qty = Number(l.qty || 0);
-      const cost = qty * Number(l.unitCost || 0);
+      const cost = qty * Number(l.unitCost || 0) * rate;
       if (l.productId) {
         const p = (planned[l.productId] ||= { qty: 0, cost: 0, code: l.code || '', name: l.description || '', unit: l.unit || '' });
         p.qty = round3(p.qty + qty);
@@ -119,11 +122,14 @@ export const acceptOffer = onCall({ region: REGION }, async (request) => {
         productId, code: p.code, name: p.name, unit: p.unit, plannedQty: p.qty, reservedQty: 0,
       });
     }
-    const net = Number(o.totals?.net ?? o.totals?.subtotal ?? 0);
+    const net = Number(o.totals?.net ?? o.totals?.subtotal ?? 0) * rate;
     tx.set(db.doc(`projectFinance/${projectRef.id}`), {
       contractValue: round2(net),
       offerValue: round2(net),
-      offerValueWithVat: round2(Number(o.totals?.total || 0)),
+      offerValueWithVat: round2(Number(o.totals?.total || 0) * rate),
+      offerCurrency: o.currency === 'EUR' ? 'EUR' : 'ALL',
+      offerExchangeRate: rate,
+      offerValueOriginal: round2(Number(o.totals?.net ?? o.totals?.subtotal ?? 0)),
       plannedMaterialCost: round2(plannedMaterialCost),
       plannedOtherCost: round2(plannedOtherCost),
       plannedCosts: Object.fromEntries(Object.entries(planned).map(([id, p]) => [id, p.qty ? round2(p.cost / p.qty) : 0])),

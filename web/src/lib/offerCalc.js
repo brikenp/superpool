@@ -18,7 +18,7 @@ export const priceFromCost = (cost, markupPct) => round2(Number(cost || 0) * (1 
  * Gjeneron rreshtat e ofertës nga modeli. Kthen { lines, errors }.
  * costOf(productId) → kosto njësi aktuale (mesatare ose e fundit e blerjes)
  */
-export function linesFromModel(model, offer, { productsById, costOf }) {
+export function linesFromModel(model, offer, { productsById, costOf, toCur = (x) => x }) {
   const vars = offerVariables(offer);
   const errors = [];
   const lines = (model.items || []).map((item) => {
@@ -29,9 +29,10 @@ export function linesFromModel(model, offer, { productsById, costOf }) {
       errors.push(`${item.description || productsById[item.productId]?.name || 'Rresht'}: ${err.message}`);
     }
     const product = item.productId ? productsById[item.productId] : null;
-    const unitCost = product ? costOf(item.productId) : toNumber(item.unitCost);
+    // Kostot/çmimet e modelit janë në lekë; toCur i kthen në monedhën e ofertës.
+    const unitCost = product ? costOf(item.productId) : toCur(toNumber(item.unitCost));
     const markup = item.markupPct !== '' && item.markupPct !== undefined && item.markupPct !== null ? item.markupPct : model.markupPct;
-    const unitPrice = toNumber(item.unitPrice) > 0 ? toNumber(item.unitPrice) : priceFromCost(unitCost, markup);
+    const unitPrice = toNumber(item.unitPrice) > 0 ? toCur(toNumber(item.unitPrice)) : priceFromCost(unitCost, markup);
     return {
       key: newKey(),
       section: item.section || 'other',

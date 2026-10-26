@@ -17,6 +17,7 @@ import { clientFields, normalizeClient } from '../partners/Clients.jsx';
 import { freeQty } from '../inventory/Products.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
+import { CurrencyFields } from '../../components/Currency.jsx';
 
 const TEXT_FIELDS = [
   ['technicalText', 'Zgjidhja teknike (përshkrimi i punimeve)'],
@@ -56,6 +57,7 @@ export default function OfferEditor() {
         technicalText: '', filtration: '', equipmentText: '', servicesText: '',
         paymentTerms: company.defaultPaymentTerms || '', deliveryTerm: company.defaultDeliveryTerm || '', clientNotes: '',
         discountPct: 0, vatPct: company.vatPct ?? 20, showLinePrices: false, notesInternal: '', lines: [],
+        currency: 'ALL', exchangeRate: 1,
       });
     } else if (offer) {
       setForm({ ...offer, lines: (offer.lines || []).map((l) => ({ ...l, key: l.key || newKey() })) });
@@ -77,13 +79,25 @@ export default function OfferEditor() {
     return { ...next, lines: recalcQuantities(next.lines, next) };
   });
   const setLine = (i, patch) => set('lines', form.lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const costOf = (pid) => unitCostOf(costsById, pid);
+  // Oferta në euro: kostot dhe çmimet e magazinës (në lekë) kthehen me kursin e ofertës.
+  const rate = form.currency === 'EUR' ? toNumber(form.exchangeRate) : 1;
+  const toCur = (x) => (form.currency === 'EUR' && rate > 0 ? round2(Number(x || 0) / rate) : Number(x || 0));
+  const costOf = (pid) => toCur(unitCostOf(costsById, pid));
+  const cur = form.currency === 'EUR' ? 'EUR' : 'ALL';
+  const changeCurrency = (patch) => setForm((f) => {
+    const next = { ...f, ...patch };
+    const fromRate = f.currency === 'EUR' ? toNumber(f.exchangeRate) : 1;
+    const toRate = next.currency === 'EUR' ? toNumber(next.exchangeRate) : 1;
+    if (!(fromRate > 0) || !(toRate > 0) || fromRate === toRate) return next;
+    const conv = (x) => round2((toNumber(x) * fromRate) / toRate);
+    return { ...next, lines: f.lines.map((l) => ({ ...l, unitCost: conv(l.unitCost), unitPrice: conv(l.unitPrice) })) };
+  });
 
   const applyModel = async () => {
     const model = models.data.find((m) => m.id === modelId);
     if (!model) return;
     if (form.lines.length && !(await ask({ title: 'Apliko modelin', message: 'Rreshtat ekzistues do të zëvendësohen me materialet e modelit.', confirmLabel: 'Apliko' }))) return;
-    const { lines, errors } = linesFromModel(model, form, { productsById, costOf });
+    const { lines, errors } = linesFromModel(model, form, { productsById, costOf, toCur });
     setForm((f) => ({
       ...f,
       modelId: model.id,
@@ -109,6 +123,7 @@ export default function OfferEditor() {
       area: round2(vars.A),
       length: toNumber(form.length), width: toNumber(form.width), depthMin: toNumber(form.depthMin), depthMax: toNumber(form.depthMax),
       discountPct: toNumber(form.discountPct), vatPct: toNumber(form.vatPct),
+      currency: cur, exchangeRate: cur === 'EUR' ? rate : 1,
       lines: form.lines.map((l) => ({
         ...l, qty: toNumber(l.qty), unitCost: toNumber(l.unitCost), unitPrice: toNumber(l.unitPrice), productId: l.productId || null,
       })),
@@ -293,7 +308,7 @@ export default function OfferEditor() {
                         </td>
                         <td className="r"><input className="num" type="number" step="any" value={l.unitCost} onChange={(e) => setLine(i, { unitCost: e.target.value })} style={{ maxWidth: 100 }} /></td>
                         <td className="r"><input className="num" type="number" step="any" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} style={{ maxWidth: 110 }} /></td>
-                        <td className="r">{money(toNumber(l.qty) * toNumber(l.unitPrice))}</td>
+                        <td className="r">{money(toNumber(l.qty) * toNumber(l.unitPrice), cur)}</td>
                         <td className={`r ${p && free < toNumber(l.qty) ? 'text-danger' : ''}`}>{p ? qty(free) : ''}</td>
                         <td><input type="checkbox" checked={l.showOnClient !== false} onChange={(e) => setLine(i, { showOnClient: e.target.checked })} title="Shfaqet në ofertën për klientin" /></td>
                         <td><button type="button" className="icon-btn" onClick={() => set('lines', form.lines.filter((_, j) => j !== i))}><X size={16} /></button></td>
@@ -321,22 +336,24 @@ export default function OfferEditor() {
               <div className="form-grid">
                 <Field label="Zbritje (%)"><input className="num" type="number" step="any" value={form.discountPct} onChange={(e) => set('discountPct', e.target.value)} /></Field>
                 <Field label="TVSH (%)"><input className="num" type="number" step="any" value={form.vatPct} onChange={(e) => set('vatPct', e.target.value)} /></Field>
+                <CurrencyFields currency={cur} rate={form.exchangeRate} amount={totals.total} disabled={locked}
+                  onChange={(patch) => changeCurrency(patch.currency === 'EUR' && !(toNumber(patch.exchangeRate ?? form.exchangeRate) > 1) ? { ...patch, exchangeRate: company.eurRate || '' } : patch)} />
                 <Field className="span-all">
                   <label className="checkbox"><input type="checkbox" checked={Boolean(form.showLinePrices)} onChange={(e) => set('showLinePrices', e.target.checked)} /> Shfaq çmimet për çdo rresht në ofertën e klientit</label>
                 </Field>
               </div>
               <dl className="props" style={{ marginTop: 12 }}>
-                <dt>Vlera</dt><dd>{money(totals.subtotal)}</dd>
-                {totals.discount > 0 && <><dt>Zbritje</dt><dd>- {money(totals.discount)}</dd></>}
-                <dt>Pa TVSH</dt><dd>{money(totals.net)}</dd>
-                <dt>TVSH</dt><dd>{money(totals.vat)}</dd>
-                <dt className="bold">Totali</dt><dd className="bold">{money(totals.total)}</dd>
+                <dt>Vlera</dt><dd>{money(totals.subtotal, cur)}</dd>
+                {totals.discount > 0 && <><dt>Zbritje</dt><dd>- {money(totals.discount, cur)}</dd></>}
+                <dt>Pa TVSH</dt><dd>{money(totals.net, cur)}</dd>
+                <dt>TVSH</dt><dd>{money(totals.vat, cur)}</dd>
+                <dt className="bold">Totali</dt><dd className="bold">{money(totals.total, cur)}</dd>
               </dl>
             </Card>
             <Card title="Preventivi i brendshëm (konfidencial)">
               <div className="grid grid-3">
-                <Stat label="Kosto" value={money(totals.cost)} />
-                <Stat label="Marzhi" value={money(totals.margin)} tone={totals.margin < 0 ? 'danger' : 'ok'} />
+                <Stat label="Kosto" value={money(totals.cost, cur)} />
+                <Stat label="Marzhi" value={money(totals.margin, cur)} tone={totals.margin < 0 ? 'danger' : 'ok'} />
                 <Stat label="Marzhi %" value={`${totals.marginPct}%`} tone={totals.marginPct < 15 ? 'warn' : 'ok'} />
               </div>
               <Field label="Shënime të brendshme" className="span-all">

@@ -11,6 +11,8 @@ export const inAll = (x) => {
   const rate = x.currency === 'EUR' ? Number(x.exchangeRate) || 0 : 1;
   return Math.round(Number(x.amount || 0) * rate * 100) / 100;
 };
+/** Një vlerë e ofertës (totals.net / total …) në lekë, me kursin e ofertës. */
+export const offerAll = (o, field = 'total') => Math.round(Number(o?.totals?.[field] || 0) * (o?.currency === 'EUR' ? Number(o.exchangeRate) || 1 : 1) * 100) / 100;
 /** "1.250,00 €  (≈ 123.125,00 L)" për shumat në euro. */
 export const moneyWithAll = (x, field = 'amount') => (x?.currency === 'EUR'
   ? `${money(x[field], 'EUR')} (≈ ${money(inAll(x))})`

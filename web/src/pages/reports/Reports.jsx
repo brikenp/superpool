@@ -14,7 +14,7 @@ import { Card, Field, Loading, PageHeader, SearchSelect } from '../../components
 import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
-import { date, firstOfMonth, inAll, round2, todayISO } from '../../lib/format.js';
+import { date, firstOfMonth, inAll, offerAll, round2, todayISO } from '../../lib/format.js';
 import { StockTable } from '../inventory/Stock.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
@@ -249,8 +249,8 @@ function OffersReport({ f }) {
         { key: 'clientName', label: 'Klienti' },
         { key: 'projectName', label: 'Projekti' },
         { key: 'createdByName', label: 'Përgatiti' },
-        { key: 'net', label: 'Pa TVSH', type: 'money', total: true, value: (o) => Number(o.totals?.net || 0) },
-        { key: 'cost', label: 'Kosto', type: 'money', total: true, hidden: !can(CAPS.VIEW_COSTS), value: (o) => Number(o.totals?.cost || 0) },
+        { key: 'net', label: 'Pa TVSH (L)', type: 'money', total: true, value: (o) => offerAll(o, 'net') },
+        { key: 'cost', label: 'Kosto', type: 'money', total: true, hidden: !can(CAPS.VIEW_COSTS), value: (o) => offerAll(o, 'cost') },
         { key: 'marginPct', label: 'Marzhi %', type: 'number', hidden: !can(CAPS.VIEW_COSTS), value: (o) => Number(o.totals?.marginPct || 0) },
         { key: 'status', label: 'Statusi', value: (o) => OFFER_STATUS[o.status] },
       ]}

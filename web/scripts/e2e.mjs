@@ -432,7 +432,8 @@ async function main() {
   });
   const er = await admin.call('fiscalizeInvoice', { invoiceId: eInv.id });
   const eSent = posal.requests.filter((r) => r.method === 'POST').at(-1).body.order.options;
-  assert.deepEqual([eSent.invoiceType, eSent.isEinvoice, eSent.customer.typeOfId, eSent.eInvoiceOptions.prepaidAmount], ['EINVOICE', true, 'NUIS', 50000]);
+  assert.deepEqual([eSent.invoiceType, eSent.isEinvoice, eSent.customer.typeOfId, eSent.eInvoiceOptions.prepaidAmount], ['EINVOICE', true, 'NUIS', 0]);
+  assert.equal(posal.requests.filter((r) => r.method === 'POST').at(-1).body.order.items.reduce((s, i) => s + i.totalWithTax, 0), 70000);
   assert.ok(er.eic);
   const ep = await admin.call('fiscalInvoicePdf', { invoiceId: eInv.id });
   assert.equal(Buffer.from(ep.pdf, 'base64').toString().slice(0, 8), '%PDF-1.4');
@@ -464,6 +465,20 @@ async function main() {
   assert.equal(posal.requests.filter((r) => r.method === 'POST').at(-1).body.orderId, 'FAT-T3-2');
   await new Promise((r) => mock.close(r));
   ok('fiskalizimi me POS.AL: jo-cash, e-faturë me paradhënie, PDF nga tatimet, korrigjim, NIPT; çelësi API mbetet në server');
+
+  // --- Ofertë në euro → projekt me financa në lekë ---
+  const { number: eurOffer } = await ofer.call('allocateNumber', { prefix: 'OF' });
+  const eo = await addDoc(collection(ofer.db, 'offers'), {
+    number: eurOffer, status: 'sent', date: '2026-10-26', clientId: client.id, clientName: 'Vila Golem', projectName: 'Pishinë në euro',
+    currency: 'EUR', exchangeRate: 100, vatPct: 20,
+    lines: [{ key: 'e1', section: 'piping', productId: pipe, code: 'TUB-50', description: 'Tub', unit: 'm', qty: 10, unitCost: 2.5, unitPrice: 4, showOnClient: true },
+      { key: 'e2', section: 'services', productId: null, description: 'Montim', unit: 'ore', qty: 10, unitCost: 10, unitPrice: 96, showOnClient: true }],
+    totals: { subtotal: 1000, discount: 0, net: 1000, vat: 200, total: 1200, cost: 125 },
+  });
+  const ep2 = await ofer.call('acceptOffer', { offerId: eo.id });
+  const ef = (await getDoc(doc(admin.db, 'projectFinance', ep2.projectId))).data();
+  assert.deepEqual([ef.contractValue, ef.offerValueWithVat, ef.plannedMaterialCost, ef.plannedOtherCost, ef.offerCurrency], [100000, 120000, 2500, 10000, 'EUR']);
+  ok('oferta në euro (kurs 100) → projekti me kontratë 100.000 L dhe kosto të planifikuar në lekë');
 
   // --- Roli i personalizuar (leje të zgjedhura me dorë) ---
   const custom = await admin.call('createUser', {
