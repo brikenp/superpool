@@ -20,6 +20,7 @@ import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
 import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
 import { clientOption } from '../../lib/clients.js';
+import { BankReport, ClientStatementReport, SupplierStatementReport } from './FinanceReports.jsx';
 
 const REPORTS = [
   { key: 'stock', label: 'Gjendja e magazinës', filters: [] },
@@ -32,6 +33,9 @@ const REPORTS = [
   { key: 'offers', label: 'Ofertat dhe statusi', filters: ['period', 'client'] },
   { key: 'projects', label: 'Kostot e projekteve', filters: ['client'], caps: [CAPS.VIEW_COSTS] },
   { key: 'invoices', label: 'Faturat dhe pagesat e klientëve', filters: ['period', 'client', 'project'] },
+  { key: 'pasqyra-klientet', label: 'Pasqyra e klientëve (gjendje dhe vjetërsi)', filters: ['period', 'client'], caps: [CAPS.FINANCE, CAPS.REPORTS] },
+  { key: 'pasqyra-furnitoret', label: 'Pasqyra e furnitorëve (detyrime dhe vjetërsi)', filters: ['period', 'supplier'], caps: [CAPS.FINANCE, CAPS.REPORTS] },
+  { key: 'bankat', label: 'Bankat dhe arka (hyrje, dalje, gjendje)', filters: ['period'], caps: [CAPS.FINANCE, CAPS.REPORTS] },
 ];
 
 function Filters({ report, f, setF }) {
@@ -376,6 +380,9 @@ export default function Reports() {
         {report.key === 'offers' && <OffersReport f={f} />}
         {report.key === 'projects' && <ProjectsReport f={f} />}
         {report.key === 'invoices' && <InvoicesReport f={f} />}
+        {report.key === 'pasqyra-klientet' && <ClientStatementReport f={f} />}
+        {report.key === 'pasqyra-furnitoret' && <SupplierStatementReport f={f} />}
+        {report.key === 'bankat' && <BankReport f={f} />}
       </Card>
       <p className="muted" style={{ fontSize: '0.83rem' }}>Llojet e vendeve: {Object.values(LOCATION_KINDS).slice(0, 4).join(', ')}.</p>
     </>

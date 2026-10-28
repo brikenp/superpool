@@ -107,6 +107,26 @@ export const IMPORTS = {
     ],
     help: 'Pozitive = klienti na detyrohet, negative = parapagim. Shfaqen te Financa → Kartela e klientit dhe te Detyrimet.',
   },
+  supplierBalances: {
+    caps: [CAPS.FINANCE],
+    label: 'Gjendjet fillestare të furnitorëve',
+    sheet: 'GjendjetFurnitore',
+    columns: [
+      { key: 'supplier', width: 30, help: 'Emri ose NIPT-i i furnitorit. Nëse nuk ekziston, krijohet.' },
+      { key: 'nipt', help: 'NIPT (opsional).' },
+      { key: 'amount', required: true, help: 'Pozitive = ne i detyrohemi furnitorit; negative = i kemi paguar më shumë (parapagim).' },
+      { key: 'currency', list: ['ALL', 'EUR'], help: 'Monedha: ALL ose EUR. Bosh = ALL.' },
+      { key: 'exchangeRate', help: 'Kursi i euros (për EUR). Bosh = kursi te Cilësimet.' },
+      { key: 'date', help: 'Data e gjendjes (p.sh. 01.01.2026).' },
+      { key: 'notes', width: 30, help: 'Shënime.' },
+    ],
+    sample: [
+      { supplier: 'Astral Pool', nipt: 'K12345678B', amount: 480000, currency: 'ALL', date: '01.01.2026', notes: 'Fatura të papaguara 2025' },
+      { supplier: 'Kimikate Durrës', amount: 2500, currency: 'EUR', exchangeRate: 98, date: '01.01.2026' },
+    ],
+    notes: ['Çdo furnitor ka vetëm një gjendje fillestare; ndryshohet te Financa → Kartela e furnitorit.', 'Fshini rreshtat shembull para importit.'],
+    help: 'Pozitive = ne i detyrohemi, negative = parapagim. Shfaqen te Detyrimet ndaj furnitorëve dhe te kartela.',
+  },
   suppliers: {
     caps: [CAPS.SUPPLIERS],
     label: 'Furnitorët',
@@ -296,7 +316,7 @@ export function ImportPanel({ type: initialType = 'products', fixed = false, onD
             </select>
           </Field>
         )}
-        {(type === 'products' || type === 'clientBalances') && (
+        {(type === 'products' || type === 'clientBalances' || type === 'supplierBalances') && (
           <Field label="Kursi i euros (L për 1 €)" hint="Për vlerat në EUR: vlera në lekë = shuma në euro × kursi.">
             <input className="num" type="number" step="any" value={eurRate} placeholder={company.eurRate ? String(company.eurRate) : 'p.sh. 98'} onChange={(e) => setEurRate(e.target.value)} />
           </Field>

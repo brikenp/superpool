@@ -170,6 +170,7 @@ export default function ClientCard() {
               columns={[
                 { key: 'date', label: 'Data', render: (p) => date(p.date) },
                 { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHOD_LABELS[p.method] || p.method },
+            { key: 'accountName', label: 'Banka / arka' },
                 { key: 'reference', label: 'Referenca' },
                 { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : inAll(p)), render: (p) => (p.status === 'cancelled' ? money(0) : moneyWithAll(p)) },
                 printColumn((p) => <PrintPaymentButton payment={p} />),

@@ -12,7 +12,7 @@ export const RESET_GROUPS = {
   transactions: {
     label: 'Lëvizjet dhe dokumentet',
     collections: ['movements', 'movementCosts', 'stock', 'sales', 'invoices', 'payments', 'offers', 'projects', 'projectFinance',
-      'contracts', 'purchaseOrders', 'inventoryCounts', 'fiscalStock', 'counters'],
+      'contracts', 'purchaseOrders', 'inventoryCounts', 'fiscalStock', 'counters', 'supplierInvoices', 'supplierPayments', 'bankTransactions'],
   },
   clients: { label: 'Klientët', collections: ['clients'] },
   products: { label: 'Artikujt dhe kategoritë', collections: ['products', 'productCosts', 'categories', 'supplierPrices'] },

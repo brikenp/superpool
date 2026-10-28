@@ -77,7 +77,9 @@ export function DataProvider({ children }) {
   const vehicles = useCollection('vehicles', active);
   const users = useCollection('users', active);
   const settings = useDocument(active ? 'settings/company' : null);
-  const suppliers = useCollection('suppliers', active && (caps.has(CAPS.INVENTORY_VIEW) || caps.has(CAPS.SUPPLIERS)));
+  const suppliers = useCollection('suppliers', active && [CAPS.INVENTORY_VIEW, CAPS.SUPPLIERS, CAPS.FINANCE, CAPS.REPORTS].some((c) => caps.has(c)));
+  // Llogaritë bankare dhe arka (për pagesat dhe rakordimin).
+  const accounts = useCollection('accounts', active && (caps.has(CAPS.FINANCE) || caps.has(CAPS.REPORTS)));
   const clients = useCollection('clients', active && caps.has(CAPS.CLIENTS_VIEW));
   const costs = useCollection('productCosts', active && caps.has(CAPS.VIEW_COSTS));
 
@@ -103,11 +105,13 @@ export function DataProvider({ children }) {
       clients: [...clients.data].sort(sortBy('name')),
       clientsById: byId(clients.data),
       costsById: byId(costs.data),
+      accounts: [...accounts.data].sort((a, b) => (a.kind || '').localeCompare(b.kind || '') || sortBy('name')(a, b)),
+      accountsById: byId(accounts.data),
       company: { name: 'SuperPool', vatPct: 20, ...(settings.data || {}), loaded: !settings.loading },
       listsLoading: { clients: clients.loading, suppliers: suppliers.loading, products: products.loading, locations: locations.loading },
     };
   }, [clients.loading, suppliers.loading, products.data, products.loading, categories.data, locations.data, locations.loading, employees.data,
-    vehicles.data, users.data, suppliers.data, clients.data, costs.data, settings.data, settings.loading]);
+    vehicles.data, users.data, suppliers.data, clients.data, costs.data, accounts.data, settings.data, settings.loading]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

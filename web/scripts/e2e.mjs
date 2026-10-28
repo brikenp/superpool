@@ -10,7 +10,7 @@ import { createServer } from 'node:http';
 import { deleteApp, initializeApp } from 'firebase/app';
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import {
-  addDoc, collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, query, setDoc, updateDoc, where,
+  addDoc, collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 
@@ -579,6 +579,48 @@ async function main() {
   await denied(admin.call('createUser', { email: 'x@superpool.al', password: 'Fjalekalim123', name: 'x', role: 'custom', caps: [] }), 'custom pa leje');
   await deleteApp(cu.app);
   ok('roli i personalizuar: lejet e zgjedhura zbatohen në rregulla dhe funksione; ndryshimi vlen menjëherë');
+
+  // --- Furnitorët: gjendje fillestare, faturë blerjeje nga fletëhyrja, pagesë nga banka ---
+  const bank = await addDoc(collection(admin.db, 'accounts'), { name: 'BKT lekë', kind: 'bank', currency: 'ALL', iban: 'AL00BKT', openingBalance: 1000000, openingDate: '2026-01-01', active: true });
+  const cash = await addDoc(collection(admin.db, 'accounts'), { name: 'Arka', kind: 'cash', currency: 'ALL', openingBalance: 0, active: true });
+  await denied(addDoc(collection(gerti.db, 'accounts'), { name: 'X', kind: 'bank' }), 'Gerti krijon llogari bankare');
+  const sb = await admin.call('importData', { type: 'supplierBalances', rows: [{ supplier: 'Hidro Furnizim', amount: 300000, date: '01.01.2026' }] });
+  assert.equal(sb.balances, 1);
+  const fb = (await admin.call('allocateNumber', { prefix: 'FB' })).number;
+  assert.match(fb, /^FB-/);
+  // Magazinieri (furnitorët) regjistron faturën e blerjes që mbulon fletëhyrjen e parë.
+  const fbNo = (await mag.call('allocateNumber', { prefix: 'FB' })).number;
+  await addDoc(collection(mag.db, 'supplierInvoices'), {
+    supplierId: sup.id, supplierName: 'Hidro Furnizim', internalNumber: fbNo, number: 'F-1', date: '2026-10-02', dueDate: '2026-11-01',
+    net: 220000, vatPct: 20, amount: 264000, currency: 'ALL', exchangeRate: 1, amountAll: 264000, movementIds: [p1.id], type: 'purchase', status: 'active', source: 'superpool',
+  });
+  await denied(addDoc(collection(mag.db, 'supplierPayments'), { supplierId: sup.id, amount: 1 }), 'magazinieri paguan furnitorin');
+  const mp = (await admin.call('allocateNumber', { prefix: 'MP' })).number;
+  await addDoc(collection(admin.db, 'supplierPayments'), {
+    number: mp, supplierId: sup.id, supplierName: 'Hidro Furnizim', supplierInvoiceId: null, date: '2026-10-10', amount: 200000, currency: 'ALL', exchangeRate: 1, amountAll: 200000,
+    method: 'bank', accountId: bank.id, accountName: 'BKT lekë', reference: 'UP-1', status: 'active', source: 'superpool',
+  });
+  const supInv = await getDocs(query(collection(admin.db, 'supplierInvoices'), where('supplierId', '==', sup.id)));
+  const supPay = await getDocs(query(collection(admin.db, 'supplierPayments'), where('supplierId', '==', sup.id)));
+  const owed = supInv.docs.reduce((s, d) => s + d.data().amountAll, 0) - supPay.docs.reduce((s, d) => s + d.data().amountAll, 0);
+  assert.equal(owed, 364000); // 300.000 + 264.000 − 200.000
+  const linked = await getDocs(query(collection(admin.db, 'supplierInvoices'), where('movementIds', 'array-contains', p1.id)));
+  assert.equal(linked.size, 1);
+
+  // Rakordimi bankar: rreshti i ekstraktit lidhet me arkëtimin e shitjes (krijuar nga serveri).
+  const salePayDoc = salePay.docs[0];
+  const tx = doc(admin.db, 'bankTransactions', 'bt_test1');
+  await setDoc(tx, { accountId: bank.id, accountName: 'BKT lekë', date: salePayDoc.data().date, amount: salePayDoc.data().amount, description: 'Pagese', status: 'open', source: 'statement' });
+  const b1 = writeBatch(admin.db);
+  b1.update(doc(admin.db, 'payments', salePayDoc.id), { accountId: bank.id, accountName: 'BKT lekë', bankTxId: 'bt_test1' });
+  b1.update(tx, { status: 'matched', match: { kind: 'client', paymentId: salePayDoc.id, col: 'payments', created: false } });
+  await b1.commit();
+  await denied(updateDoc(doc(admin.db, 'payments', salePayDoc.id), { amount: 1 }), 'ndryshon shumën e pagesës së shitjes');
+  await setDoc(doc(admin.db, 'bankTransactions', 'bt_fee'), { accountId: bank.id, date: '2026-10-11', amount: -500, description: 'Komision', status: 'matched', match: { kind: 'other', category: 'Komision banke' } });
+  await denied(updateDoc(doc(gerti.db, 'bankTransactions', 'bt_fee'), { status: 'open' }), 'Gerti ndryshon ekstraktin');
+  assert.equal((await getDoc(doc(admin.db, 'payments', salePayDoc.id))).data().accountId, bank.id);
+  void cash;
+  ok('furnitorët (gjendje fillestare, faturë blerjeje nga fletëhyrja, pagesë nga banka) dhe rakordimi bankar');
 
   // --- Gjurmët ---
   const audit = await getDocs(collection(admin.db, 'auditLog'));

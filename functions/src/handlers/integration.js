@@ -92,6 +92,7 @@ const IMPORT_CAPS = {
   fiscalStock: [CAPS.INVENTORY_MANAGE],
   clients: [CAPS.CLIENTS_MANAGE, CAPS.FINANCE],
   clientBalances: [CAPS.FINANCE],
+  supplierBalances: [CAPS.FINANCE],
   invoices: [CAPS.FINANCE],
   payments: [CAPS.FINANCE],
   suppliers: [CAPS.SUPPLIERS],
@@ -146,6 +147,64 @@ const importers = {
       result[existing ? 'updated' : 'created'] += 1;
     });
     await w.flush();
+  },
+
+  // Gjendjet fillestare të furnitorëve: shuma pozitive = ne i detyrohemi, negative = i kemi paguar më shumë.
+  async supplierBalances(rows, result, user, options = {}) {
+    const snap = await db.collection('suppliers').get();
+    const byKey = new Map();
+    snap.forEach((d) => { for (const k of [d.get('nipt'), d.get('name')]) if (str(k)) byKey.set(str(k).toLowerCase(), d); });
+    const withOpening = new Set();
+    for (const c of ['supplierInvoices', 'supplierPayments']) {
+      (await db.collection(c).where('type', '==', 'opening').get()).forEach((d) => { if (d.get('status') !== 'cancelled') withOpening.add(d.get('supplierId')); });
+    }
+    let eurRate = Number(options.eurRate) > 1 ? Number(options.eurRate) : 0;
+    if (!eurRate) eurRate = Number((await db.doc('settings/company').get()).get('eurRate')) || 0;
+    const docs = [];
+    const w = new Writer();
+    rows.forEach((r, i) => {
+      const nipt = str(r.nipt).toUpperCase();
+      const name = str(r.supplier || r.furnitori || r.name || r.emri);
+      const amount = num(r.amount ?? r.shuma ?? r.gjendja);
+      if (!nipt && !name) { result.errors.push(`Rreshti ${i + 2}: mungon furnitori (emri ose NIPT).`); return; }
+      if (amount === null || amount === 0) { result.errors.push(`Rreshti ${i + 2} (${name || nipt}): mungon shuma.`); return; }
+      const currency = parseCurrency(r.currency ?? r.monedha) || 'ALL';
+      const rate = currency === 'EUR' ? num(r.exchangeRate ?? r.kursi) || eurRate : 1;
+      if (currency === 'EUR' && !(rate > 1)) { result.errors.push(`Rreshti ${i + 2} (${name || nipt}): vendosni kursin e euros.`); return; }
+      let sup = (nipt && byKey.get(nipt.toLowerCase())) || (name && byKey.get(name.toLowerCase()));
+      if (!sup) {
+        const ref = db.collection('suppliers').doc();
+        const data = { name: name || nipt, nipt, contactPerson: '', phone: '', email: '', address: '', active: true, createdAt: FieldValue.serverTimestamp() };
+        w.set(ref, data);
+        sup = { id: ref.id, get: (f) => data[f] };
+        for (const k of [nipt, data.name]) if (k) byKey.set(k.toLowerCase(), sup);
+        result.created += 1;
+      }
+      if (withOpening.has(sup.id)) { result.errors.push(`Rreshti ${i + 2} (${sup.get('name')}): ka tashmë gjendje fillestare — ndryshojeni te Financa → Kartela e furnitorit.`); return; }
+      withOpening.add(sup.id);
+      const value = Math.abs(amount);
+      docs.push({
+        debt: amount > 0,
+        data: {
+          type: 'opening', date: date(r.date || r.data), supplierId: sup.id, supplierName: sup.get('name'),
+          amount: value, currency, exchangeRate: rate, amountAll: round2(value * rate), notes: str(r.notes || r.shenime),
+          status: 'active', source: 'superpool', createdBy: user.uid, createdAt: FieldValue.serverTimestamp(),
+        },
+      });
+    });
+    if (docs.length) {
+      const { numbers } = await db.runTransaction(async (tx) => {
+        const n = await reserveNumber(tx, 'GJF', new Date(), docs.length);
+        n.commit();
+        return n;
+      });
+      docs.forEach(({ debt, data }, k) => {
+        if (debt) w.set(db.collection('supplierInvoices').doc(), { ...data, internalNumber: numbers[k], number: '', dueDate: data.date, movementIds: [] });
+        else w.set(db.collection('supplierPayments').doc(), { ...data, number: numbers[k], supplierInvoiceId: null, method: 'opening', reference: 'Gjendje fillestare', accountId: null, accountName: '' });
+      });
+    }
+    await w.flush();
+    result.balances = docs.length;
   },
 
   // Gjendjet fillestare të klientëve: shuma pozitive = klienti na detyrohet, negative = ka paguar më shumë.

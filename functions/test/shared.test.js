@@ -270,3 +270,56 @@ test('formula: depoja, vëllimi total dhe qarkullimi', () => {
   assert.equal(poolVariables({ length: 10, width: 5, depthMin: 1.5 }).Q, 75 / 4); // pa depo, 4 orë
   assert.equal(evaluateFormula('ceil(Q / 20)', v), 3);
 });
+
+test('kartela: gjendja fillestare, gjendja pas çdo rreshti dhe vjetërsia FIFO', async () => {
+  const { buildLedger, agingOf } = await import('../src/shared/ledger.js');
+  const debits = [
+    { id: 'gj', date: '2026-01-01', dueDate: '2026-01-01', amount: 250000 },
+    { id: 'f1', date: '2026-03-05', dueDate: '2026-03-20', amount: 120000 },
+    { id: 'f2', date: '2026-04-10', dueDate: '2026-05-10', amount: 50000 },
+  ];
+  const credits = [
+    { id: 'p1', date: '2026-02-10', amount: 100000 },
+    { id: 'p2', date: '2026-04-02', amount: 80000, linkId: 'f2' }, // 50.000 te f2, 30.000 FIFO
+  ];
+  const l = buildLedger(debits, credits, '2026-03-01', '2026-12-31');
+  assert.equal(l.opening, 150000);
+  assert.deepEqual(l.rows.map((r) => r.balance), [270000, 190000, 240000]);
+  assert.deepEqual([l.debit, l.credit, l.closing], [170000, 80000, 240000]);
+  const a = agingOf(debits, credits, '2026-05-15');
+  assert.equal(a.total, 240000);
+  assert.deepEqual(a.open.map((d) => [d.id, d.remaining, d.bucket]), [['gj', 120000, 'd90plus'], ['f1', 120000, 'd60']]);
+  assert.equal(a.buckets.d90plus, 120000);
+  const pre = agingOf(debits, [...credits, { id: 'p3', date: '2026-05-01', amount: 300000 }], '2026-05-15');
+  assert.deepEqual([pre.total, pre.unapplied], [0, 60000]); // parapagim
+});
+
+test('ekstrakti bankar: shumat, datat, kolonat dhe sugjerimet', async () => {
+  const { parseAmount, parseDate, detectColumns, statementRows, suggestMatch, findParty, txKey } = await import('../src/shared/bank.js');
+  assert.deepEqual(['1.234,56', '1,234.56', '-500', '(250,00)', '12.500', '12,5', 980, ''].map(parseAmount), [1234.56, 1234.56, -500, -250, 12500, 12.5, 980, null]);
+  assert.deepEqual(['05.10.2026', '2026-10-05', '5/1/26', 46300].map(parseDate), ['2026-10-05', '2026-10-05', '2026-01-05', '2026-10-05']);
+  const matrix = [
+    ['Banka Kombëtare Tregtare'], ['Ekstrakt llogarie', '', 'ALL'], [],
+    ['Data e transaksionit', 'Përshkrimi', 'Debi', 'Kredi', 'Referenca'],
+    ['01.10.2026', 'Pagese nga RIVIERA SHPK NIPT L11111111A fat 512', '', '120.000,00', 'TRX1'],
+    ['02.10.2026', 'Komision mirembajtje', '500,00', '', 'TRX2'],
+    ['03.10.2026', 'Transferte per Astral Pool fatura 245', '80.000,00', '', 'TRX3'],
+    ['', 'Totali', '80.500,00', '120.000,00', ''],
+  ];
+  const { headerRow, map } = detectColumns(matrix);
+  assert.equal(headerRow, 3);
+  const rows = statementRows(matrix, headerRow, map);
+  assert.deepEqual(rows.map((r) => r.amount), [120000, -500, -80000]);
+  assert.notEqual(txKey('a', rows[0]), txKey('a', rows[1]));
+  assert.equal(txKey('a', rows[0]), txKey('a', { ...rows[0] }));
+  const clients = [{ id: 'c1', name: 'Riviera Sh.p.k.', nipt: 'L11111111A' }, { id: 'c2', name: 'Vila Golem' }];
+  const suppliers = [{ id: 's1', name: 'Astral Pool' }];
+  assert.equal(findParty('pagese nga vila golem', clients).id, 'c2');
+  assert.deepEqual(suggestMatch(rows[0], { accountId: 'a', clients, suppliers }), { kind: 'client', party: clients[0] });
+  assert.equal(suggestMatch(rows[2], { accountId: 'a', clients, suppliers }).party.id, 's1');
+  assert.equal(suggestMatch(rows[1], { accountId: 'a', clients, suppliers }), null);
+  const pay = { id: 'p1', clientId: 'c1', date: '2026-09-30', accountAmount: 120000, status: 'active' };
+  const link = suggestMatch(rows[0], { accountId: 'a', clients, suppliers, payments: [pay] });
+  assert.deepEqual([link.kind, link.payment.id], ['link', 'p1']);
+  assert.equal(suggestMatch(rows[0], { accountId: 'a', clients, payments: [{ ...pay, bankTxId: 'x' }] }).kind, 'client');
+});

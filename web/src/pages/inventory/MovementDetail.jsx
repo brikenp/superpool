@@ -12,6 +12,7 @@ import { call } from '../../lib/firebase.js';
 import { date, dateTime, money, qty } from '../../lib/format.js';
 import { ProductThumb } from '../../components/ProductImage.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
+import { PurchaseInvoiceButton } from '../finance/SupplierFinance.jsx';
 
 export default function MovementDetail() {
   const id = useRouteId();
@@ -70,6 +71,7 @@ export default function MovementDetail() {
         actions={(
           <>
             <button type="button" className="btn" onClick={pdf} disabled={busy}>PDF / Printo</button>
+            {m.kind === 'purchase' && m.status === 'confirmed' && can(CAPS.FINANCE, CAPS.SUPPLIERS) && <PurchaseInvoiceButton movement={m} />}
             {editable && <button type="button" className="btn" onClick={() => navigate(`/levizjet/${id}/ndrysho`)}>Ndrysho</button>}
             {canApprove && ['pending', 'draft'].includes(m.status) && <button type="button" className="btn ok" disabled={busy} onClick={approve}>Mirato dhe konfirmo</button>}
             {canApprove && m.status === 'pending' && <button type="button" className="btn danger" disabled={busy} onClick={reject}>Refuzo</button>}

@@ -19,6 +19,10 @@ import { call, db } from '../../lib/firebase.js';
 import { addDays, date, inAll, money, moneyWithAll, round2, todayISO, toNumber } from '../../lib/format.js';
 import { clientOption } from '../../lib/clients.js';
 import { OpeningBalanceForm } from './OpeningBalance.jsx';
+import { SupplierFinancePage, SupplierLedgerPage } from './SupplierFinance.jsx';
+import { BanksPage } from './Banks.jsx';
+import { AccountField, accountFields } from '../../components/AccountField.jsx';
+import { defaultAccountId } from '../../lib/accounts.js';
 import { ClientLedgerPage } from './ClientLedger.jsx';
 import { prettySegment } from '../../lib/prettyUrl.jsx';
 import { ImportButton } from '../../components/ImportExcel.jsx';
@@ -49,7 +53,7 @@ export function InvoiceForm({ record, onClose }) {
 }
 
 function ManualInvoiceForm({ record, onClose }) {
-  const { clients, clientsById, company } = useData();
+  const { clients, clientsById, company, accounts, accountsById } = useData();
   const { uid } = useAuth();
   const projects = useQuery(() => query(collection(db, 'projects')), []);
   const isNew = !record.id;
@@ -142,6 +146,7 @@ function ManualInvoiceForm({ record, onClose }) {
           number,
           date: v.date, clientId: v.clientId, clientName: data.clientName, invoiceId: ref.id, projectId: data.projectId,
           amount: data.amount, currency: data.currency, exchangeRate: data.exchangeRate, amountAll: data.amountAll, method: v.paidMethod || 'bank', reference: data.fiscalNumber || internalNumber,
+          ...accountFields(v.paidAccountId ?? defaultAccountId(v.paidMethod || 'bank', accounts, data.currency), accountsById),
           status: 'active', source: 'superpool', createdBy: uid, createdAt: serverTimestamp(),
         });
       }
@@ -225,10 +230,13 @@ function ManualInvoiceForm({ record, onClose }) {
         )}
         {isNew && v.paidNow && (
           <Field label="Mënyra e pagesës">
-            <select value={v.paidMethod || 'bank'} onChange={(e) => set('paidMethod', e.target.value)}>
+            <select value={v.paidMethod || 'bank'} onChange={(e) => setV((s) => ({ ...s, paidMethod: e.target.value, paidAccountId: undefined }))}>
               {Object.entries(PAYMENT_METHODS).filter(([k]) => k !== 'credit').map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
           </Field>
+        )}
+        {isNew && v.paidNow && (
+          <AccountField value={v.paidAccountId ?? defaultAccountId(v.paidMethod || 'bank', accounts, v.currency)} onChange={(id) => set('paidAccountId', id)} />
         )}
         {!isNew && !record.saleId && (
           <label className="checkbox span-all"><input type="checkbox" checked={v.status === 'cancelled'} onChange={(e) => set('status', e.target.checked ? 'cancelled' : '')} /> Fatura është anuluar</label>
@@ -239,7 +247,7 @@ function ManualInvoiceForm({ record, onClose }) {
 }
 
 export function PaymentForm({ record, invoices = [], onClose }) {
-  const { clients, clientsById } = useData();
+  const { clients, clientsById, accounts, accountsById } = useData();
   const { uid } = useAuth();
   const { company } = useData();
   const [v, setV] = useState(() => {
@@ -264,6 +272,7 @@ export function PaymentForm({ record, invoices = [], onClose }) {
       number,
       date: v.date, clientId: v.clientId, clientName: clientsById[v.clientId]?.name || '', invoiceId: v.invoiceId || null,
       amount: toNumber(v.amount), ...currencyData(v.currency, v.exchangeRate, v.amount), method: v.method, reference: v.reference || '', status: 'active', source: 'superpool',
+      ...accountFields(v.accountId ?? defaultAccountId(v.method, accounts, v.currency), accountsById),
       createdBy: uid, createdAt: serverTimestamp(),
     });
     onClose();
@@ -279,10 +288,11 @@ export function PaymentForm({ record, invoices = [], onClose }) {
         <Field label={`Shuma (${v.currency === 'EUR' ? '€' : 'L'})`} required><input className="num" type="number" step="any" value={v.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
         <Field label="Mënyra">
-          <select value={v.method} onChange={(e) => set('method', e.target.value)}>
+          <select value={v.method} onChange={(e) => setV((s) => ({ ...s, method: e.target.value, accountId: undefined }))}>
             {Object.entries(PAYMENT_METHODS).filter(([k]) => k !== 'credit').map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </Field>
+        <AccountField value={v.accountId ?? defaultAccountId(v.method, accounts, v.currency)} onChange={(id) => set('accountId', id)} />
         <Field label="Fatura">
           <select value={v.invoiceId || ''} onChange={(e) => pickInvoice(e.target.value)}>
             <option value="">—</option>
@@ -301,12 +311,20 @@ const FINANCE_SECTIONS = {
   detyrimet: { tab: 'debts', title: 'Detyrimet e klientëve', subtitle: 'Klientët me fatura të papaguara, sipas detyrimit dhe afatit.' },
   faturat: { tab: 'invoices', title: 'Faturat', subtitle: 'Faturat e klientëve: fiskalizimi (POS.AL), numrat fiskalë, vlerat dhe afatet.' },
   pagesat: { tab: 'payments', title: 'Pagesat', subtitle: 'Pagesat e arkëtuara nga klientët (cash, bankë, kartë).' },
+  furnitoret: { tab: 'supplierDebts', title: 'Detyrimet ndaj furnitorëve', subtitle: 'Sa u detyrohemi furnitorëve, me vjetërsinë e faturave të papaguara.' },
+  'kartela-furnitori': { tab: 'supplierLedger', title: 'Kartela e furnitorit', subtitle: 'Gjendja fillestare, faturat e blerjes dhe pagesat te furnitori, me gjendjen pas çdo veprimi.' },
+  'faturat-blerje': { tab: 'supplierInvoices', title: 'Faturat e blerjes', subtitle: 'Faturat nga furnitorët, të lidhura me fletëhyrjet.' },
+  'pagesat-furnitore': { tab: 'supplierPayments', title: 'Pagesat te furnitorët', subtitle: 'Pagesat nga banka ose arka te furnitorët.' },
+  bankat: { tab: 'banks', title: 'Bankat dhe arka', subtitle: 'Gjendja e çdo llogarie, lëvizjet dhe rakordimi me ekstraktin bankar.' },
 };
 
 export default function Finance() {
   const { section: key = 'detyrimet' } = useParams();
   const section = FINANCE_SECTIONS[key] || FINANCE_SECTIONS.detyrimet;
   if (section.tab === 'ledger') return <ClientLedgerPage section={section} />;
+  if (section.tab === 'supplierLedger') return <SupplierLedgerPage section={section} />;
+  if (['supplierDebts', 'supplierInvoices', 'supplierPayments'].includes(section.tab)) return <SupplierFinancePage key={section.tab} section={section} />;
+  if (section.tab === 'banks') return <BanksPage section={section} />;
   return <FinanceSection key={section.tab} section={section} />;
 }
 
@@ -401,6 +419,7 @@ function FinanceSection({ section }) {
             { key: 'number', label: 'Nr. mandati' },
             { key: 'clientName', label: 'Klienti' },
             { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHOD_LABELS[p.method] || p.method },
+            { key: 'accountName', label: 'Banka / arka' },
             { key: 'reference', label: 'Referenca' },
             { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : inAll(p)), render: (p) => (p.status === 'cancelled' ? money(0) : moneyWithAll(p)) },
             printColumn((p) => <PrintPaymentButton payment={p} />),

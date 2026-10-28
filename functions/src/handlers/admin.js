@@ -140,7 +140,9 @@ const NUMBER_PREFIXES = {
   FAT: CAPS.FINANCE,
   KON: [CAPS.FINANCE, CAPS.PROJECTS_MANAGE],
   MA: CAPS.FINANCE, // mandat arkëtimi
-  GJF: CAPS.FINANCE, // gjendje fillestare e klientit
+  GJF: [CAPS.FINANCE, CAPS.SUPPLIERS], // gjendje fillestare e klientit / furnitorit
+  FB: [CAPS.FINANCE, CAPS.SUPPLIERS], // faturë blerjeje (nr. i brendshëm)
+  MP: CAPS.FINANCE, // mandat pagese te furnitori
 };
 
 /** Jep numrin e radhës për dokumentet që krijohen nga aplikacioni (oferta, porosi, projekte...). */

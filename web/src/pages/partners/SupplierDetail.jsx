@@ -14,11 +14,15 @@ import { date, money, todayISO } from '../../lib/format.js';
 import { supplierFields } from './Suppliers.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
+import { useAuth } from '../../lib/auth.jsx';
+import { SupplierLedger } from '../finance/SupplierFinance.jsx';
+import { CAPS } from '@shared/roles.js';
 
 export default function SupplierDetail() {
   const id = useRouteId();
   const navigate = useNavigate();
   const { suppliersById, products, productsById } = useData();
+  const { can } = useAuth();
   const [tab, setTab] = useState('prices');
   const [editing, setEditing] = useState(false);
   const [priceEdit, setPriceEdit] = useState(null);
@@ -50,7 +54,9 @@ export default function SupplierDetail() {
         { key: 'orders', label: `Porositë (${orders.data.length})` },
         { key: 'receipts', label: 'Historiku i blerjeve' },
         { key: 'products', label: 'Artikujt' },
+        can(CAPS.FINANCE, CAPS.REPORTS) && { key: 'ledger', label: 'Kartela' },
       ]} />
+      {tab === 'ledger' && <SupplierLedger supplierId={id} />}
       {tab === 'prices' && (
         <Card actions={<button type="button" className="btn small primary" onClick={() => setPriceEdit({ date: todayISO() })}><Plus size={16} /> Çmim / ofertë</button>}>
           <DataTable

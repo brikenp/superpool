@@ -163,10 +163,12 @@ export async function readTableWithImages(file) {
   return { rows: filled.map(({ r }) => r), images: remap };
 }
 
-export function parseCsv(text) {
-  const clean = text.replace(/^﻿/, '');
-  const firstLine = clean.split(/\r?\n/)[0] || '';
-  const sep = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+/** CSV → tabelë (rreshta me qeliza); ndarësi (; ose ,) gjendet nga rreshtat e parë. */
+export function parseCsvMatrix(text) {
+  const clean = text.replace(/^\uFEFF/, '');
+  const firstLines = clean.split(/\r?\n/).slice(0, 10);
+  const count = (re) => Math.max(0, ...firstLines.map((l) => (l.match(re) || []).length));
+  const sep = count(/;/g) > count(/,/g) ? ';' : count(/\t/g) > count(/,/g) ? '\t' : ',';
   const records = [];
   let field = '';
   let record = [];
@@ -183,9 +185,34 @@ export function parseCsv(text) {
     } else field += ch;
   }
   if (field || record.length) { record.push(field); records.push(record); }
-  const [headers, ...rest] = records.filter((r) => r.some((c) => c.trim() !== ''));
+  return records.filter((r) => r.some((c) => c.trim() !== ''));
+}
+
+export function parseCsv(text) {
+  const [headers, ...rest] = parseCsvMatrix(text);
   if (!headers) return [];
   return rest.map((r) => Object.fromEntries(headers.map((h, i) => [h.trim(), (r[i] ?? '').trim()])));
+}
+
+/** Gjithë fleta e parë si tabelë (pa supozuar se titujt janë në rreshtin e parë) — për ekstraktet bankare. */
+export async function readSheetMatrix(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.csv') || name.endsWith('.txt')) return parseCsvMatrix(await file.text());
+  const { default: ExcelJS } = await import('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  const ws = wb.worksheets[0];
+  const out = [];
+  ws.eachRow({ includeEmpty: false }, (row) => {
+    out.push(row.values.slice(1).map((v) => {
+      if (v && typeof v === 'object') {
+        if (v instanceof Date) return v.toISOString().slice(0, 10);
+        return v.result ?? v.text ?? v.richText?.map((t) => t.text).join('') ?? '';
+      }
+      return v ?? '';
+    }));
+  });
+  return out;
 }
 
 export function downloadCsv(filename, columns, rows) {

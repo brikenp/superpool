@@ -1,6 +1,6 @@
 import { collection, query, where } from 'firebase/firestore';
 import {
-  ArrowLeftRight, Banknote, BookOpen, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
+  ArrowLeftRight, Banknote, BookOpen, Boxes, Landmark, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
   FileCheck, FilePen, FileSignature, FilePlus, FileX, Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
   Scale, Search, Send, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
   Warehouse, Waves, Wrench,
@@ -70,6 +70,11 @@ export const NAV = [
     { to: '/financa/kartela', label: 'Kartela e klientit', icon: BookOpen, caps: [C.FINANCE, C.REPORTS] },
     { to: '/financa/faturat', label: 'Faturat', icon: Receipt, caps: [C.FINANCE, C.REPORTS] },
     { to: '/financa/pagesat', label: 'Pagesat', icon: Banknote, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/furnitoret', label: 'Detyrimet ndaj furnitorëve', icon: Scale, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/kartela-furnitori', label: 'Kartela e furnitorit', icon: BookOpen, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/faturat-blerje', label: 'Faturat e blerjes', icon: FileText, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/pagesat-furnitore', label: 'Pagesat te furnitorët', icon: Send, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/bankat', label: 'Bankat dhe arka', icon: Landmark, caps: [C.FINANCE, C.REPORTS] },
   ] },
   { title: 'Furnizimi', items: [
     { to: '/furnitoret', label: 'Furnitorët', icon: Factory, caps: [C.SUPPLIERS] },
@@ -90,6 +95,9 @@ export const NAV = [
     { to: '/raportet/offers', label: 'Ofertat dhe statusi', icon: FileText, caps: [C.REPORTS], end: true },
     { to: '/raportet/projects', label: 'Kostot e projekteve', icon: TrendingUp, caps: [C.VIEW_COSTS], requires: [C.REPORTS], end: true },
     { to: '/raportet/invoices', label: 'Faturat dhe pagesat', icon: Receipt, caps: [C.REPORTS], end: true },
+    { to: '/raportet/pasqyra-klientet', label: 'Pasqyra e klientëve', icon: Wallet, caps: [C.REPORTS], end: true },
+    { to: '/raportet/pasqyra-furnitoret', label: 'Pasqyra e furnitorëve', icon: Scale, caps: [C.REPORTS], end: true },
+    { to: '/raportet/bankat', label: 'Bankat dhe arka', icon: Landmark, caps: [C.REPORTS], end: true },
   ] },
   { title: 'Administrimi', items: [
     { to: '/integrimi', label: 'Integrimi / importi', icon: Plug, caps: [C.INTEGRATION] },

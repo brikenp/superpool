@@ -120,7 +120,7 @@ service cloud.firestore {
     }
 
     match /suppliers/{id} {
-      allow read: if can_inventory_view() || can_suppliers();
+      allow read: if can_inventory_view() || can_suppliers() || can_finance() || can_reports();
       allow create, update: if can_suppliers();
       allow delete: if can_users();
     }
@@ -174,10 +174,38 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Llogaritë bankare dhe arka.
+    match /accounts/{id} {
+      allow read: if can_finance() || can_reports();
+      allow create, update: if can_finance();
+      allow delete: if false; // çaktivizohen
+    }
+
+    // Faturat e blerjes (nga furnitorët) dhe pagesat te furnitorët.
+    match /supplierInvoices/{id} {
+      allow read: if can_finance() || can_reports() || can_suppliers();
+      allow create, update: if can_finance() || can_suppliers();
+      allow delete: if false;
+    }
+    match /supplierPayments/{id} {
+      allow read: if can_finance() || can_reports();
+      allow create, update: if can_finance();
+      allow delete: if false;
+    }
+
+    // Rreshtat e ekstrakteve bankare (rakordimi me pagesat).
+    match /bankTransactions/{id} {
+      allow read: if can_finance() || can_reports();
+      allow create, update: if can_finance();
+      allow delete: if can_finance() && resource.data.status != 'matched';
+    }
+
     match /payments/{id} {
       allow read: if can_reports() || can_finance()
         || (can_chem_sales() && resource.data.createdBy == request.auth.uid);
       allow create, update: if can_finance() && request.resource.data.get('saleId', null) == null;
+      // Pagesat e shitjeve (të krijuara nga serveri) lidhen vetëm me bankën / arkën.
+      allow update: if can_finance() && changes(['accountId', 'accountName', 'bankTxId']);
       allow delete: if false;
     }
 
