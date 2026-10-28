@@ -6,6 +6,7 @@ import { DataTable } from '../../components/DataTable.jsx';
 import { EntityForm } from '../../components/EntityForm.jsx';
 import { PageHeader } from '../../components/ui.jsx';
 import { useData } from '../../lib/data.jsx';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 
 export const supplierFields = [
   { key: 'name', label: 'Emri', required: true },
@@ -28,7 +29,12 @@ export default function Suppliers() {
       <PageHeader
         title="Furnitorët"
         subtitle="Kartela e furnitorëve me kontaktet, çmimet dhe historikun e blerjeve."
-        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Furnitor</button>}
+        actions={(
+          <>
+            <ImportButton type="suppliers" />
+            <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Furnitor</button>
+          </>
+        )}
       />
       <DataTable
         title="Furnitorët"

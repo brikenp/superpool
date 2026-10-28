@@ -81,7 +81,73 @@ async function postOpeningStock(lines, destId, user) {
   return count;
 }
 
+const yes = (v) => !/^(jo|no|false|0|joaktiv)$/i.test(str(v));
+/** Kolona "active": bosh = aktiv për të rinjtë, pa ndryshim për ekzistuesit. */
+const activeOf = (r, existing) => (str(r.active ?? r.aktiv) ? yes(r.active ?? r.aktiv) : existing ? undefined : true);
+
+// Kush mund të importojë çdo lloj (përveç rolit me "integration", që i bën të gjitha).
+const IMPORT_CAPS = {
+  products: [CAPS.INVENTORY_MANAGE],
+  openingStock: [CAPS.INVENTORY_MANAGE],
+  fiscalStock: [CAPS.INVENTORY_MANAGE],
+  clients: [CAPS.CLIENTS_MANAGE, CAPS.FINANCE],
+  clientBalances: [CAPS.FINANCE],
+  invoices: [CAPS.FINANCE],
+  payments: [CAPS.FINANCE],
+  suppliers: [CAPS.SUPPLIERS],
+  employees: [CAPS.FLEET],
+  vehicles: [CAPS.FLEET],
+};
+
 const importers = {
+  async employees(rows, result) {
+    const byName = await indexBy('employees', 'name');
+    const w = new Writer();
+    rows.forEach((r, i) => {
+      const name = str(r.name || r.emri);
+      if (!name) { result.errors.push(`Rreshti ${i + 2}: mungon emri.`); return; }
+      const existing = byName.get(name.toLowerCase());
+      const data = {
+        name, position: str(r.position || r.pozicioni), phone: str(r.phone || r.telefon),
+        active: activeOf(r, existing), updatedAt: FieldValue.serverTimestamp(),
+      };
+      if (data.active === undefined) delete data.active;
+      const cost = num(r.hourlyCost ?? r.kosto_ore);
+      if (cost !== null) data.hourlyCost = cost;
+      if (existing) Object.keys(data).forEach((k) => { if (data[k] === '') delete data[k]; });
+      const ref = existing ? existing.ref : db.collection('employees').doc();
+      w.set(ref, existing ? data : { ...data, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+      byName.set(name.toLowerCase(), { ref, id: ref.id, get: (f) => data[f] });
+      result[existing ? 'updated' : 'created'] += 1;
+    });
+    await w.flush();
+  },
+
+  async vehicles(rows, result) {
+    const byPlate = await indexBy('vehicles', 'plate');
+    const employees = await indexBy('employees', 'name');
+    const w = new Writer();
+    rows.forEach((r, i) => {
+      const plate = str(r.plate || r.targa).toUpperCase().replace(/\s+/g, '');
+      if (!plate) { result.errors.push(`Rreshti ${i + 2}: mungon targa.`); return; }
+      const existing = byPlate.get(plate.toLowerCase());
+      const data = { plate, description: str(r.description || r.pershkrimi), active: activeOf(r, existing), updatedAt: FieldValue.serverTimestamp() };
+      if (data.active === undefined) delete data.active;
+      const respName = str(r.responsible || r.pergjegjesi);
+      if (respName) {
+        const emp = employees.get(respName.toLowerCase());
+        if (emp) Object.assign(data, { responsibleId: emp.id, responsibleName: emp.get('name') });
+        else result.errors.push(`Rreshti ${i + 2} (${plate}): punonjësi «${respName}» nuk u gjet — automjeti u ruajt pa përgjegjës.`);
+      }
+      if (existing && !data.description) delete data.description;
+      const ref = existing ? existing.ref : db.collection('vehicles').doc();
+      w.set(ref, existing ? data : { responsibleId: null, responsibleName: '', ...data, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+      byPlate.set(plate.toLowerCase(), { ref });
+      result[existing ? 'updated' : 'created'] += 1;
+    });
+    await w.flush();
+  },
+
   // Gjendjet fillestare të klientëve: shuma pozitive = klienti na detyrohet, negative = ka paguar më shumë.
   async clientBalances(rows, result, user, options = {}) {
     const clientsSnap = await db.collection('clients').get();
@@ -366,9 +432,9 @@ const importers = {
 
 export const importData = onCall({ region: REGION, timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
   const user = await userContext(request);
-  requireCap(user, CAPS.INTEGRATION);
   const { type, rows, options = {} } = request.data || {};
   if (!importers[type]) fail('Lloj importi i panjohur.', 'invalid-argument');
+  requireCap(user, CAPS.INTEGRATION, ...(IMPORT_CAPS[type] || []));
   if (!Array.isArray(rows) || !rows.length) fail('Skedari nuk ka rreshta.', 'invalid-argument');
   if (rows.length > MAX_ROWS) fail(`Maksimumi ${MAX_ROWS} rreshta për import.`, 'invalid-argument');
   const result = { created: 0, updated: 0, errors: [] };

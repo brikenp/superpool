@@ -267,6 +267,21 @@ async function main() {
   assert.deepEqual([riv.name, riv.tradeName], ['Riviera Sh.p.k.', 'Hotel Riviera']);
   ok('klientët me emër tregtar (import)');
 
+  // Importi nga seksionet: sipas të drejtës së seksionit, jo vetëm Integrimi.
+  const gimp = await gerti.call('importData', { type: 'clients', rows: [{ name: 'Klient nga Gerti' }] });
+  assert.equal(gimp.created, 1);
+  await gerti.call('importData', { type: 'products', rows: [{ code: 'X-G', name: 'X' }] }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /të drejtë/));
+  const eimp = await admin.call('importData', { type: 'employees', rows: [{ name: 'Teknik Import', position: 'Teknik', hourlyCost: 500 }, { name: 'Shofer Import', active: 'jo' }] });
+  assert.equal(eimp.created, 2);
+  const vimp = await admin.call('importData', { type: 'vehicles', rows: [{ plate: 'zz 999 zz', description: 'Doblo', responsible: 'Teknik Import' }, { plate: 'YY1', responsible: 'Askush' }] });
+  assert.equal(vimp.created, 2);
+  assert.equal(vimp.errors.length, 1);
+  const impVeh = (await getDocs(query(collection(admin.db, 'vehicles'), where('plate', '==', 'ZZ999ZZ')))).docs[0].data();
+  assert.equal(impVeh.responsibleName, 'Teknik Import');
+  const shofer = (await getDocs(query(collection(admin.db, 'employees'), where('name', '==', 'Shofer Import')))).docs[0].data();
+  assert.equal(shofer.active, false);
+  ok('import nga çdo seksion (klientë nga Gerti, punonjës, automjete) sipas të drejtave');
+
   // --- Gjendjet fillestare të klientëve dhe likujdimet ---
   const bimp = await admin.call('importData', { type: 'clientBalances', options: { eurRate: 100 }, rows: [
     { client: 'Hotel Riviera', amount: 250000, date: '01.01.2026' },

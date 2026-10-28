@@ -21,6 +21,7 @@ import { clientOption } from '../../lib/clients.js';
 import { OpeningBalanceForm } from './OpeningBalance.jsx';
 import { ClientLedgerPage } from './ClientLedger.jsx';
 import { prettySegment } from '../../lib/prettyUrl.jsx';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 
 export const INVOICE_STATUS = { pending_fiscal: 'Pa numër fiskal', issued: 'E lëshuar', cancelled: 'Anuluar' };
 // Lloji i faturës manuale (fusha "type"); faturat e shitjeve krijohen nga moduli i shitjeve.
@@ -348,6 +349,7 @@ function FinanceSection({ section }) {
             {tab !== 'payments' && <button type="button" className={`btn ${tab === 'invoices' ? 'primary' : ''}`} onClick={() => setInvoiceForm({})}><Plus size={16} /> Faturë</button>}
             {tab !== 'invoices' && <button type="button" className="btn primary" onClick={() => setPaymentForm({})}><Plus size={16} /> Pagesë</button>}
             {tab === 'debts' && <button type="button" className="btn" onClick={() => setOpeningForm(true)}><Plus size={16} /> Gjendje fillestare</button>}
+            <ImportButton type={{ debts: 'clientBalances', invoices: 'invoices', payments: 'payments' }[tab]} label={tab === 'debts' ? 'Import gjendjesh' : 'Import nga Excel'} />
           </>
         )}
       />

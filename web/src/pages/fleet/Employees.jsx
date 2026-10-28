@@ -5,6 +5,7 @@ import { DataTable } from '../../components/DataTable.jsx';
 import { EntityForm } from '../../components/EntityForm.jsx';
 import { Badge, PageHeader } from '../../components/ui.jsx';
 import { useData } from '../../lib/data.jsx';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 
 export default function Employees() {
   const { employees, usersById, vehicles } = useData();
@@ -14,7 +15,12 @@ export default function Employees() {
       <PageHeader
         title="Punonjësit"
         subtitle="Punonjësit lidhen me automjetet, daljet e materialeve dhe ekipet e projekteve. Lidhja me llogarinë e përdoruesit bëhet te Përdoruesit."
-        actions={<button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Punonjës</button>}
+        actions={(
+          <>
+            <ImportButton type="employees" />
+            <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Punonjës</button>
+          </>
+        )}
       />
       <DataTable
         title="Punonjësit"

@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData } from '../../lib/data.jsx';
 import { NiptLookup } from '../../components/Fiscal.jsx';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 
 export const clientFields = [
   { key: 'name', label: 'Emri / subjekti', required: true, span: 2 },
@@ -37,7 +38,12 @@ export default function Clients() {
       <PageHeader
         title="Klientët"
         subtitle="Kartela e vetme e klientit: oferta, projekte, shitje kimikatesh, fatura dhe pagesa."
-        actions={can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <button type="button" className="btn primary" onClick={() => setCreating(true)}><Plus size={16} /> Klient</button>}
+        actions={can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && (
+          <>
+            <ImportButton type="clients" />
+            <button type="button" className="btn primary" onClick={() => setCreating(true)}><Plus size={16} /> Klient</button>
+          </>
+        )}
       />
       <DataTable
         title="Klientët"

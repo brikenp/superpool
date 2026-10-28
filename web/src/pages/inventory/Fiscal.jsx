@@ -1,6 +1,6 @@
 import { collection, query, where } from 'firebase/firestore';
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { MOVEMENT_KINDS } from '@shared/constants.js';
 
@@ -9,6 +9,7 @@ import { Card, Field, PageHeader, Tabs } from '../../components/ui.jsx';
 import { useCollection, useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { addDays, date, round3, todayISO } from '../../lib/format.js';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 
 export default function Fiscal() {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export default function Fiscal() {
       <PageHeader
         title="Rakordimi: stoku fizik / fiskal"
         subtitle="Krahason gjendjen fizike në SuperPool me gjendjen fiskale të importuar nga programi i faturimit."
-        actions={<Link className="btn" to="/integrimi">Importo gjendjen fiskale</Link>}
+        actions={<ImportButton type="fiscalStock" label="Importo gjendjen fiskale" />}
       />
       <Tabs active={tab} onChange={setTab} tabs={[
         { key: 'stock', label: 'Diferencat e sasive' },

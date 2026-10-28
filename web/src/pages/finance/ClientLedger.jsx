@@ -7,6 +7,7 @@ import { PAYMENT_METHOD_LABELS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 import { Card, Field, PageHeader, SearchSelect, Stat } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { clientLabel, clientOption } from '../../lib/clients.js';
@@ -139,14 +140,19 @@ export function ClientLedgerPage({ section }) {
       <PageHeader
         title={section.title}
         subtitle={section.subtitle}
-        actions={can(CAPS.FINANCE) && <button type="button" className="btn" onClick={() => setOpeningForm(true)}><Plus size={16} /> Gjendje fillestare</button>}
+        actions={can(CAPS.FINANCE) && (
+          <>
+            <ImportButton type="clientBalances" label="Import gjendjesh" />
+            <button type="button" className="btn" onClick={() => setOpeningForm(true)}><Plus size={16} /> Gjendje fillestare</button>
+          </>
+        )}
       />
       <Card>
         <Field label="Klienti">
           <SearchSelect options={clients.map((c) => clientOption(c, [c.nipt, c.phone, c.city]))} value={client?.id || ''} onChange={pick} placeholder="Kërko klientin me emër, emër tregtar ose NIPT…" />
         </Field>
         {client && <p className="muted" style={{ margin: '6px 0 0' }}><Link to={`/klientet/${prettySegment('clients', client, { clients })}`}>Hap kartelën e plotë të klientit →</Link></p>}
-        {!client && <p className="muted" style={{ margin: '6px 0 0' }}>Gjendjet fillestare të shumë klientëve njëherësh mund t&apos;i importoni nga Excel te Integrimi → «Gjendjet fillestare të klientëve».</p>}
+        {!client && <p className="muted" style={{ margin: '6px 0 0' }}>Gjendjet fillestare të shumë klientëve njëherësh i importoni nga Excel me butonin «Import gjendjesh».</p>}
       </Card>
       {client && <ClientLedger key={client.id} clientId={client.id} />}
       {openingForm && <OpeningBalanceForm record={client ? { clientId: client.id } : {}} onClose={() => setOpeningForm(false)} />}

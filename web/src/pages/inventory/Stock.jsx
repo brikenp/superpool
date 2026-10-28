@@ -11,6 +11,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { physicalLocations, unitCostOf, useData, useQuery } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { ProductThumb } from '../../components/ProductImage.jsx';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 
 /** Tabela e stokut për një ose disa vende magazinimi (përdoret edhe te automjetet dhe kantieret). */
 export function StockTable({ locationIds, title, showLocation }) {
@@ -67,7 +68,7 @@ export default function Stock() {
 
   return (
     <>
-      <PageHeader title="Gjendja e stokut" subtitle="Sasitë fizike sipas magazinës, automjetit, kantierit ose shitësit." />
+      <PageHeader title="Gjendja e stokut" subtitle="Sasitë fizike sipas magazinës, automjetit, kantierit ose shitësit." actions={<ImportButton type="openingStock" label="Import stoku fillestar" />} />
       <div className="row" style={{ marginBottom: 12 }}>
         <select value={selected} onChange={(e) => setParams({ vendi: e.target.value })} style={{ width: 'auto', minWidth: 240 }}>
           <option value="all">Të gjitha vendet</option>

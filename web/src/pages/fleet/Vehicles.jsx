@@ -14,6 +14,7 @@ import { db } from '../../lib/firebase.js';
 import { FlowSummary } from '../inventory/LocationDetail.jsx';
 import { movementColumns } from '../inventory/Movements.jsx';
 import { StockTable } from '../inventory/Stock.jsx';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 
 export default function Vehicles() {
   const { vehicles, vehiclesById, employees, employeesById } = useData();
@@ -29,7 +30,12 @@ export default function Vehicles() {
       <PageHeader
         title="Automjetet"
         subtitle="Çdo automjet ka nënmagazinën e vet: materialet që ndodhen në të, përgjegjësin dhe historikun."
-        actions={canManage && <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Automjet</button>}
+        actions={canManage && (
+          <>
+            <ImportButton type="vehicles" />
+            <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Automjet</button>
+          </>
+        )}
       />
       <DataTable
         title="Automjetet"

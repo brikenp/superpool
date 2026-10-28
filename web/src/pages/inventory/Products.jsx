@@ -15,6 +15,7 @@ import { db } from '../../lib/firebase.js';
 import { removeProductImage, uploadProductImage } from '../../lib/images.js';
 import { ProductThumb } from '../../components/ProductImage.jsx';
 import { money, round3, toNumber } from '../../lib/format.js';
+import { ImportButton } from '../../components/ImportExcel.jsx';
 import { priceFields } from '@shared/prices.js';
 
 export const freeQty = (p) => round3(Number(p.qtyMain || 0) - Number(p.qtyReserved || 0));
@@ -260,6 +261,7 @@ export default function Products() {
         subtitle="Kartela e artikujve me sasinë fizike, të rezervuar dhe të lirë."
         actions={canManage && (
           <>
+            <ImportButton type="products" />
             <button type="button" className="btn" onClick={() => setCatModal({})}>Kategoritë</button>
             <button type="button" className="btn primary" onClick={() => setEditing({})}><Plus size={16} /> Artikull i ri</button>
           </>
