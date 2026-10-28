@@ -226,14 +226,18 @@ async function main() {
   ok('importi i faturave lidh numrin fiskal me shitjen');
 
   const pimp = await admin.call('importData', { type: 'products', options: { eurRate: 100 }, rows: [
-    { code: 'EUR-PMP', name: 'Pompë EUR', purchasePrice: 250, purchaseCurrency: 'EUR', salePrice: 380, saleCurrency: '€' },
+    { code: 'EUR-PMP', name: 'Pompë EUR', purchasePrice: 250, purchaseCurrency: 'EUR', salePrice: 380, saleCurrency: '€', supplier: 'Furnitor i Ri Import' },
     { code: 'MIX-FLT', name: 'Filtër', purchasePrice: 180, purchaseCurrency: 'EUR', salePrice: 32000, saleCurrency: 'ALL' },
     { code: 'BAD-CUR', name: 'Gabim', salePrice: 10, saleCurrency: 'USD' },
   ] });
   assert.equal(pimp.created, 2);
+  assert.equal(pimp.suppliers, 1);
+  const newSup = (await getDocs(query(collection(admin.db, 'suppliers'), where('name', '==', 'Furnitor i Ri Import')))).docs[0];
+  assert.ok(newSup && newSup.data().active);
   assert.equal(pimp.errors.length, 1);
   const eurProd = (await getDocs(query(collection(admin.db, 'products'), where('code', '==', 'EUR-PMP')))).docs[0];
   assert.deepEqual([eurProd.data().salePrice, eurProd.data().salePriceCurrency, eurProd.data().salePriceEur], [38000, 'EUR', 380]);
+  assert.deepEqual([eurProd.data().supplierId, eurProd.data().supplierName], [newSup.id, 'Furnitor i Ri Import']);
   const eurCost = (await getDoc(doc(admin.db, 'productCosts', eurProd.id))).data();
   assert.deepEqual([eurCost.purchasePrice, eurCost.avgCost, eurCost.purchaseCurrency, eurCost.purchasePriceEur], [25000, 25000, 'EUR', 250]);
   const mixProd = (await getDocs(query(collection(admin.db, 'products'), where('code', '==', 'MIX-FLT')))).docs[0];

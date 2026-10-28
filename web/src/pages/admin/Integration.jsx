@@ -25,7 +25,7 @@ const IMPORTS = {
       { key: 'model', help: 'Modeli.' },
       { key: 'unit', list: UNIT_LIST, help: `Njësia: ${UNIT_LIST.join(', ')}.` },
       { key: 'category', width: 18, help: 'Kategoria (krijohet nëse nuk ekziston). Kategoritë me "kimik" në emër shënohen si kimikate.' },
-      { key: 'supplier', width: 22, help: 'Emri i furnitorit kryesor (duhet të ekzistojë te Furnitorët).' },
+      { key: 'supplier', width: 22, help: 'Emri i furnitorit kryesor. Nëse nuk ekziston te Furnitorët, krijohet automatikisht.' },
       { key: 'purchasePrice', help: 'Çmimi i blerjes (pa TVSH), në monedhën e kolonës purchaseCurrency.' },
       { key: 'purchaseCurrency', list: ['ALL', 'EUR'], help: 'Monedha e çmimit të blerjes: ALL (lekë) ose EUR. Bosh = ALL.' },
       { key: 'salePrice', help: 'Çmimi i shitjes (me TVSH), në monedhën e kolonës saleCurrency.' },
@@ -183,7 +183,7 @@ export default function Integration() {
     setRows(null);
     setImages({});
     return res;
-  }, (r) => `Importi përfundoi: ${r.created} të reja, ${r.updated} të përditësuara${r.stock ? `, gjendje për ${r.stock} artikuj` : ''}${r.balances ? `, ${r.balances} gjendje fillestare` : ''}${r.photos ? `, ${r.photos.done} foto` : ''}.`);
+  }, (r) => `Importi përfundoi: ${r.created} të reja, ${r.updated} të përditësuara${r.stock ? `, gjendje për ${r.stock} artikuj` : ''}${r.balances ? `, ${r.balances} gjendje fillestare` : ''}${r.suppliers ? `, ${r.suppliers} furnitorë të rinj` : ''}${r.photos ? `, ${r.photos.done} foto` : ''}.`);
 
   const exportPending = () => downloadCsv('shitje_per_faturim.csv', [
     { label: 'Nr. shitjes', value: (i) => i.saleNumber },
@@ -252,7 +252,7 @@ export default function Integration() {
           {photoProgress && busy && <div className="alert info" style={{ marginTop: 12 }}>{photoProgress}</div>}
           {result && (
             <div className={`alert ${result.errors.length ? 'warn' : 'ok'}`} style={{ marginTop: 12 }}>
-              Të reja: {result.created} · Të përditësuara: {result.updated}{result.stock ? ` · Gjendje fillestare: ${result.stock}` : ''}
+              Të reja: {result.created} · Të përditësuara: {result.updated}{result.stock ? ` · Gjendje fillestare: ${result.stock}` : ''}{result.suppliers ? ` · Furnitorë të rinj: ${result.suppliers}` : ''}
               {result.photos && ` · Foto: ${result.photos.done}${result.photos.failed.length ? ` (${result.photos.failed.length} dështuan: ${result.photos.failed.slice(0, 10).join(', ')})` : ''}`}
               {result.errors.length > 0 && <>{'\n'}Gabime ({result.errors.length}):{'\n'}{result.errors.slice(0, 30).join('\n')}</>}
             </div>

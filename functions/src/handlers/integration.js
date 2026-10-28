@@ -208,7 +208,17 @@ const importers = {
           categories.set(catName.toLowerCase(), category);
         }
       }
-      const supplier = suppliers.get(str(r.supplier || r.furnitori).toLowerCase());
+      // Furnitori që nuk ekziston krijohet (si kategoritë), që artikulli të lidhet me të.
+      const supName = str(r.supplier || r.furnitori);
+      let supplier = supName ? suppliers.get(supName.toLowerCase()) : null;
+      if (supName && !supplier) {
+        const ref = db.collection('suppliers').doc();
+        const sup = { name: supName, nipt: '', contactPerson: '', phone: '', email: '', address: '', active: true, createdAt: FieldValue.serverTimestamp() };
+        w.set(ref, sup);
+        supplier = { id: ref.id, get: (f) => sup[f], ref };
+        suppliers.set(supName.toLowerCase(), supplier);
+        result.suppliers = (result.suppliers || 0) + 1;
+      }
       const unitRaw = str(r.unit || r.njesia).toLowerCase();
       const unit = UNITS[unitRaw] ? unitRaw : Object.keys(UNITS).find((k) => UNITS[k] === unitRaw) || 'cope';
       const existing = byCode.get(code.toLowerCase());
