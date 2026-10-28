@@ -79,8 +79,8 @@ service cloud.firestore {
     match /productCosts/{id} {
       allow read: if can_view_costs();
       allow create: if can_inventory_manage()
-        && request.resource.data.keys().hasOnly(['purchasePrice', 'avgCost']);
-      allow update: if can_inventory_manage() && changes(['purchasePrice']);
+        && request.resource.data.keys().hasOnly(['purchasePrice', 'avgCost', 'purchaseCurrency', 'purchasePriceEur']);
+      allow update: if can_inventory_manage() && changes(['purchasePrice', 'purchaseCurrency', 'purchasePriceEur']);
     }
 
     match /stock/{id} {

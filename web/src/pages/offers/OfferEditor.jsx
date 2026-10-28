@@ -4,6 +4,7 @@ import { X, Plus } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { OFFER_STATUS, POOL_SECTIONS, POOL_TYPES, UNITS } from '@shared/constants.js';
+import { unitCostIn } from '@shared/prices.js';
 
 import { EntityForm } from '../../components/EntityForm.jsx';
 import { Card, Field, Loading, PageHeader, SearchSelect, Stat, StatusBadge, useAction, useUi } from '../../components/ui.jsx';
@@ -82,7 +83,8 @@ export default function OfferEditor() {
   // Oferta në euro: kostot dhe çmimet e magazinës (në lekë) kthehen me kursin e ofertës.
   const rate = form.currency === 'EUR' ? toNumber(form.exchangeRate) : 1;
   const toCur = (x) => (form.currency === 'EUR' && rate > 0 ? round2(Number(x || 0) / rate) : Number(x || 0));
-  const costOf = (pid) => toCur(unitCostOf(costsById, pid));
+  // Blerjet në euro përdorin çmimin origjinal në euro te ofertat në euro.
+  const costOf = (pid) => (form.currency === 'EUR' ? unitCostIn(costsById[pid], 'EUR', rate) : unitCostOf(costsById, pid));
   const cur = form.currency === 'EUR' ? 'EUR' : 'ALL';
   const changeCurrency = (patch) => setForm((f) => {
     const next = { ...f, ...patch };

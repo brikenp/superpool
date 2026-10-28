@@ -8,6 +8,7 @@
 import { onCall } from 'firebase-functions/v2/https';
 
 import { LOC, UNITS } from '../shared/constants.js';
+import { parseCurrency, priceFields } from '../shared/prices.js';
 import { CAPS } from '../shared/roles.js';
 import { FieldValue, REGION, audit, db, fail, requireCap, reserveNumber, round2, round3, userContext } from '../lib/context.js';
 import { loadContext, planOrFail, writeEffects } from '../lib/movements.js';
@@ -83,8 +84,11 @@ const importers = {
     await w.flush();
   },
 
-  async products(rows, result) {
+  async products(rows, result, user, options = {}) {
     const byCode = await indexBy('products', 'code');
+    // Kursi i euros: nga ekrani i importit, ose nga Cilësimet e kompanisë.
+    let eurRate = Number(options.eurRate) > 1 ? Number(options.eurRate) : 0;
+    if (!eurRate) eurRate = Number((await db.doc('settings/company').get()).get('eurRate')) || 0;
     const categories = await indexBy('categories', 'name');
     const suppliers = await indexBy('suppliers', 'name');
     const w = new Writer();
@@ -115,18 +119,31 @@ const importers = {
       };
       if (category) { data.categoryId = category.id; data.categoryName = category.get('name'); data.isChemical = Boolean(category.get('isChemical')); }
       if (supplier) { data.supplierId = supplier.id; data.supplierName = supplier.get('name'); }
+      // Monedha e çmimeve: kolona e veçantë për blerjen/shitjen, ose një kolonë "currency" për të dyja.
+      const anyCur = r.currency ?? r.monedha;
+      const saleCur = parseCurrency(r.saleCurrency ?? r.monedha_shitjes ?? anyCur);
+      const purchaseCur = parseCurrency(r.purchaseCurrency ?? r.monedha_blerjes ?? anyCur);
+      if (saleCur === undefined || purchaseCur === undefined) { result.errors.push(`Rreshti ${i + 2} (${code}): monedha duhet të jetë ALL ose EUR.`); continue; }
       const salePrice = num(r.salePrice ?? r.cmimi_shitjes);
-      if (salePrice !== null) data.salePrice = salePrice;
+      const purchasePrice = num(r.purchasePrice ?? r.cmimi_blerjes);
+      if (((saleCur === 'EUR' && salePrice !== null) || (purchaseCur === 'EUR' && purchasePrice !== null)) && !eurRate) {
+        result.errors.push(`Rreshti ${i + 2} (${code}): vendosni kursin e euros (te importi ose te Cilësimet).`);
+        continue;
+      }
+      if (salePrice !== null) {
+        const f = priceFields(salePrice, saleCur || 'ALL', eurRate);
+        Object.assign(data, { salePrice: f.all, salePriceCurrency: saleCur || 'ALL', salePriceEur: f.eur });
+      }
       const minStock = num(r.minStock ?? r.stoku_minimal);
       if (minStock !== null) data.minStock = minStock;
       if (!existing) Object.assign(data, { active: true, qtyTotal: 0, qtyMain: 0, qtyReserved: 0, createdAt: FieldValue.serverTimestamp() });
       Object.keys(data).forEach((k) => { if (data[k] === '' && existing) delete data[k]; });
       const ref = existing ? existing.ref : db.collection('products').doc();
       w.set(ref, data, { merge: true });
-      const purchasePrice = num(r.purchasePrice ?? r.cmimi_blerjes);
       if (purchasePrice !== null) {
-        const costs = { purchasePrice };
-        if (!existing) costs.avgCost = purchasePrice;
+        const f = priceFields(purchasePrice, purchaseCur || 'ALL', eurRate);
+        const costs = { purchasePrice: f.all, purchaseCurrency: purchaseCur || 'ALL', purchasePriceEur: f.eur };
+        if (!existing || !(Number(existing.get('qtyTotal')) > 0)) costs.avgCost = f.all;
         w.set(db.doc(`productCosts/${ref.id}`), costs, { merge: true });
       }
       result[existing ? 'updated' : 'created'] += 1;

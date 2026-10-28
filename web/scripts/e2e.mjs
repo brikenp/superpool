@@ -225,6 +225,22 @@ async function main() {
   assert.equal(inv2.date, '2026-10-05');
   ok('importi i faturave lidh numrin fiskal me shitjen');
 
+  const pimp = await admin.call('importData', { type: 'products', options: { eurRate: 100 }, rows: [
+    { code: 'EUR-PMP', name: 'Pompë EUR', purchasePrice: 250, purchaseCurrency: 'EUR', salePrice: 380, saleCurrency: '€' },
+    { code: 'MIX-FLT', name: 'Filtër', purchasePrice: 180, purchaseCurrency: 'EUR', salePrice: 32000, saleCurrency: 'ALL' },
+    { code: 'BAD-CUR', name: 'Gabim', salePrice: 10, saleCurrency: 'USD' },
+  ] });
+  assert.equal(pimp.created, 2);
+  assert.equal(pimp.errors.length, 1);
+  const eurProd = (await getDocs(query(collection(admin.db, 'products'), where('code', '==', 'EUR-PMP')))).docs[0];
+  assert.deepEqual([eurProd.data().salePrice, eurProd.data().salePriceCurrency, eurProd.data().salePriceEur], [38000, 'EUR', 380]);
+  const eurCost = (await getDoc(doc(admin.db, 'productCosts', eurProd.id))).data();
+  assert.deepEqual([eurCost.purchasePrice, eurCost.avgCost, eurCost.purchaseCurrency, eurCost.purchasePriceEur], [25000, 25000, 'EUR', 250]);
+  const mixProd = (await getDocs(query(collection(admin.db, 'products'), where('code', '==', 'MIX-FLT')))).docs[0];
+  assert.deepEqual([mixProd.data().salePrice, mixProd.data().salePriceCurrency, mixProd.data().salePriceEur], [32000, 'ALL', null]);
+  assert.equal((await getDoc(doc(admin.db, 'productCosts', mixProd.id))).data().purchasePrice, 18000);
+  ok('importi i artikujve me kosto dhe shitje në lekë ose euro');
+
   // --- Anulimi i shitjes ---
   await mag.call('cancelSale', { id: sale.id, reason: 'test' }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /fiskalizuar/));
   ok('shitja e fiskalizuar nuk anulohet pa kaluar nga programi i faturimit');

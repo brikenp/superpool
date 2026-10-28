@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { PAYMENT_METHODS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
+import { salePriceIn } from '@shared/prices.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
 import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
@@ -199,7 +200,7 @@ export function InvoiceForm({ record, onClose }) {
         )}
         {lines && (
           <div className="span-all">
-            <InvoiceLinesEditor lines={lines} onChange={setLines} currency={v.currency} disabled={lockedMoney} />
+            <InvoiceLinesEditor lines={lines} onChange={setLines} currency={v.currency} rate={v.exchangeRate} disabled={lockedMoney} />
           </div>
         )}
         {!lines && !lockedMoney && (
@@ -395,15 +396,17 @@ function FinanceSection({ section }) {
 }
 
 /** Rreshtat e faturës: artikull nga magazina ose shërbim me tekst, sasia, çmimi me TVSH dhe norma e TVSH-së. */
-function InvoiceLinesEditor({ lines, onChange, currency, disabled }) {
-  const { products } = useData();
+function InvoiceLinesEditor({ lines, onChange, currency, rate, disabled }) {
+  const { products, company } = useData();
+  // Çmimi i artikullit në monedhën e faturës (çmimet në euro përdoren direkt; të tjerat kthehen me kursin).
+  const priceOf = (p) => salePriceIn(p, currency === 'EUR' ? 'EUR' : 'ALL', currency === 'EUR' ? toNumber(rate) : toNumber(company.eurRate));
   const sym = currency === 'EUR' ? '€' : 'L';
-  const options = products.filter((p) => p.active !== false).map((p) => ({ value: p.id, label: `${p.code} · ${p.name}`, sub: p.salePrice ? money(p.salePrice) : '' }));
+  const options = products.filter((p) => p.active !== false).map((p) => ({ value: p.id, label: `${p.code} · ${p.name}`, sub: p.salePriceCurrency === 'EUR' && p.salePriceEur ? money(p.salePriceEur, 'EUR') : p.salePrice ? money(p.salePrice) : '' }));
   const setLine = (i, patch) => onChange(lines.map((l, k) => (k === i ? { ...l, ...patch } : l)));
   const pick = (i, id) => {
     const p = products.find((x) => x.id === id);
     if (!p) { setLine(i, { productId: '', code: '' }); return; }
-    setLine(i, { productId: p.id, code: p.code || '', description: p.name, unit: p.unit || 'cope', ...(currency !== 'EUR' && p.salePrice ? { priceGross: p.salePrice } : {}) });
+    setLine(i, { productId: p.id, code: p.code || '', description: p.name, unit: p.unit || 'cope', ...(priceOf(p) ? { priceGross: priceOf(p) } : {}) });
   };
   const total = lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.priceGross), 0);
   return (

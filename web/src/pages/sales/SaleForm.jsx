@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { LOC, PAYMENT_METHODS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 import { explodeRecipes, isComposite } from '@shared/stock.js';
+import { salePriceIn } from '@shared/prices.js';
 
 import { EntityForm } from '../../components/EntityForm.jsx';
 import { LinesEditor, cleanLines, emptyLine } from '../../components/LinesEditor.jsx';
@@ -18,7 +19,7 @@ import { clientFields, normalizeClient } from '../partners/Clients.jsx';
 
 export default function SaleForm() {
   const { uid, can } = useAuth();
-  const { locations, clients, products, productsById } = useData();
+  const { locations, clients, products, productsById, company } = useData();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const seesAll = can(CAPS.CHEM_SALES_ALL);
@@ -102,7 +103,7 @@ export default function SaleForm() {
           available={available.all}
           priceField="unitPrice"
           priceLabel="Çmimi me TVSH"
-          defaultPrice={(p) => Number(p.salePrice || 0)}
+          defaultPrice={(p) => salePriceIn(p, 'ALL', company.eurRate)}
           productFilter={seesAll ? undefined : (p) => p.isChemical}
         />
       </Card>

@@ -14,19 +14,39 @@ import { unitCostOf, useData } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { removeProductImage, uploadProductImage } from '../../lib/images.js';
 import { ProductThumb } from '../../components/ProductImage.jsx';
-import { round3, toNumber } from '../../lib/format.js';
+import { money, round3, toNumber } from '../../lib/format.js';
+import { priceFields } from '@shared/prices.js';
 
 export const freeQty = (p) => round3(Number(p.qtyMain || 0) - Number(p.qtyReserved || 0));
 
+/** Çmim me zgjedhje monedhe (L / €). */
+function PriceInput({ value, currency, onValue, onCurrency }) {
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      <input className="num" type="number" step="any" value={value} onChange={(e) => onValue(e.target.value)} style={{ flex: 1, minWidth: 0 }} />
+      <select value={currency} onChange={(e) => onCurrency(e.target.value)} style={{ width: 'auto' }} aria-label="Monedha">
+        <option value="ALL">L</option>
+        <option value="EUR">€</option>
+      </select>
+    </div>
+  );
+}
+
 export function ProductForm({ product, onClose, onSaved }) {
-  const { categories, categoriesById, suppliers, suppliersById, products, costsById } = useData();
+  const { categories, categoriesById, suppliers, suppliersById, products, costsById, company } = useData();
   const { can } = useAuth();
   const showCosts = can(CAPS.VIEW_COSTS);
   const [v, setV] = useState(() => ({
     code: '', name: '', description: '', brand: '', model: '', unit: 'cope', categoryId: '', supplierId: '',
     salePrice: '', minStock: '', barcode: '', active: true,
     ...(product || {}),
-    purchasePrice: product ? costsById[product.id]?.purchasePrice ?? '' : '',
+    // Çmimet shfaqen në monedhën ku janë vendosur (lekë ose euro).
+    saleCurrency: product?.salePriceCurrency === 'EUR' ? 'EUR' : 'ALL',
+    ...(product?.salePriceCurrency === 'EUR' ? { salePrice: product.salePriceEur ?? '' } : {}),
+    purchaseCurrency: product && costsById[product.id]?.purchaseCurrency === 'EUR' ? 'EUR' : 'ALL',
+    purchasePrice: product
+      ? (costsById[product.id]?.purchaseCurrency === 'EUR' ? costsById[product.id]?.purchasePriceEur : costsById[product.id]?.purchasePrice) ?? ''
+      : '',
   }));
   const [recipe, setRecipe] = useState(() => (product?.recipe || []).map((c) => ({ ...c })));
   const [composite, setComposite] = useState(() => recipe.length > 0);
@@ -51,6 +71,10 @@ export function ProductForm({ product, onClose, onSaved }) {
     if (composite && !parts.length) { setError('Shtoni materialet e recetës ose hiqni zgjedhjen «Artikull i përbërë».'); return; }
     if (parts.some((c) => !(c.qty > 0))) { setError('Sasia e çdo materiali në recetë duhet të jetë më e madhe se zero.'); return; }
     if (new Set(parts.map((c) => c.productId)).size !== parts.length) { setError('Një material është shtuar dy herë në recetë.'); return; }
+    const rate = toNumber(company.eurRate);
+    const usesEur = (v.saleCurrency === 'EUR' && v.salePrice !== '') || (showCosts && v.purchaseCurrency === 'EUR' && v.purchasePrice !== '');
+    if (usesEur && !(rate > 1)) { setError('Për çmimet në euro vendosni kursin e euros te Cilësimet.'); return; }
+    const sale = priceFields(toNumber(v.salePrice), v.saleCurrency, rate);
     run(async () => {
       const category = categoriesById[v.categoryId];
       const supplier = suppliersById[v.supplierId];
@@ -66,7 +90,9 @@ export function ProductForm({ product, onClose, onSaved }) {
         isChemical: Boolean(category?.isChemical),
         supplierId: v.supplierId || null,
         supplierName: supplier?.name || '',
-        salePrice: toNumber(v.salePrice),
+        salePrice: sale.all,
+        salePriceCurrency: v.saleCurrency,
+        salePriceEur: sale.eur,
         minStock: toNumber(v.minStock),
         barcode: v.barcode || '',
         active: Boolean(v.active),
@@ -79,9 +105,13 @@ export function ProductForm({ product, onClose, onSaved }) {
       } else {
         id = (await addDoc(collection(db, 'products'), { ...data, qtyTotal: 0, qtyMain: 0, qtyReserved: 0, createdAt: serverTimestamp() })).id;
       }
-      if (showCosts && v.purchasePrice !== '' && Number(v.purchasePrice) !== Number(costsById[id]?.purchasePrice)) {
-        const price = toNumber(v.purchasePrice);
-        await setDoc(doc(db, 'productCosts', id), costsById[id] ? { purchasePrice: price } : { purchasePrice: price, avgCost: price }, { merge: true });
+      const oldCost = costsById[id];
+      const oldPurchase = oldCost?.purchaseCurrency === 'EUR' ? oldCost.purchasePriceEur : oldCost?.purchasePrice;
+      const oldPurchaseCur = oldCost?.purchaseCurrency === 'EUR' ? 'EUR' : 'ALL';
+      if (showCosts && v.purchasePrice !== '' && (Number(v.purchasePrice) !== Number(oldPurchase) || v.purchaseCurrency !== oldPurchaseCur)) {
+        const f = priceFields(toNumber(v.purchasePrice), v.purchaseCurrency, rate);
+        const costs = { purchasePrice: f.all, purchaseCurrency: v.purchaseCurrency, purchasePriceEur: f.eur };
+        await setDoc(doc(db, 'productCosts', id), oldCost ? costs : { ...costs, avgCost: f.all }, { merge: true });
       }
       if (photo === 'remove' && product) await removeProductImage(product);
       else if (photo) {
@@ -138,11 +168,13 @@ export function ProductForm({ product, onClose, onSaved }) {
           <SearchSelect options={suppliers.map((s) => ({ value: s.id, label: s.name }))} value={v.supplierId || ''} onChange={(val) => set('supplierId', val)} />
         </Field>
         {showCosts && (
-          <Field label="Çmimi i blerjes (L)" hint="Kosto mesatare përditësohet automatikisht nga fletëhyrjet.">
-            <input className="num" type="number" step="any" value={v.purchasePrice} onChange={(e) => set('purchasePrice', e.target.value)} />
+          <Field label="Çmimi i blerjes (pa TVSH)" hint={v.purchaseCurrency === 'EUR' && company.eurRate ? `≈ ${money(toNumber(v.purchasePrice) * company.eurRate)} me kursin ${company.eurRate}` : 'Kosto mesatare përditësohet automatikisht nga fletëhyrjet.'}>
+            <PriceInput value={v.purchasePrice} currency={v.purchaseCurrency} onValue={(x) => set('purchasePrice', x)} onCurrency={(c) => set('purchaseCurrency', c)} />
           </Field>
         )}
-        <Field label="Çmimi i shitjes (L, me TVSH)"><input className="num" type="number" step="any" value={v.salePrice} onChange={(e) => set('salePrice', e.target.value)} /></Field>
+        <Field label="Çmimi i shitjes (me TVSH)" hint={v.saleCurrency === 'EUR' && company.eurRate ? `≈ ${money(toNumber(v.salePrice) * company.eurRate)} me kursin ${company.eurRate}` : undefined}>
+          <PriceInput value={v.salePrice} currency={v.saleCurrency} onValue={(x) => set('salePrice', x)} onCurrency={(c) => set('saleCurrency', c)} />
+        </Field>
         <Field label="Stoku minimal"><input className="num" type="number" step="any" value={v.minStock} onChange={(e) => set('minStock', e.target.value)} /></Field>
         <Field label="Barkodi"><input value={v.barcode} onChange={(e) => set('barcode', e.target.value)} /></Field>
         <Field label="Përshkrimi teknik" className="span-all"><textarea value={v.description} onChange={(e) => set('description', e.target.value)} /></Field>

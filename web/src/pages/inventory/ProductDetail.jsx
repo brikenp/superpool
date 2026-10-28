@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { LOCATION_KINDS, MOVEMENT_KINDS, MOVEMENT_STATUS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
+import { salePriceIn } from '@shared/prices.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
 import { Card, Empty, Loading, PageHeader, Stat, StatusBadge } from '../../components/ui.jsx';
@@ -18,7 +19,7 @@ import { useRouteId } from '../../lib/prettyUrl.jsx';
 export default function ProductDetail() {
   const id = useRouteId();
   const navigate = useNavigate();
-  const { productsById, locationsById, costsById, suppliersById } = useData();
+  const { productsById, locationsById, costsById, suppliersById, company } = useData();
   const { can } = useAuth();
   const [editing, setEditing] = useState(false);
   const product = productsById[id];
@@ -62,10 +63,10 @@ export default function ProductDetail() {
           <dl className="props">
             <dt>Njësia</dt><dd>{unit}</dd>
             <dt>Furnitori</dt><dd>{product.supplierId ? <Link to={`/furnitoret/${product.supplierId}`}>{product.supplierName}</Link> : '—'}</dd>
-            <dt>Çmimi i shitjes</dt><dd>{money(product.salePrice)}</dd>
+            <dt>Çmimi i shitjes</dt><dd>{product.salePriceCurrency === 'EUR' && product.salePriceEur ? <>{money(product.salePriceEur, 'EUR')} <small className="muted">(≈ {money(salePriceIn(product, 'ALL', company.eurRate))})</small></> : money(product.salePrice)}</dd>
             {showCosts && (
               <>
-                <dt>Çmimi i fundit i blerjes</dt><dd>{money(cost.purchasePrice)} {cost.lastPurchaseDate && <small>({date(cost.lastPurchaseDate)}{cost.lastSupplierId ? `, ${suppliersById[cost.lastSupplierId]?.name || ''}` : ''})</small>}</dd>
+                <dt>Çmimi i fundit i blerjes</dt><dd>{cost.purchaseCurrency === 'EUR' && cost.purchasePriceEur ? <>{money(cost.purchasePriceEur, 'EUR')} <small className="muted">(≈ {money(cost.purchasePrice)})</small></> : money(cost.purchasePrice)} {cost.lastPurchaseDate && <small>({date(cost.lastPurchaseDate)}{cost.lastSupplierId ? `, ${suppliersById[cost.lastSupplierId]?.name || ''}` : ''})</small>}</dd>
                 <dt>Kosto mesatare</dt><dd>{money(unitCostOf(costsById, id))}</dd>
                 <dt>Vlera e stokut</dt><dd>{money(Number(product.qtyTotal || 0) * unitCostOf(costsById, id))}</dd>
                 <dt>Gjendja fiskale</dt><dd>{fiscal.data ? `${qty(fiscal.data.quantity)} ${unit} (më ${date(fiscal.data.asOf)})` : '—'}</dd>

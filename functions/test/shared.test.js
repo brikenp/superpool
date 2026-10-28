@@ -245,3 +245,18 @@ test('fiskalizimi: rreshtat e faturës manuale (çmim me TVSH, TVSH për rresht,
   assert.deepEqual([a.name, a.code, a.priceWithoutTax, a.totalWithTax, a.taxType], ['Pompë 1HP', 'PMP-1', 1000, 1200, '20']);
   assert.deepEqual([t.name, t.taxRate, t.totalWithTax, t.taxType], ['Transport', 0, 100, '0']);
 });
+
+test('çmimet: lekë dhe euro', async () => {
+  const { parseCurrency, priceFields, salePriceIn, unitCostIn } = await import('../src/shared/prices.js');
+  assert.deepEqual(['€', 'Euro', 'lekë', 'ALL', '', 'USD'].map(parseCurrency), ['EUR', 'EUR', 'ALL', 'ALL', null, undefined]);
+  assert.deepEqual(priceFields(380, 'EUR', 100), { all: 38000, eur: 380 });
+  assert.deepEqual(priceFields(250, 'ALL', 100), { all: 250, eur: null });
+  const eur = { salePrice: 38000, salePriceCurrency: 'EUR', salePriceEur: 380 };
+  assert.equal(salePriceIn(eur, 'EUR', 100), 380);
+  assert.equal(salePriceIn(eur, 'ALL', 102), 38760); // rillogaritet me kursin aktual
+  assert.equal(salePriceIn({ salePrice: 250 }, 'EUR', 100), 2.5);
+  assert.equal(salePriceIn({ salePrice: 250 }, 'ALL', 100), 250);
+  assert.equal(unitCostIn({ avgCost: 25500, purchasePrice: 25000, purchaseCurrency: 'EUR', purchasePriceEur: 250 }, 'EUR', 100), 250);
+  assert.equal(unitCostIn({ avgCost: 25500, purchaseCurrency: 'EUR', purchasePriceEur: 250 }, 'ALL', 100), 25500);
+  assert.equal(unitCostIn({ avgCost: 1200 }, 'EUR', 100), 12);
+});

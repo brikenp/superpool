@@ -8,7 +8,7 @@ import { downloadCsv, downloadTemplate, readTableWithImages } from '../../lib/ex
 import { linkProductImage, uploadProductImage } from '../../lib/images.js';
 import { call, db } from '../../lib/firebase.js';
 import { FiscalSettings } from './FiscalSettings.jsx';
-import { date } from '../../lib/format.js';
+import { date, toNumber } from '../../lib/format.js';
 
 // Kolonat e pranuara për çdo lloj importi (titujt në rreshtin e parë të skedarit).
 // Pranohen edhe emrat shqip: kodi, emri, njesia, kategoria, furnitori, cmimi_blerjes, cmimi_shitjes, stoku_minimal, foto.
@@ -26,19 +26,23 @@ const IMPORTS = {
       { key: 'unit', list: UNIT_LIST, help: `Njësia: ${UNIT_LIST.join(', ')}.` },
       { key: 'category', width: 18, help: 'Kategoria (krijohet nëse nuk ekziston). Kategoritë me "kimik" në emër shënohen si kimikate.' },
       { key: 'supplier', width: 22, help: 'Emri i furnitorit kryesor (duhet të ekzistojë te Furnitorët).' },
-      { key: 'purchasePrice', help: 'Çmimi i blerjes (L, pa TVSH).' },
-      { key: 'salePrice', help: 'Çmimi i shitjes (L, me TVSH).' },
+      { key: 'purchasePrice', help: 'Çmimi i blerjes (pa TVSH), në monedhën e kolonës purchaseCurrency.' },
+      { key: 'purchaseCurrency', list: ['ALL', 'EUR'], help: 'Monedha e çmimit të blerjes: ALL (lekë) ose EUR. Bosh = ALL.' },
+      { key: 'salePrice', help: 'Çmimi i shitjes (me TVSH), në monedhën e kolonës saleCurrency.' },
+      { key: 'saleCurrency', list: ['ALL', 'EUR'], help: 'Monedha e çmimit të shitjes: ALL (lekë) ose EUR. Bosh = ALL.' },
       { key: 'minStock', help: 'Stoku minimal për listën e porosive.' },
       { key: 'image', width: 16, help: 'Fotoja: ngjitni foton në këtë qelizë (Insert → Pictures → Place in Cell) ose shkruani një link https://…' },
     ],
     sample: [
-      { code: 'PMP-001', name: 'Pompë 1HP', unit: 'cope', category: 'Pompa', brand: 'Astral', purchasePrice: 25000, salePrice: 38000, minStock: 2 },
-      { code: 'RAK-90-50', name: 'Bërryl 90° PVC 50mm', unit: 'cope', category: 'Rakorderi', purchasePrice: 120, salePrice: 250, minStock: 50 },
+      { code: 'PMP-001', name: 'Pompë 1HP', unit: 'cope', category: 'Pompa', brand: 'Astral', purchasePrice: 250, purchaseCurrency: 'EUR', salePrice: 380, saleCurrency: 'EUR', minStock: 2 },
+      { code: 'RAK-90-50', name: 'Bërryl 90° PVC 50mm', unit: 'cope', category: 'Rakorderi', purchasePrice: 120, purchaseCurrency: 'ALL', salePrice: 250, saleCurrency: 'ALL', minStock: 50 },
+      { code: 'FLT-600', name: 'Filtër rëre 600mm', unit: 'cope', category: 'Filtra', purchasePrice: 180, purchaseCurrency: 'EUR', salePrice: 32000, saleCurrency: 'ALL', minStock: 1 },
     ],
     photoColumn: true,
     notes: [
       'Fotot: në Excel zgjidhni qelizën e kolonës "image" të artikullit → Insert → Pictures → Place in Cell (ose "Place over Cells" mbi rreshtin e artikullit).',
       'Mund t\'i ngarkoni fotot edhe më vonë te "Foto sipas kodit", duke i emërtuar skedarët me kodin e artikullit.',
+      'Çmimet: çdo artikull mund ta ketë blerjen dhe shitjen në lekë (ALL) ose në euro (EUR). Çmimet në euro ruhen në euro dhe përdoren direkt te ofertat/faturat në euro; në lekë kthehen me kursin e euros.',
       'Fshini rreshtat shembull para importit.',
     ],
     help: 'Fotot mund t\'i vendosni direkt në qelizat e kolonës "image" (Insert → Pictures → Place in Cell), ose një link. Mund t\'i ngarkoni edhe më vonë te "Foto sipas kodit".',
@@ -125,7 +129,8 @@ const IMPORTS = {
 };
 
 export default function Integration() {
-  const { locations } = useData();
+  const { locations, company } = useData();
+  const [eurRate, setEurRate] = useState('');
   const [type, setType] = useState('products');
   const [rows, setRows] = useState(null);
   const [images, setImages] = useState({});
@@ -145,7 +150,7 @@ export default function Integration() {
     setImages(table.images);
   });
   const submit = () => run(async () => {
-    const res = await call('importData', { type, rows, options: { locationId } });
+    const res = await call('importData', { type, rows, options: { locationId, eurRate: toNumber(eurRate || company.eurRate) } });
     if (type === 'products') res.photos = await attachPhotos(rows, images, setPhotoProgress);
     setResult(res);
     setRows(null);
@@ -183,6 +188,11 @@ export default function Integration() {
                 <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
                   {locations.filter((l) => ['main', 'agent'].includes(l.kind)).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
+              </Field>
+            )}
+            {type === 'products' && (
+              <Field label="Kursi i euros (L për 1 €)" hint="Për çmimet në EUR: vlera në lekë = çmimi në euro × kursi.">
+                <input className="num" type="number" step="any" value={eurRate} placeholder={company.eurRate ? String(company.eurRate) : 'p.sh. 98'} onChange={(e) => setEurRate(e.target.value)} />
               </Field>
             )}
             <Field label="Skedari (.xlsx ose .csv)" className="span-all">

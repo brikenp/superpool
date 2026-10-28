@@ -209,6 +209,9 @@ export function writeEffects(tx, movementId, movement, ctx, plan, direction) {
     if (movement.kind === 'purchase' && direction === 1) {
       const idx = movement.lines.map((l) => l.productId).lastIndexOf(productId);
       update.purchasePrice = plan.lineCosts[idx];
+      // Fletëhyrja është në lekë: çmimi i fundit i blerjes nuk është më ai në euro.
+      update.purchaseCurrency = 'ALL';
+      update.purchasePriceEur = null;
       update.lastSupplierId = movement.supplierId || null;
       update.lastPurchaseDate = movement.date;
     }
