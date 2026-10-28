@@ -241,6 +241,22 @@ async function main() {
   assert.equal((await getDoc(doc(admin.db, 'productCosts', mixProd.id))).data().purchasePrice, 18000);
   ok('importi i artikujve me kosto dhe shitje në lekë ose euro');
 
+  const simp = await admin.call('importData', { type: 'products', options: { eurRate: 100 }, rows: [
+    { code: 'STK-1', name: 'Me gjendje', purchasePrice: 10, purchaseCurrency: 'EUR', qty: 7 },
+    { code: 'EUR-PMP', name: 'Pompë EUR', qty: 3 },
+  ] });
+  assert.equal(simp.stock, 2);
+  const stkProd = (await getDocs(query(collection(admin.db, 'products'), where('code', '==', 'STK-1')))).docs[0];
+  assert.equal(await stockOf(admin.db, 'main', stkProd.id), 7);
+  assert.equal(stkProd.data().qtyTotal, 7);
+  const again = await admin.call('importData', { type: 'products', rows: [{ code: 'STK-1', name: 'Me gjendje', qty: 7 }] });
+  assert.equal(again.stock, undefined);
+  assert.match(again.errors[0], /ka tashmë gjendje/);
+  assert.equal(await stockOf(admin.db, 'main', stkProd.id), 7);
+  const stkMov = (await getDocs(query(collection(admin.db, 'movements'), where('productIds', 'array-contains', stkProd.id)))).docs[0];
+  assert.equal((await getDoc(doc(admin.db, 'movementCosts', stkMov.id))).data().total, 82000); // 7 × 1.000 + 3 × 25.000
+  ok('importi i artikujve vendos gjendjen fillestare (vetëm një herë), me koston e importuar');
+
   // --- Anulimi i shitjes ---
   await mag.call('cancelSale', { id: sale.id, reason: 'test' }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /fiskalizuar/));
   ok('shitja e fiskalizuar nuk anulohet pa kaluar nga programi i faturimit');

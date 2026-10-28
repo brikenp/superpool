@@ -30,12 +30,13 @@ const IMPORTS = {
       { key: 'purchaseCurrency', list: ['ALL', 'EUR'], help: 'Monedha e çmimit të blerjes: ALL (lekë) ose EUR. Bosh = ALL.' },
       { key: 'salePrice', help: 'Çmimi i shitjes (me TVSH), në monedhën e kolonës saleCurrency.' },
       { key: 'saleCurrency', list: ['ALL', 'EUR'], help: 'Monedha e çmimit të shitjes: ALL (lekë) ose EUR. Bosh = ALL.' },
+      { key: 'qty', help: 'Gjendja fillestare (sasia që keni). Shtohet te magazina e zgjedhur vetëm nëse artikulli nuk ka ende stok; vlerësohet me çmimin e blerjes.' },
       { key: 'minStock', help: 'Stoku minimal për listën e porosive.' },
       { key: 'image', width: 16, help: 'Fotoja: ngjitni foton në këtë qelizë (Insert → Pictures → Place in Cell) ose shkruani një link https://…' },
     ],
     sample: [
-      { code: 'PMP-001', name: 'Pompë 1HP', unit: 'cope', category: 'Pompa', brand: 'Astral', purchasePrice: 250, purchaseCurrency: 'EUR', salePrice: 380, saleCurrency: 'EUR', minStock: 2 },
-      { code: 'RAK-90-50', name: 'Bërryl 90° PVC 50mm', unit: 'cope', category: 'Rakorderi', purchasePrice: 120, purchaseCurrency: 'ALL', salePrice: 250, saleCurrency: 'ALL', minStock: 50 },
+      { code: 'PMP-001', name: 'Pompë 1HP', unit: 'cope', category: 'Pompa', brand: 'Astral', purchasePrice: 250, purchaseCurrency: 'EUR', salePrice: 380, saleCurrency: 'EUR', qty: 4, minStock: 2 },
+      { code: 'RAK-90-50', name: 'Bërryl 90° PVC 50mm', unit: 'cope', category: 'Rakorderi', purchasePrice: 120, purchaseCurrency: 'ALL', salePrice: 250, saleCurrency: 'ALL', qty: 120, minStock: 50 },
       { code: 'FLT-600', name: 'Filtër rëre 600mm', unit: 'cope', category: 'Filtra', purchasePrice: 180, purchaseCurrency: 'EUR', salePrice: 32000, saleCurrency: 'ALL', minStock: 1 },
     ],
     photoColumn: true,
@@ -43,9 +44,10 @@ const IMPORTS = {
       'Fotot: në Excel zgjidhni qelizën e kolonës "image" të artikullit → Insert → Pictures → Place in Cell (ose "Place over Cells" mbi rreshtin e artikullit).',
       'Mund t\'i ngarkoni fotot edhe më vonë te "Foto sipas kodit", duke i emërtuar skedarët me kodin e artikullit.',
       'Çmimet: çdo artikull mund ta ketë blerjen dhe shitjen në lekë (ALL) ose në euro (EUR). Çmimet në euro ruhen në euro dhe përdoren direkt te ofertat/faturat në euro; në lekë kthehen me kursin e euros.',
+      'Gjendja (qty): krijon një fletë rregullimi "Stok fillestar" te magazina e zgjedhur. Artikujt që kanë tashmë stok nuk ndryshohen — për ta korrigjoni përdorni inventarizimin.',
       'Fshini rreshtat shembull para importit.',
     ],
-    help: 'Fotot mund t\'i vendosni direkt në qelizat e kolonës "image" (Insert → Pictures → Place in Cell), ose një link. Mund t\'i ngarkoni edhe më vonë te "Foto sipas kodit".',
+    help: 'Kolona qty vendos gjendjen fillestare. Fotot mund t\'i vendosni direkt në qelizat e kolonës "image" (Insert → Pictures → Place in Cell), ose një link. Mund t\'i ngarkoni edhe më vonë te "Foto sipas kodit".',
   },
   openingStock: {
     label: 'Stoku fillestar',
@@ -156,7 +158,7 @@ export default function Integration() {
     setRows(null);
     setImages({});
     return res;
-  }, (r) => `Importi përfundoi: ${r.created} të reja, ${r.updated} të përditësuara${r.photos ? `, ${r.photos.done} foto` : ''}.`);
+  }, (r) => `Importi përfundoi: ${r.created} të reja, ${r.updated} të përditësuara${r.stock ? `, gjendje për ${r.stock} artikuj` : ''}${r.photos ? `, ${r.photos.done} foto` : ''}.`);
 
   const exportPending = () => downloadCsv('shitje_per_faturim.csv', [
     { label: 'Nr. shitjes', value: (i) => i.saleNumber },
@@ -183,8 +185,8 @@ export default function Integration() {
                 {Object.entries(IMPORTS).map(([k, d]) => <option key={k} value={k}>{d.label}</option>)}
               </select>
             </Field>
-            {type === 'openingStock' && (
-              <Field label="Magazina">
+            {(type === 'openingStock' || type === 'products') && (
+              <Field label="Magazina" hint={type === 'products' ? 'Ku shtohet gjendja fillestare (kolona qty).' : undefined}>
                 <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
                   {locations.filter((l) => ['main', 'agent'].includes(l.kind)).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
@@ -225,7 +227,7 @@ export default function Integration() {
           {photoProgress && busy && <div className="alert info" style={{ marginTop: 12 }}>{photoProgress}</div>}
           {result && (
             <div className={`alert ${result.errors.length ? 'warn' : 'ok'}`} style={{ marginTop: 12 }}>
-              Të reja: {result.created} · Të përditësuara: {result.updated}
+              Të reja: {result.created} · Të përditësuara: {result.updated}{result.stock ? ` · Gjendje fillestare: ${result.stock}` : ''}
               {result.photos && ` · Foto: ${result.photos.done}${result.photos.failed.length ? ` (${result.photos.failed.length} dështuan: ${result.photos.failed.slice(0, 10).join(', ')})` : ''}`}
               {result.errors.length > 0 && <>{'\n'}Gabime ({result.errors.length}):{'\n'}{result.errors.slice(0, 30).join('\n')}</>}
             </div>

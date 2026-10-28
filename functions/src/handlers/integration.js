@@ -45,6 +45,42 @@ class Writer {
   async flush() { if (this.count) this.commits.push(this.batch.commit()); await Promise.all(this.commits); }
 }
 
+/** Stoku fillestar: lëvizje rregullimi drejt vendit `destId` (në pjesë, që transaksioni të mos kalojë kufirin). */
+async function postOpeningStock(lines, destId, user) {
+  let count = 0;
+  // Çdo rresht shkruan deri në 3 dokumente; ndajmë në pjesë që transaksioni të mos kalojë kufirin.
+  for (let start = 0; start < lines.length; start += 120) {
+    const chunk = lines.slice(start, start + 120);
+    const merged = Object.values(chunk.reduce((acc, l) => {
+      (acc[l.productId] ||= { ...l, qty: 0 }).qty = round3(acc[l.productId].qty + l.qty);
+      return acc;
+    }, {}));
+    const movement = { kind: 'adjustment', date: new Date().toISOString().slice(0, 10), sourceId: LOC.ADJUST, destId, lines: merged, notes: 'Stok fillestar (import)' };
+    await db.runTransaction(async (tx) => {
+      const n = await reserveNumber(tx, 'INV');
+      const ctx = await loadContext(tx, movement);
+      const plan = planOrFail(movement, ctx, 1);
+      const ref = db.collection('movements').doc();
+      n.commit();
+      writeEffects(tx, ref.id, movement, ctx, plan, 1);
+      tx.set(ref, {
+        ...movement,
+        number: n.number,
+        lines: merged.map((l) => ({ ...l, code: ctx.products[l.productId].code, name: ctx.products[l.productId].name, unit: ctx.products[l.productId].unit || '' })),
+        productIds: merged.map((l) => l.productId),
+        sourceName: ctx.locations[LOC.ADJUST].name,
+        destName: ctx.locations[destId].name,
+        status: 'confirmed',
+        participants: [user.uid],
+        createdBy: user.uid, createdByName: user.name, createdAt: FieldValue.serverTimestamp(),
+        confirmedBy: user.uid, confirmedByName: user.name, confirmedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    count += merged.length;
+  }
+  return count;
+}
+
 const importers = {
   async clients(rows, result) {
     const byNipt = await indexBy('clients', 'nipt');
@@ -89,6 +125,8 @@ const importers = {
     // Kursi i euros: nga ekrani i importit, ose nga Cilësimet e kompanisë.
     let eurRate = Number(options.eurRate) > 1 ? Number(options.eurRate) : 0;
     if (!eurRate) eurRate = Number((await db.doc('settings/company').get()).get('eurRate')) || 0;
+    const opening = [];
+    const seenStock = new Set();
     const categories = await indexBy('categories', 'name');
     const suppliers = await indexBy('suppliers', 'name');
     const w = new Writer();
@@ -146,9 +184,18 @@ const importers = {
         if (!existing || !(Number(existing.get('qtyTotal')) > 0)) costs.avgCost = f.all;
         w.set(db.doc(`productCosts/${ref.id}`), costs, { merge: true });
       }
+      // Gjendja fillestare: vetëm për artikujt pa stok, që një import i përsëritur të mos e dyfishojë.
+      const qty = num(r.qty ?? r.quantity ?? r.sasia ?? r.gjendja);
+      if (qty !== null && qty !== 0) {
+        if (!(qty > 0)) result.errors.push(`Rreshti ${i + 2} (${code}): sasia duhet të jetë pozitive.`);
+        else if (Number(existing?.get('qtyTotal') || 0) !== 0 || seenStock.has(ref.id)) result.errors.push(`Rreshti ${i + 2} (${code}): ka tashmë gjendje — sasia nuk u shtua (përdorni inventarizimin).`);
+        else { opening.push({ productId: ref.id, qty: round3(qty), condition: 'good', note: 'Stok fillestar' }); seenStock.add(ref.id); }
+      }
       result[existing ? 'updated' : 'created'] += 1;
     }
     await w.flush();
+    // Pas ruajtjes së artikujve dhe kostove, që gjendja të vlerësohet me koston e importuar.
+    if (opening.length) result.stock = await postOpeningStock(opening, options.locationId || LOC.MAIN, user);
   },
 
   async invoices(rows, result) {
@@ -241,36 +288,7 @@ const importers = {
       lines.push({ productId: p.id, qty: round3(qty), condition: 'good', note: 'Stok fillestar' });
     });
     await costs.flush();
-    // Çdo rresht shkruan deri në 3 dokumente; ndajmë në pjesë që transaksioni të mos kalojë kufirin.
-    for (let start = 0; start < lines.length; start += 120) {
-      const chunk = lines.slice(start, start + 120);
-      const merged = Object.values(chunk.reduce((acc, l) => {
-        (acc[l.productId] ||= { ...l, qty: 0 }).qty = round3(acc[l.productId].qty + l.qty);
-        return acc;
-      }, {}));
-      const movement = { kind: 'adjustment', date: new Date().toISOString().slice(0, 10), sourceId: LOC.ADJUST, destId, lines: merged, notes: 'Stok fillestar (import)' };
-      await db.runTransaction(async (tx) => {
-        const n = await reserveNumber(tx, 'INV');
-        const ctx = await loadContext(tx, movement);
-        const plan = planOrFail(movement, ctx, 1);
-        const ref = db.collection('movements').doc();
-        n.commit();
-        writeEffects(tx, ref.id, movement, ctx, plan, 1);
-        tx.set(ref, {
-          ...movement,
-          number: n.number,
-          lines: merged.map((l) => ({ ...l, code: ctx.products[l.productId].code, name: ctx.products[l.productId].name, unit: ctx.products[l.productId].unit || '' })),
-          productIds: merged.map((l) => l.productId),
-          sourceName: ctx.locations[LOC.ADJUST].name,
-          destName: ctx.locations[destId].name,
-          status: 'confirmed',
-          participants: [user.uid],
-          createdBy: user.uid, createdByName: user.name, createdAt: FieldValue.serverTimestamp(),
-          confirmedBy: user.uid, confirmedByName: user.name, confirmedAt: FieldValue.serverTimestamp(),
-        });
-      });
-      result.created += merged.length;
-    }
+    result.created += await postOpeningStock(lines, destId, user);
   },
 };
 
