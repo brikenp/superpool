@@ -39,6 +39,41 @@ function paragraph(doc, title, text, y) {
 
 const sectionsOf = (lines) => Object.keys(POOL_SECTIONS).filter((s) => lines.some((l) => (l.section || 'other') === s));
 
+/** Blloku "Përmasat": G × Gj × Th, pastaj sipërfaqja, vëllimi, depoja, totali dhe qarkullimi (VT / orët). */
+function poolCalcBlock(doc, offer, v, y) {
+  const w = doc.internal.pageSize.getWidth();
+  const depth = Number(offer.depthMax) && Number(offer.depthMax) !== Number(offer.depthMin)
+    ? `${qty(offer.depthMin)}–${qty(offer.depthMax)}` : qty(offer.depthMin || offer.depthMax);
+  const r2 = (x) => Math.round(Number(x || 0) * 100) / 100;
+  y = ensureSpace(doc, y, 52);
+  doc.setFillColor(143, 179, 222);
+  doc.rect(14, y, w - 28, 8, 'F');
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...BRAND_NAVY);
+  doc.text(`Përmasat: ${qty(offer.length)} × ${qty(offer.width)} × ${depth} m`, w / 2, y + 5.7, { align: 'center' });
+  y += 13;
+  doc.setTextColor(20);
+  doc.setFontSize(10.5);
+  const lines = [
+    `Sipërfaqja = ${qty(r2(v.A))} m²`,
+    `Vëllimi = ${qty(r2(v.V))} m³`,
+    ...(v.D > 0 ? [`Depo = ${qty(r2(v.D))} m³`, `Totali = ${qty(r2(v.VT))} m³`] : []),
+    `Qarkullimi = ${qty(r2(v.VT))} m³ / ${qty(v.TH)} orë = ${qty(r2(v.Q))} m³/h`,
+  ];
+  for (const line of lines) { doc.text(line, w / 2, y, { align: 'center' }); y += 5.4; }
+  doc.setFont(undefined, 'normal');
+  const info = [POOL_TYPES[offer.poolType] || '', offer.circulation || ''].filter(Boolean).join(' · ');
+  if (info) {
+    doc.setFontSize(9);
+    doc.setTextColor(90);
+    doc.text(info, w / 2, y + 0.5, { align: 'center' });
+    doc.setTextColor(20);
+    y += 5;
+  }
+  return y + 4;
+}
+
 /** (A) Oferta për klientin — pa kosto, pa marzh. */
 export async function clientOfferPdf(offer, company, client) {
   // Shumat në monedhën e ofertës (L ose €).
@@ -62,26 +97,8 @@ export async function clientOfferPdf(offer, company, client) {
   });
   y = doc.lastAutoTable.finalY + 5;
 
-  doc.setFontSize(10.5);
-  doc.setTextColor(...BRAND_NAVY);
-  doc.text('Të dhënat e pishinës', 14, y);
-  doc.setTextColor(20);
-  autoTable(doc, {
-    startY: y + 2,
-    theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 1.6 },
-    headStyles: { fillColor: BRAND_NAVY },
-    head: [['Lloji', 'Përmasat (G × Gj)', 'Thellësia', 'Sipërfaqja', 'Vëllimi i ujit', 'Qarkullimi']],
-    body: [[
-      POOL_TYPES[offer.poolType] || offer.poolType || '',
-      `${qty(offer.length)} × ${qty(offer.width)} m`,
-      Number(offer.depthMax) && Number(offer.depthMax) !== Number(offer.depthMin) ? `${qty(offer.depthMin)} – ${qty(offer.depthMax)} m` : `${qty(offer.depthMin)} m`,
-      `${qty(v.A)} m²`,
-      `${qty(offer.volumeManual ? offer.volume : v.V)} m³`,
-      offer.circulation || '',
-    ]],
-  });
-  y = doc.lastAutoTable.finalY + 6;
+  // Përmasat dhe llogaritjet e pishinës (sipërfaqja, vëllimi, depoja, totali, qarkullimi).
+  y = poolCalcBlock(doc, offer, v, y);
 
   y = paragraph(doc, 'Zgjidhja teknike', offer.technicalText, y);
   y = paragraph(doc, 'Sistemi i qarkullimit dhe filtrimit', offer.filtration, y);

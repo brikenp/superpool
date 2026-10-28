@@ -260,3 +260,13 @@ test('çmimet: lekë dhe euro', async () => {
   assert.equal(unitCostIn({ avgCost: 25500, purchaseCurrency: 'EUR', purchasePriceEur: 250 }, 'ALL', 100), 25500);
   assert.equal(unitCostIn({ avgCost: 1200 }, 'EUR', 100), 12);
 });
+
+test('formula: depoja, vëllimi total dhe qarkullimi', () => {
+  const v = poolVariables({ length: 16, width: 6.5, depthMin: 1.45, volume: 160, tankPct: 10, turnoverHours: 4 });
+  assert.equal(v.A, 104);
+  assert.equal(v.D, 16);
+  assert.equal(v.VT, 176);
+  assert.equal(v.Q, 44);
+  assert.equal(poolVariables({ length: 10, width: 5, depthMin: 1.5 }).Q, 75 / 4); // pa depo, 4 orë
+  assert.equal(evaluateFormula('ceil(Q / 20)', v), 3);
+});

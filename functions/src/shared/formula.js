@@ -13,7 +13,15 @@ export const FORMULA_VARIABLES = {
   P: 'Perimetri 2×(L+W) (m)',
   S: 'Sipërfaqja e brendshme: fundi + muret (m²)',
   V: 'Vëllimi i ujit (m³)',
+  D: 'Depoja / rezervuari i balancimit (m³) = V × % e depos',
+  VT: 'Vëllimi total V + D (m³)',
+  TH: 'Orët e qarkullimit (p.sh. 4)',
+  Q: 'Qarkullimi VT / TH (m³/h)',
 };
+
+// Rezervuari i balancimit përdoret te pishinat me tejderdhje; te ato me skimer zakonisht s'ka.
+export const defaultTankPct = (poolType) => (['overflow', 'infinity'].includes(poolType) ? 10 : 0);
+export const DEFAULT_TURNOVER_HOURS = 4;
 
 export const FORMULA_FUNCTIONS = {
   ceil: (x) => Math.ceil(x),
@@ -30,7 +38,7 @@ export const FORMULA_FUNCTIONS = {
 
 export class FormulaError extends Error {}
 
-export function poolVariables({ length, width, depthMin, depthMax, volume } = {}) {
+export function poolVariables({ length, width, depthMin, depthMax, volume, tankPct = 0, turnoverHours = DEFAULT_TURNOVER_HOURS } = {}) {
   const L = Number(length) || 0;
   const W = Number(width) || 0;
   const H1 = Number(depthMin) || 0;
@@ -40,7 +48,11 @@ export function poolVariables({ length, width, depthMin, depthMax, volume } = {}
   const P = 2 * (L + W);
   const S = A + P * H;
   const V = Number(volume) || A * H;
-  return { L, W, H1, H2, H, A, P, S, V };
+  const D = (V * (Number(tankPct) || 0)) / 100;
+  const VT = V + D;
+  const TH = Number(turnoverHours) > 0 ? Number(turnoverHours) : DEFAULT_TURNOVER_HOURS;
+  const Q = VT / TH;
+  return { L, W, H1, H2, H, A, P, S, V, D, VT, TH, Q };
 }
 
 function tokenize(text) {

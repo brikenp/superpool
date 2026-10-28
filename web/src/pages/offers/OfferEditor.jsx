@@ -12,7 +12,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useCollection, useData, useDocument } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
 import { addDays, money, qty, round2, todayISO, toNumber } from '../../lib/format.js';
-import { linesFromModel, newKey, offerTotals, offerVariables, priceFromCost, recalcQuantities } from '../../lib/offerCalc.js';
+import { linesFromModel, newKey, offerTankPct, offerTotals, offerTurnoverHours, offerVariables, priceFromCost, recalcQuantities } from '../../lib/offerCalc.js';
 import { clientOfferPdf, internalEstimatePdf } from '../../lib/offerPdf.js';
 import { clientFields, normalizeClient } from '../partners/Clients.jsx';
 import { freeQty } from '../inventory/Products.jsx';
@@ -55,7 +55,7 @@ export default function OfferEditor() {
       setForm({
         status: 'draft', date: todayISO(), validUntil: addDays(todayISO(), Number(company.offerValidityDays || 30)),
         clientId: params.get('klienti') || '', projectName: '', location: '',
-        poolType: 'skimmer', circulation: '', length: 8, width: 4, depthMin: 1.2, depthMax: 1.6, volume: '', volumeManual: false,
+        poolType: 'skimmer', circulation: '', length: 8, width: 4, depthMin: 1.2, depthMax: 1.6, volume: '', volumeManual: false, tankPct: '', turnoverHours: 4,
         technicalText: '', filtration: '', equipmentText: '', servicesText: '',
         paymentTerms: company.defaultPaymentTerms || '', deliveryTerm: company.defaultDeliveryTerm || '', clientNotes: '',
         discountPct: 0, vatPct: company.vatPct ?? 20, showLinePrices: false, notesInternal: '', lines: [],
@@ -124,6 +124,8 @@ export default function OfferEditor() {
       clientName: client?.name || form.clientName || '',
       volume: form.volumeManual ? toNumber(form.volume) : round2(vars.V),
       area: round2(vars.A),
+      tankPct: form.tankPct === '' || form.tankPct == null ? '' : toNumber(form.tankPct), turnoverHours: offerTurnoverHours(form),
+      tankVolume: round2(vars.D), totalVolume: round2(vars.VT), circulationRate: round2(vars.Q),
       length: toNumber(form.length), width: toNumber(form.width), depthMin: toNumber(form.depthMin), depthMax: toNumber(form.depthMax),
       discountPct: toNumber(form.discountPct), vatPct: toNumber(form.vatPct),
       currency: cur, exchangeRate: cur === 'EUR' ? rate : 1,
@@ -239,11 +241,11 @@ export default function OfferEditor() {
                 </div>
               </Field>
               <Field label="Lloji">
-                <select value={form.poolType} onChange={(e) => set('poolType', e.target.value)}>
+                <select value={form.poolType} onChange={(e) => setDims('poolType', e.target.value)}>
                   {Object.entries(POOL_TYPES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                 </select>
               </Field>
-              <Field label="Qarkullimi"><input value={form.circulation || ''} onChange={(e) => set('circulation', e.target.value)} /></Field>
+              <Field label="Sistemi i qarkullimit"><input value={form.circulation || ''} onChange={(e) => set('circulation', e.target.value)} placeholder="p.sh. Tejderdhje me depo balancimi" /></Field>
               <Field label="Gjatësia (m)"><input className="num" type="number" step="any" value={form.length} onChange={(e) => setDims('length', e.target.value)} /></Field>
               <Field label="Gjerësia (m)"><input className="num" type="number" step="any" value={form.width} onChange={(e) => setDims('width', e.target.value)} /></Field>
               <Field label="Thellësia min (m)"><input className="num" type="number" step="any" value={form.depthMin} onChange={(e) => setDims('depthMin', e.target.value)} /></Field>
@@ -253,6 +255,19 @@ export default function OfferEditor() {
                   onChange={(e) => setForm((f) => { const next = { ...f, volume: e.target.value, volumeManual: true }; return { ...next, lines: recalcQuantities(next.lines, next) }; })} />
               </Field>
               {form.volumeManual && <Field label=" "><button type="button" className="btn small" onClick={() => setDims('volumeManual', false)}>Llogarit automatikisht</button></Field>}
+              <Field label="Depoja (% e vëllimit)" hint={`Depo = ${qty(round2(vars.D))} m³${form.tankPct === '' || form.tankPct == null ? ' · sipas llojit të pishinës' : ''}`}>
+                <input className="num" type="number" step="any" value={form.tankPct ?? ''} placeholder={String(offerTankPct({ poolType: form.poolType }))} onChange={(e) => setDims('tankPct', e.target.value)} />
+              </Field>
+              <Field label="Orët e qarkullimit" hint="Sa orë qarkullon i gjithë uji (zakonisht 4).">
+                <input className="num" type="number" step="any" value={form.turnoverHours ?? ''} placeholder="4" onChange={(e) => setDims('turnoverHours', e.target.value)} />
+              </Field>
+              <div className="span-all pool-summary">
+                <span>Sipërfaqja = <b>{qty(round2(vars.A))} m²</b></span>
+                <span>Vëllimi = <b>{qty(round2(vars.V))} m³</b></span>
+                <span>Depo = <b>{qty(round2(vars.D))} m³</b></span>
+                <span>Totali = <b>{qty(round2(vars.VT))} m³</b></span>
+                <span>Qarkullimi = {qty(round2(vars.VT))} m³ / {qty(vars.TH)} orë = <b>{qty(round2(vars.Q))} m³/h</b></span>
+              </div>
             </div>
           </Card>
         </div>

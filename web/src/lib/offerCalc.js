@@ -1,14 +1,21 @@
 // Llogaritjet e ofertës: materialet nga modeli i pishinës dhe totalet.
 
-import { evaluateFormula, poolVariables } from '@shared/formula.js';
+import { DEFAULT_TURNOVER_HOURS, defaultTankPct, evaluateFormula, poolVariables } from '@shared/formula.js';
 
 import { round2, round3, toNumber } from './format.js';
 
 export const newKey = () => Math.random().toString(36).slice(2, 10);
 
+const blank = (x) => x === '' || x === null || x === undefined;
+
+/** % e depos (bosh = sipas llojit të pishinës) dhe orët e qarkullimit (bosh = 4). */
+export const offerTankPct = (offer) => (blank(offer.tankPct) ? defaultTankPct(offer.poolType) : toNumber(offer.tankPct));
+export const offerTurnoverHours = (offer) => (blank(offer.turnoverHours) || !(toNumber(offer.turnoverHours) > 0) ? DEFAULT_TURNOVER_HOURS : toNumber(offer.turnoverHours));
+
 export function offerVariables(offer) {
   return poolVariables({
     length: offer.length, width: offer.width, depthMin: offer.depthMin, depthMax: offer.depthMax, volume: offer.volumeManual ? offer.volume : null,
+    tankPct: offerTankPct(offer), turnoverHours: offerTurnoverHours(offer),
   });
 }
 
