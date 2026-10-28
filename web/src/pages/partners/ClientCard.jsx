@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Paperclip, X, Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { OFFER_STATUS, PAYMENT_METHODS, PROJECT_STATUS } from '@shared/constants.js';
+import { OFFER_STATUS, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PROJECT_STATUS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
@@ -15,6 +15,7 @@ import { Card, Field, Loading, PageHeader, Stat, StatusBadge, Tabs, useAction } 
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { ContractsCard } from '../finance/Contracts.jsx';
+import { ClientLedger } from '../finance/ClientLedger.jsx';
 import { db, storage } from '../../lib/firebase.js';
 import { date, dateTime, inAll, money, moneyWithAll, offerAll } from '../../lib/format.js';
 import { InvoiceForm, PaymentForm, INVOICE_STATUS } from '../finance/Finance.jsx';
@@ -86,6 +87,7 @@ export default function ClientCard() {
         seeProjects && { key: 'projects', label: `Projektet (${projects.data.length})` },
         { key: 'sales', label: `Shitjet (${sales.data.length})` },
         { key: 'finance', label: 'Faturat & pagesat' },
+        seeAllFinance && { key: 'ledger', label: 'Kartela' },
         { key: 'docs', label: 'Dokumente & shënime' },
       ]} />
       {tab === 'overview' && (
@@ -167,7 +169,7 @@ export default function ClientCard() {
               rows={[...payments.data].sort(byDate)}
               columns={[
                 { key: 'date', label: 'Data', render: (p) => date(p.date) },
-                { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHODS[p.method] || p.method },
+                { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHOD_LABELS[p.method] || p.method },
                 { key: 'reference', label: 'Referenca' },
                 { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : inAll(p)), render: (p) => (p.status === 'cancelled' ? money(0) : moneyWithAll(p)) },
                 printColumn((p) => <PrintPaymentButton payment={p} />),
@@ -176,6 +178,7 @@ export default function ClientCard() {
           </Card>
         </div>
       )}
+      {tab === 'ledger' && seeAllFinance && <ClientLedger clientId={id} />}
       {tab === 'docs' && <ClientDocuments clientId={id} />}
       {editing && <EntityForm title={`Ndrysho ${client.name}`} collectionName="clients" record={client} fields={clientFields} transform={normalizeClient} onClose={() => setEditing(false)} />}
       {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}

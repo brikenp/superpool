@@ -16,7 +16,7 @@ import { Field, Modal, useAction, useUi } from './ui.jsx';
 export function useCanFiscalize(invoice) {
   const { company } = useData();
   const { can, uid } = useAuth();
-  if (!company.fiscalEnabled || !invoice || invoice.fiscal?.fic || invoice.status === 'cancelled' || invoice.fiscalNumber) return false;
+  if (!company.fiscalEnabled || !invoice || invoice.fiscal?.fic || invoice.status === 'cancelled' || invoice.fiscalNumber || invoice.type === 'opening') return false;
   return can(CAPS.FINANCE) || (Boolean(invoice.saleId) && can(CAPS.CHEM_SALES) && invoice.createdBy === uid);
 }
 

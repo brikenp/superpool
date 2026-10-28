@@ -263,6 +263,28 @@ async function main() {
   assert.deepEqual([riv.name, riv.tradeName], ['Riviera Sh.p.k.', 'Hotel Riviera']);
   ok('klientët me emër tregtar (import)');
 
+  // --- Gjendjet fillestare të klientëve dhe likujdimet ---
+  const bimp = await admin.call('importData', { type: 'clientBalances', options: { eurRate: 100 }, rows: [
+    { client: 'Hotel Riviera', amount: 250000, date: '01.01.2026' },
+    { client: 'Klient i Ri', amount: -20000, date: '01.01.2026' },
+    { client: 'L99999999A', amount: 1000, currency: 'EUR', date: '01.01.2026' },
+  ] });
+  assert.equal(bimp.balances, 2);
+  assert.equal(bimp.created, 1);
+  assert.match(bimp.errors[0], /ka tashmë gjendje fillestare/);
+  const rivId = (await getDocs(query(collection(admin.db, 'clients'), where('nipt', '==', 'L99999999A')))).docs[0].id;
+  const rivOpen = (await getDocs(query(collection(admin.db, 'invoices'), where('clientId', '==', rivId), where('type', '==', 'opening')))).docs[0].data();
+  assert.deepEqual([rivOpen.amount, rivOpen.status, rivOpen.date, rivOpen.kind], [250000, 'issued', '2026-01-01', 'opening']);
+  assert.match(rivOpen.internalNumber, /^GJF-/);
+  const newId = (await getDocs(query(collection(admin.db, 'clients'), where('name', '==', 'Klient i Ri')))).docs[0].id;
+  const credit = (await getDocs(query(collection(admin.db, 'payments'), where('clientId', '==', newId)))).docs[0].data();
+  assert.deepEqual([credit.type, credit.method, credit.amount], ['opening', 'opening', 20000]);
+  // Likujdim nga aplikacioni (si te kartela) i lidhur me gjendjen fillestare.
+  const rivOpenId = (await getDocs(query(collection(admin.db, 'invoices'), where('clientId', '==', rivId), where('type', '==', 'opening')))).docs[0].id;
+  await addDoc(collection(admin.db, 'payments'), { clientId: rivId, invoiceId: rivOpenId, amount: 100000, method: 'bank', date: '2026-02-01', status: 'active', source: 'superpool' });
+  await admin.call('fiscalizeInvoice', { invoiceId: rivOpenId }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /nuk fiskalizohet|aktivizuar/));
+  ok('gjendjet fillestare të klientëve (import debi/kredi, një herë për klient) dhe likujdimet');
+
   // --- Anulimi i shitjes ---
   await mag.call('cancelSale', { id: sale.id, reason: 'test' }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /fiskalizuar/));
   ok('shitja e fiskalizuar nuk anulohet pa kaluar nga programi i faturimit');

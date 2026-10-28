@@ -35,6 +35,7 @@ export const addDays = (iso, days) => {
   return d.toISOString().slice(0, 10);
 };
 
+export const firstOfYear = () => `${todayISO().slice(0, 4)}-01-01`;
 export const firstOfMonth = () => `${todayISO().slice(0, 8)}01`;
 
 /** Data në formatin dd.mm.yyyy (pranon ISO string ose Firestore Timestamp). */

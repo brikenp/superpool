@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { PAYMENT_METHODS, UNITS } from '@shared/constants.js';
+import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 import { salePriceIn } from '@shared/prices.js';
 
@@ -18,6 +18,9 @@ import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
 import { addDays, date, inAll, money, moneyWithAll, round2, todayISO, toNumber } from '../../lib/format.js';
 import { clientOption } from '../../lib/clients.js';
+import { OpeningBalanceForm } from './OpeningBalance.jsx';
+import { ClientLedgerPage } from './ClientLedger.jsx';
+import { prettySegment } from '../../lib/prettyUrl.jsx';
 
 export const INVOICE_STATUS = { pending_fiscal: 'Pa numër fiskal', issued: 'E lëshuar', cancelled: 'Anuluar' };
 // Lloji i faturës manuale (fusha "type"); faturat e shitjeve krijohen nga moduli i shitjeve.
@@ -36,9 +39,15 @@ export async function findActiveFinalInvoice(projectId) {
   return activeFinalInvoice(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
 }
 
-export const invoiceTypeLabel = (i) => (i.saleId ? 'Shitje' : INVOICE_TYPES[i.type] || (i.projectId ? 'Projekt' : 'Tjetër'));
+export const invoiceTypeLabel = (i) => (i.type === 'opening' ? 'Gjendje fillestare' : i.saleId ? 'Shitje' : INVOICE_TYPES[i.type] || (i.projectId ? 'Projekt' : 'Tjetër'));
 
 export function InvoiceForm({ record, onClose }) {
+  // Gjendja fillestare ka formën e vet (nuk ka rreshta, nuk fiskalizohet).
+  if (record?.type === 'opening') return <OpeningBalanceForm record={record} onClose={onClose} />;
+  return <ManualInvoiceForm record={record} onClose={onClose} />;
+}
+
+function ManualInvoiceForm({ record, onClose }) {
   const { clients, clientsById, company } = useData();
   const { uid } = useAuth();
   const projects = useQuery(() => query(collection(db, 'projects')), []);
@@ -287,6 +296,7 @@ export function PaymentForm({ record, invoices = [], onClose }) {
 }
 
 const FINANCE_SECTIONS = {
+  kartela: { tab: 'ledger', title: 'Kartela e klientit', subtitle: 'Gjendja fillestare, faturat dhe likujdimet e klientit me gjendjen pas çdo veprimi.' },
   detyrimet: { tab: 'debts', title: 'Detyrimet e klientëve', subtitle: 'Klientët me fatura të papaguara, sipas detyrimit dhe afatit.' },
   faturat: { tab: 'invoices', title: 'Faturat', subtitle: 'Faturat e klientëve: fiskalizimi (POS.AL), numrat fiskalë, vlerat dhe afatet.' },
   pagesat: { tab: 'payments', title: 'Pagesat', subtitle: 'Pagesat e arkëtuara nga klientët (cash, bankë, kartë).' },
@@ -295,6 +305,7 @@ const FINANCE_SECTIONS = {
 export default function Finance() {
   const { section: key = 'detyrimet' } = useParams();
   const section = FINANCE_SECTIONS[key] || FINANCE_SECTIONS.detyrimet;
+  if (section.tab === 'ledger') return <ClientLedgerPage section={section} />;
   return <FinanceSection key={section.tab} section={section} />;
 }
 
@@ -304,6 +315,8 @@ function FinanceSection({ section }) {
   const [from, setFrom] = useState(addDays(todayISO(), -90));
   const [invoiceForm, setInvoiceForm] = useState(null);
   const [paymentForm, setPaymentForm] = useState(null);
+  const [openingForm, setOpeningForm] = useState(false);
+  const { clients, clientsById } = useData();
   const invoices = useQuery(() => query(collection(db, 'invoices'), where('date', '>=', tab === 'debts' ? '2000-01-01' : from), orderBy('date', 'desc')), [from, tab]);
   const payments = useQuery(() => query(collection(db, 'payments'), where('date', '>=', tab === 'debts' ? '2000-01-01' : from), orderBy('date', 'desc')), [from, tab]);
   const canEdit = can(CAPS.FINANCE);
@@ -334,6 +347,7 @@ function FinanceSection({ section }) {
           <>
             {tab !== 'payments' && <button type="button" className={`btn ${tab === 'invoices' ? 'primary' : ''}`} onClick={() => setInvoiceForm({})}><Plus size={16} /> Faturë</button>}
             {tab !== 'invoices' && <button type="button" className="btn primary" onClick={() => setPaymentForm({})}><Plus size={16} /> Pagesë</button>}
+            {tab === 'debts' && <button type="button" className="btn" onClick={() => setOpeningForm(true)}><Plus size={16} /> Gjendje fillestare</button>}
           </>
         )}
       />
@@ -352,6 +366,7 @@ function FinanceSection({ section }) {
             { key: 'balance', label: 'Detyrimi', type: 'money', total: true },
             { key: 'overdueBalance', label: 'Me afat të kaluar', type: 'money', total: true },
             { key: 'lastDate', label: 'Fatura e fundit', render: (d) => date(d.lastDate) },
+            { key: 'ledger', label: '', export: false, sortable: false, render: (d) => <Link className="btn small" to={`/financa/kartela?klienti=${prettySegment('clients', clientsById[d.id] || { id: d.id }, { clients })}`}>Kartela</Link> },
           ]}
         />
       )}
@@ -383,7 +398,7 @@ function FinanceSection({ section }) {
             { key: 'date', label: 'Data', render: (p) => date(p.date) },
             { key: 'number', label: 'Nr. mandati' },
             { key: 'clientName', label: 'Klienti' },
-            { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHODS[p.method] || p.method },
+            { key: 'method', label: 'Mënyra', value: (p) => PAYMENT_METHOD_LABELS[p.method] || p.method },
             { key: 'reference', label: 'Referenca' },
             { key: 'amount', label: 'Shuma', type: 'money', total: true, value: (p) => (p.status === 'cancelled' ? 0 : inAll(p)), render: (p) => (p.status === 'cancelled' ? money(0) : moneyWithAll(p)) },
             printColumn((p) => <PrintPaymentButton payment={p} />),
@@ -392,6 +407,7 @@ function FinanceSection({ section }) {
       )}
       {invoiceForm && <InvoiceForm record={invoiceForm} onClose={() => setInvoiceForm(null)} />}
       {paymentForm && <PaymentForm record={paymentForm} invoices={invoices.data.filter((i) => i.status !== 'cancelled')} onClose={() => setPaymentForm(null)} />}
+      {openingForm && <OpeningBalanceForm onClose={() => setOpeningForm(false)} />}
     </>
   );
 }

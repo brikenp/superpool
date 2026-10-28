@@ -75,6 +75,30 @@ const IMPORTS = {
     ],
     sample: [{ name: 'Riviera Sh.p.k.', tradeName: 'Hotel Riviera', nipt: 'L12345678A', phone: '0691234567', city: 'Durrës' }],
   },
+  clientBalances: {
+    label: 'Gjendjet fillestare të klientëve',
+    sheet: 'Gjendjet',
+    columns: [
+      { key: 'client', width: 30, help: 'Emri, emri tregtar ose NIPT-i i klientit. Nëse nuk ekziston, klienti krijohet.' },
+      { key: 'nipt', help: 'NIPT (opsional, për gjetjen e saktë të klientit).' },
+      { key: 'amount', required: true, help: 'Gjendja: pozitive = klienti na detyrohet; negative = klienti ka paguar më shumë (parapagim).' },
+      { key: 'currency', list: ['ALL', 'EUR'], help: 'Monedha: ALL ose EUR. Bosh = ALL.' },
+      { key: 'exchangeRate', help: 'Kursi i euros (për EUR). Bosh = kursi te Cilësimet.' },
+      { key: 'date', help: 'Data e gjendjes (p.sh. 01.01.2026).' },
+      { key: 'notes', width: 30, help: 'Shënime.' },
+    ],
+    sample: [
+      { client: 'Hotel Riviera', nipt: 'L12345678A', amount: 250000, currency: 'ALL', date: '01.01.2026', notes: 'Detyrim i mbartur' },
+      { client: 'Vila Golem', amount: 1500, currency: 'EUR', exchangeRate: 98, date: '01.01.2026' },
+      { client: 'Arben Hoxha', amount: -20000, currency: 'ALL', date: '01.01.2026', notes: 'Parapagim' },
+    ],
+    notes: [
+      'Çdo klient ka vetëm një gjendje fillestare; klientët që e kanë nuk ndryshohen (ndryshojeni te Financa → Kartela e klientit).',
+      'Likujdimet e mëvonshme regjistrohen si pagesa dhe zbresin nga kjo gjendje te kartela e klientit.',
+      'Fshini rreshtat shembull para importit.',
+    ],
+    help: 'Pozitive = klienti na detyrohet, negative = parapagim. Shfaqen te Financa → Kartela e klientit dhe te Detyrimet.',
+  },
   suppliers: {
     label: 'Furnitorët',
     sheet: 'Furnitorët',
@@ -159,7 +183,7 @@ export default function Integration() {
     setRows(null);
     setImages({});
     return res;
-  }, (r) => `Importi përfundoi: ${r.created} të reja, ${r.updated} të përditësuara${r.stock ? `, gjendje për ${r.stock} artikuj` : ''}${r.photos ? `, ${r.photos.done} foto` : ''}.`);
+  }, (r) => `Importi përfundoi: ${r.created} të reja, ${r.updated} të përditësuara${r.stock ? `, gjendje për ${r.stock} artikuj` : ''}${r.balances ? `, ${r.balances} gjendje fillestare` : ''}${r.photos ? `, ${r.photos.done} foto` : ''}.`);
 
   const exportPending = () => downloadCsv('shitje_per_faturim.csv', [
     { label: 'Nr. shitjes', value: (i) => i.saleNumber },
@@ -193,8 +217,8 @@ export default function Integration() {
                 </select>
               </Field>
             )}
-            {type === 'products' && (
-              <Field label="Kursi i euros (L për 1 €)" hint="Për çmimet në EUR: vlera në lekë = çmimi në euro × kursi.">
+            {(type === 'products' || type === 'clientBalances') && (
+              <Field label="Kursi i euros (L për 1 €)" hint="Për vlerat në EUR: vlera në lekë = shuma në euro × kursi.">
                 <input className="num" type="number" step="any" value={eurRate} placeholder={company.eurRate ? String(company.eurRate) : 'p.sh. 98'} onChange={(e) => setEurRate(e.target.value)} />
               </Field>
             )}

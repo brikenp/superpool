@@ -144,6 +144,8 @@ export const PAYMENT_METHODS = {
   card: 'Kartë',
   credit: 'Me afat (pa paguar)',
 };
+// Etiketat për shfaqje (përfshin gjendjen fillestare kreditore të klientit, që nuk është mënyrë pagese).
+export const PAYMENT_METHOD_LABELS = { ...PAYMENT_METHODS, opening: 'Gjendje fillestare' };
 
 export const EXPENSE_CATEGORIES = {
   labor: 'Punë / orë pune',

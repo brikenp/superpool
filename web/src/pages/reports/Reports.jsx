@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import {
-  CONDITIONS, LOCATION_KINDS, MOVEMENT_KINDS, OFFER_STATUS, PAYMENT_METHODS, PO_STATUS, PROJECT_STATUS, UNITS,
+  CONDITIONS, LOCATION_KINDS, MOVEMENT_KINDS, OFFER_STATUS, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PO_STATUS, PROJECT_STATUS, UNITS,
 } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 import { projectResult } from '@shared/stock.js';
@@ -319,7 +319,7 @@ function InvoicesReport({ f }) {
   const openInvoices = useQuery(() => (paymentForm ? query(collection(db, 'invoices'), where('status', 'in', ['pending_fiscal', 'issued'])) : null), [Boolean(paymentForm)]);
   const rows = [
     ...invoices.data.filter((i) => i.status !== 'cancelled').map((i) => ({ id: `i${i.id}`, record: i, date: i.date, type: `Faturë · ${invoiceTypeLabel(i)}`, doc: i.fiscalNumber || i.internalNumber || '', clientId: i.clientId, clientName: i.clientName, projectId: i.projectId, debit: inAll(i), credit: 0 })),
-    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, payment: p, date: p.date, type: `Pagesë (${PAYMENT_METHODS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: p.projectId || null, debit: 0, credit: inAll(p) })),
+    ...payments.data.filter((p) => p.status !== 'cancelled').map((p) => ({ id: `p${p.id}`, payment: p, date: p.date, type: `Pagesë (${PAYMENT_METHOD_LABELS[p.method] || p.method})`, doc: p.reference || '', clientId: p.clientId, clientName: p.clientName, projectId: p.projectId || null, debit: 0, credit: inAll(p) })),
   ]
     .filter((r) => (!f.client || r.clientId === f.client) && (!f.project || r.projectId === f.project))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));

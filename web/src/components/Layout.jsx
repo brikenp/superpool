@@ -1,6 +1,6 @@
 import { collection, query, where } from 'firebase/firestore';
 import {
-  ArrowLeftRight, Banknote, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
+  ArrowLeftRight, Banknote, BookOpen, Boxes, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
   FileCheck, FilePen, FileSignature, FilePlus, FileX, Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
   Scale, Search, Send, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
   Warehouse, Waves, Wrench,
@@ -67,6 +67,7 @@ export const NAV = [
   { title: 'Financa', items: [
     { to: '/kontratat', label: 'Kontratat', icon: FileSignature, caps: [C.FINANCE, C.PROJECTS_MANAGE, C.REPORTS] },
     { to: '/financa/detyrimet', label: 'Detyrimet e klientëve', icon: Wallet, caps: [C.FINANCE, C.REPORTS] },
+    { to: '/financa/kartela', label: 'Kartela e klientit', icon: BookOpen, caps: [C.FINANCE, C.REPORTS] },
     { to: '/financa/faturat', label: 'Faturat', icon: Receipt, caps: [C.FINANCE, C.REPORTS] },
     { to: '/financa/pagesat', label: 'Pagesat', icon: Banknote, caps: [C.FINANCE, C.REPORTS] },
   ] },

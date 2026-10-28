@@ -82,6 +82,68 @@ async function postOpeningStock(lines, destId, user) {
 }
 
 const importers = {
+  // Gjendjet fillestare të klientëve: shuma pozitive = klienti na detyrohet, negative = ka paguar më shumë.
+  async clientBalances(rows, result, user, options = {}) {
+    const clientsSnap = await db.collection('clients').get();
+    const byKey = new Map();
+    clientsSnap.forEach((d) => {
+      for (const k of [d.get('nipt'), d.get('name'), d.get('tradeName')]) if (str(k)) byKey.set(str(k).toLowerCase(), d);
+    });
+    const withOpening = new Set();
+    for (const c of ['invoices', 'payments']) {
+      (await db.collection(c).where('type', '==', 'opening').get()).forEach((d) => { if (d.get('status') !== 'cancelled') withOpening.add(d.get('clientId')); });
+    }
+    let eurRate = Number(options.eurRate) > 1 ? Number(options.eurRate) : 0;
+    if (!eurRate) eurRate = Number((await db.doc('settings/company').get()).get('eurRate')) || 0;
+    const docs = [];
+    const w = new Writer();
+    rows.forEach((r, i) => {
+      const nipt = str(r.nipt).toUpperCase();
+      const name = str(r.client || r.klienti || r.name || r.emri);
+      const amount = num(r.amount ?? r.shuma ?? r.gjendja);
+      if (!nipt && !name) { result.errors.push(`Rreshti ${i + 2}: mungon klienti (emri ose NIPT).`); return; }
+      if (amount === null || amount === 0) { result.errors.push(`Rreshti ${i + 2} (${name || nipt}): mungon shuma.`); return; }
+      const currency = parseCurrency(r.currency ?? r.monedha) || 'ALL';
+      const rate = currency === 'EUR' ? num(r.exchangeRate ?? r.kursi) || eurRate : 1;
+      if (currency === 'EUR' && !(rate > 1)) { result.errors.push(`Rreshti ${i + 2} (${name || nipt}): vendosni kursin e euros.`); return; }
+      let client = (nipt && byKey.get(nipt.toLowerCase())) || (name && byKey.get(name.toLowerCase()));
+      if (!client) {
+        const ref = db.collection('clients').doc();
+        const data = { name: name || nipt, nipt, type: nipt ? 'business' : 'individual', tradeName: '', createdAt: FieldValue.serverTimestamp() };
+        w.set(ref, data);
+        client = { id: ref.id, get: (f) => data[f] };
+        for (const k of [nipt, data.name]) if (k) byKey.set(k.toLowerCase(), client);
+        result.created += 1;
+      }
+      if (withOpening.has(client.id)) { result.errors.push(`Rreshti ${i + 2} (${client.get('name')}): ka tashmë gjendje fillestare — ndryshojeni te Financa → Kartela e klientit.`); return; }
+      withOpening.add(client.id);
+      const value = Math.abs(amount);
+      docs.push({
+        debit: amount > 0,
+        data: {
+          type: 'opening', date: date(r.date || r.data), clientId: client.id, clientName: client.get('name'),
+          amount: value, currency, exchangeRate: rate, amountAll: round2(value * rate),
+          notes: str(r.notes || r.shenime), source: 'superpool', createdBy: user.uid, createdAt: FieldValue.serverTimestamp(),
+        },
+      });
+    });
+    if (docs.length) {
+      const { numbers } = await db.runTransaction(async (tx) => {
+        const n = await reserveNumber(tx, 'GJF', new Date(), docs.length);
+        n.commit();
+        return n;
+      });
+      docs.forEach(({ debit, data }, k) => {
+        if (debit) {
+          w.set(db.collection('invoices').doc(), { ...data, kind: 'opening', status: 'issued', internalNumber: numbers[k], fiscalNumber: '', dueDate: data.date, projectId: null });
+        } else {
+          w.set(db.collection('payments').doc(), { ...data, status: 'active', number: numbers[k], invoiceId: null, method: 'opening', reference: 'Gjendje fillestare' });
+        }
+      });
+    }
+    await w.flush();
+    result.balances = docs.length;
+  },
   async clients(rows, result) {
     const byNipt = await indexBy('clients', 'nipt');
     const byName = await indexBy('clients', 'name');

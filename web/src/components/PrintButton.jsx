@@ -20,11 +20,13 @@ function PrintButton({ onPrint, label = 'PDF / Printo' }) {
 
 export function PrintInvoiceButton({ invoice }) {
   const { company, clientsById } = useData();
+  if (invoice?.type === 'opening') return null; // gjendja fillestare nuk është faturë
   return <PrintButton label="PDF / Printo faturën" onPrint={() => invoicePdf(invoice, { company, clientsById })} />;
 }
 
 export function PrintPaymentButton({ payment }) {
   const { company, clientsById } = useData();
+  if (payment?.type === 'opening') return null;
   return <PrintButton label="PDF / Printo mandatin" onPrint={() => paymentPdf(payment, { company, clientsById })} />;
 }
 

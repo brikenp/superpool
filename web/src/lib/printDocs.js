@@ -2,7 +2,7 @@
 
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 
-import { PAYMENT_METHODS, UNITS } from '@shared/constants.js';
+import { PAYMENT_METHOD_LABELS, UNITS } from '@shared/constants.js';
 
 import { brandHeader } from './brand.js';
 import { movementPdf } from './docPdf.js';
@@ -363,7 +363,7 @@ export async function paymentPdf(payment, { company, clientsById = {} }) {
         ['Shuma', money(payment.amount, cur)],
         ['Shuma me fjalë', amountInWords(payment.amount, cur)],
         cur === 'EUR' && Number(payment.exchangeRate) > 0 ? ['Kursi', `1 € = ${payment.exchangeRate} L  ·  ${money(Number(payment.amount) * Number(payment.exchangeRate))}`] : null,
-        ['Mënyra e pagesës', PAYMENT_METHODS[payment.method] || payment.method || ''],
+        ['Mënyra e pagesës', PAYMENT_METHOD_LABELS[payment.method] || payment.method || ''],
         invoice ? ['Për faturën', [invoice.fiscalNumber || invoice.internalNumber, date(invoice.date), money(invoice.amount, invoice.currency)].filter(Boolean).join(' · ')] : null,
         ref ? ['Referenca', ref] : null,
         payment.status === 'cancelled' ? ['Statusi', 'ANULUAR'] : null,

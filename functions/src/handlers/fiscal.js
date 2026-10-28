@@ -134,6 +134,7 @@ export const fiscalizeInvoice = onCall({ region: REGION }, async (request) => {
     const inv = { id: snap.id, ...snap.data() };
     if (!canFiscalize(user, inv)) fail('Nuk keni të drejtë të fiskalizoni këtë faturë.', 'permission-denied');
     if (inv.status === 'cancelled') fail('Fatura është anuluar.');
+    if (inv.type === 'opening') fail('Gjendja fillestare e klientit nuk fiskalizohet.');
     if (inv.fiscal?.fic) fail(`Fatura është fiskalizuar më parë (${inv.fiscalNumber}).`, 'already-exists');
     const started = inv.fiscalizing?.toMillis?.() || 0;
     if (started && Date.now() - started < 120000) fail('Fatura po fiskalizohet nga dikush tjetër. Prisni pak dhe rifreskoni.');
