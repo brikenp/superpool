@@ -16,6 +16,7 @@ import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
 import { qty as fmtQty, money, todayISO, toNumber } from '../../lib/format.js';
 import { clientFields, normalizeClient } from '../partners/Clients.jsx';
+import { clientOption } from '../../lib/clients.js';
 
 export default function SaleForm() {
   const { uid, can } = useAuth();
@@ -77,7 +78,7 @@ export default function SaleForm() {
           <Field label="Klienti" required className="span-2">
             <div className="row" style={{ flexWrap: 'nowrap' }}>
               <div style={{ flex: 1 }}>
-                <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: [c.nipt, c.phone, c.city].filter(Boolean).join(' · ') }))} value={form.clientId} onChange={(v) => set('clientId', v)} />
+                <SearchSelect options={clients.map((c) => clientOption(c, [c.nipt, c.phone, c.city]))} value={form.clientId} onChange={(v) => set('clientId', v)} />
               </div>
               {can(CAPS.CLIENTS_MANAGE) && <button type="button" className="btn" onClick={() => setNewClient(true)}><Plus size={16} /> I ri</button>}
             </div>

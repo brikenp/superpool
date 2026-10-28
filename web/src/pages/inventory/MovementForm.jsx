@@ -13,6 +13,7 @@ import { call, db } from '../../lib/firebase.js';
 import { callOrQueue, newRequestId } from '../../lib/outbox.js';
 import { todayISO } from '../../lib/format.js';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
+import { clientOption } from '../../lib/clients.js';
 
 const VIRTUAL_BY_KIND = { supplier: LOC.SUPPLIER, customer: LOC.CUSTOMER, consumed: LOC.CONSUMED, loss: LOC.LOSS, adjust: LOC.ADJUST };
 
@@ -246,7 +247,7 @@ export default function MovementForm() {
           )}
           {kind === 'customer_return' && (
             <Field label="Klienti" required>
-              <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={form.clientId || ''} onChange={(v) => set('clientId', v)} />
+              <SearchSelect options={clients.map((c) => clientOption(c))} value={form.clientId || ''} onChange={(v) => set('clientId', v)} />
             </Field>
           )}
           {['purchase', 'supplier_return', 'customer_return', 'agent_issue', 'transfer'].includes(kind) && (

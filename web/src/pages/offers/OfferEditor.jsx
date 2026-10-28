@@ -19,6 +19,7 @@ import { freeQty } from '../inventory/Products.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
 import { CurrencyFields } from '../../components/Currency.jsx';
+import { clientOption } from '../../lib/clients.js';
 
 const TEXT_FIELDS = [
   ['technicalText', 'Zgjidhja teknike (përshkrimi i punimeve)'],
@@ -215,7 +216,7 @@ export default function OfferEditor() {
               <Field label="Klienti" required className="span-all">
                 <div className="row" style={{ flexWrap: 'nowrap' }}>
                   <div style={{ flex: 1 }}>
-                    <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: [c.nipt, c.phone].filter(Boolean).join(' · ') }))} value={form.clientId} onChange={(v) => set('clientId', v)} />
+                    <SearchSelect options={clients.map((c) => clientOption(c, [c.nipt, c.phone]))} value={form.clientId} onChange={(v) => set('clientId', v)} />
                   </div>
                   <button type="button" className="btn" onClick={() => setNewClient(true)}><Plus size={16} /> I ri</button>
                 </div>

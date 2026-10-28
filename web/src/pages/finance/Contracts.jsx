@@ -16,6 +16,7 @@ import { addDays, date, money, round2, todayISO, toNumber } from '../../lib/form
 import { newKey } from '../../lib/offerCalc.js';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from './Finance.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
+import { clientOption } from '../../lib/clients.js';
 
 // Ndarje e shpejtë e kësteve (përqindje e vlerës me TVSH).
 const SPLITS = {
@@ -160,7 +161,7 @@ export function ContractForm({ record, onClose, onSaved }) {
       footer={<><button type="button" className="btn" onClick={onClose}>Anulo</button><button type="button" className="btn primary" disabled={busy} onClick={save}>Ruaj</button></>}>
       <div className="form-grid">
         <Field label="Klienti" required className="span-2">
-          <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={v.clientId} onChange={(val) => set('clientId', val)} disabled={!isNew} />
+          <SearchSelect options={clients.map((c) => clientOption(c))} value={v.clientId} onChange={(val) => set('clientId', val)} disabled={!isNew} />
         </Field>
         <Field label="Projekti" className="span-2">
           <SearchSelect options={[{ value: '', label: '— pa projekt —' }, ...clientProjects.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}`, sub: p.clientName }))]} value={v.projectId || ''} onChange={pickProject} />

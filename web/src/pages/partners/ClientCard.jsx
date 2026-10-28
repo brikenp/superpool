@@ -64,7 +64,7 @@ export default function ClientCard() {
       <PageHeader
         breadcrumb={<Link to="/klientet">Klientët</Link>}
         title={client.name}
-        subtitle={[client.nipt && `NIPT ${client.nipt}`, client.contactPerson, client.phone, client.email, client.city].filter(Boolean).join(' · ')}
+        subtitle={[client.tradeName && client.tradeName !== client.name && `«${client.tradeName}»`, client.nipt && `NIPT ${client.nipt}`, client.contactPerson, client.phone, client.email, client.city].filter(Boolean).join(' · ')}
         actions={(
           <>
             {can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <TaxpayerLookupButton client={client} onApply={(data) => updateDoc(doc(db, 'clients', id), data)} />}

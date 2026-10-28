@@ -12,6 +12,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
 import { date, todayISO } from '../../lib/format.js';
+import { clientOption } from '../../lib/clients.js';
 
 export default function Projects() {
   const { uid, can } = useAuth();
@@ -82,7 +83,7 @@ function NewProject({ onClose }) {
       <div className="form-grid">
         <Field label="Emri i projektit" required className="span-all"><input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
         <Field label="Klienti" required className="span-all">
-          <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name }))} value={v.clientId} onChange={(c) => setV({ ...v, clientId: c })} />
+          <SearchSelect options={clients.map((c) => clientOption(c))} value={v.clientId} onChange={(c) => setV({ ...v, clientId: c })} />
         </Field>
         <Field label="Vendndodhja" className="span-all"><input value={v.address} onChange={(e) => setV({ ...v, address: e.target.value })} /></Field>
       </div>

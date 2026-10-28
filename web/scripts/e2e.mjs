@@ -257,6 +257,12 @@ async function main() {
   assert.equal((await getDoc(doc(admin.db, 'movementCosts', stkMov.id))).data().total, 82000); // 7 × 1.000 + 3 × 25.000
   ok('importi i artikujve vendos gjendjen fillestare (vetëm një herë), me koston e importuar');
 
+  const cimp = await admin.call('importData', { type: 'clients', rows: [{ name: 'Riviera Sh.p.k.', tradeName: 'Hotel Riviera', nipt: 'L99999999A' }] });
+  assert.equal(cimp.created, 1);
+  const riv = (await getDocs(query(collection(admin.db, 'clients'), where('nipt', '==', 'L99999999A')))).docs[0].data();
+  assert.deepEqual([riv.name, riv.tradeName], ['Riviera Sh.p.k.', 'Hotel Riviera']);
+  ok('klientët me emër tregtar (import)');
+
   // --- Anulimi i shitjes ---
   await mag.call('cancelSale', { id: sale.id, reason: 'test' }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /fiskalizuar/));
   ok('shitja e fiskalizuar nuk anulohet pa kaluar nga programi i faturimit');

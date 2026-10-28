@@ -13,6 +13,7 @@ import { NiptLookup } from '../../components/Fiscal.jsx';
 
 export const clientFields = [
   { key: 'name', label: 'Emri / subjekti', required: true, span: 2 },
+  { key: 'tradeName', label: 'Emri tregtar', hint: 'Emri me të cilin njihet (p.sh. emri i hotelit/dyqanit). Klienti gjendet edhe me këtë emër.' },
   { key: 'type', label: 'Lloji', type: 'select', required: true, options: [{ value: 'individual', label: 'Individ' }, { value: 'business', label: 'Biznes' }] },
   { key: 'nipt', label: 'NIPT', extra: NiptLookup, hint: 'Me POS.AL aktiv, emri dhe adresa plotësohen nga tatimet.' },
   { key: 'contactPerson', label: 'Personi i kontaktit' },
@@ -24,7 +25,7 @@ export const clientFields = [
   { key: 'notes', label: 'Shënime', type: 'textarea', span: 'all' },
 ];
 
-export const normalizeClient = (d) => ({ ...d, nipt: (d.nipt || '').toUpperCase().trim(), name: d.name.trim() });
+export const normalizeClient = (d) => ({ ...d, nipt: (d.nipt || '').toUpperCase().trim(), name: d.name.trim(), tradeName: (d.tradeName || '').trim() });
 
 export default function Clients() {
   const { clients } = useData();
@@ -44,6 +45,7 @@ export default function Clients() {
         onRowClick={(c) => navigate(`/klientet/${c.id}`)}
         columns={[
           { key: 'name', label: 'Emri' },
+          { key: 'tradeName', label: 'Emri tregtar' },
           { key: 'nipt', label: 'NIPT' },
           { key: 'phone', label: 'Telefoni' },
           { key: 'email', label: 'Email' },

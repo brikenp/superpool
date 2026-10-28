@@ -92,7 +92,7 @@ const importers = {
       const nipt = str(r.nipt).toUpperCase();
       const existing = (nipt && byNipt.get(nipt.toLowerCase())) || byName.get(name.toLowerCase());
       const data = {
-        name, nipt, type: nipt ? 'business' : 'individual',
+        name, nipt, type: nipt ? 'business' : 'individual', tradeName: str(r.tradeName || r.emri_tregtar),
         phone: str(r.phone || r.telefon), email: str(r.email), address: str(r.address || r.adresa), city: str(r.city || r.qyteti),
         billingId: str(r.billingId || r.id_faturimi),
         updatedAt: FieldValue.serverTimestamp(),

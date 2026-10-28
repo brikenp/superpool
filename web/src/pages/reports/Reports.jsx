@@ -19,6 +19,7 @@ import { StockTable } from '../inventory/Stock.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { InvoiceForm, PaymentForm, invoiceTypeLabel } from '../finance/Finance.jsx';
 import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
+import { clientOption } from '../../lib/clients.js';
 
 const REPORTS = [
   { key: 'stock', label: 'Gjendja e magazinës', filters: [] },
@@ -74,7 +75,7 @@ function Filters({ report, f, setF }) {
           </Field>
         )}
         {has('supplier') && <Field label="Furnitori"><SearchSelect options={suppliers.map((s) => ({ value: s.id, label: s.name }))} value={f.supplier} onChange={(v) => setF({ ...f, supplier: v })} /></Field>}
-        {has('client') && <Field label="Klienti"><SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name }))} value={f.client} onChange={(v) => setF({ ...f, client: v })} /></Field>}
+        {has('client') && <Field label="Klienti"><SearchSelect options={clients.map((c) => clientOption(c))} value={f.client} onChange={(v) => setF({ ...f, client: v })} /></Field>}
       </div>
     </Card>
   );

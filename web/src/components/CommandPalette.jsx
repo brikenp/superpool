@@ -6,6 +6,7 @@ import { CAPS } from '@shared/roles.js';
 
 import { useAuth } from '../lib/auth.jsx';
 import { useData } from '../lib/data.jsx';
+import { clientLabel } from '../lib/clients.js';
 import { NAV, navAllowed } from './Layout.jsx';
 import { ProductThumb } from './ProductImage.jsx';
 
@@ -31,8 +32,8 @@ export function CommandPalette({ onClose }) {
       ? products.filter((p) => match(`${p.code} ${p.name} ${p.brand || ''} ${p.model || ''} ${p.barcode || ''}`)).slice(0, 8)
         .map((p) => ({ group: 'Artikujt', key: `a${p.id}`, to: `/artikuj/${p.id}`, label: `${p.code} · ${p.name}`, sub: [p.brand, p.categoryName].filter(Boolean).join(' · '), product: p }))
       : [];
-    const cls = clients.filter((c) => match(`${c.name} ${c.nipt || ''} ${c.phone || ''} ${c.city || ''}`)).slice(0, 6)
-      .map((c) => ({ group: 'Klientët', key: `k${c.id}`, to: `/klientet/${c.id}`, label: c.name, sub: [c.nipt, c.phone, c.city].filter(Boolean).join(' · '), icon: Handshake }));
+    const cls = clients.filter((c) => match(`${c.name} ${c.tradeName || ''} ${c.nipt || ''} ${c.phone || ''} ${c.city || ''}`)).slice(0, 6)
+      .map((c) => ({ group: 'Klientët', key: `k${c.id}`, to: `/klientet/${c.id}`, label: clientLabel(c), sub: [c.nipt, c.phone, c.city].filter(Boolean).join(' · '), icon: Handshake }));
     return [...pages.slice(0, 6), ...prods, ...cls];
   }, [term, products, clients, can]);
 

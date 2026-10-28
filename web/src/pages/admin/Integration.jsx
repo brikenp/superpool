@@ -65,6 +65,7 @@ const IMPORTS = {
     sheet: 'Klientët',
     columns: [
       { key: 'name', required: true, width: 30, help: 'Emri / subjekti.' },
+      { key: 'tradeName', width: 24, help: 'Emri tregtar (p.sh. emri i hotelit ose dyqanit).' },
       { key: 'nipt', help: 'NIPT (për biznese). Përdoret për të gjetur klientët ekzistues.' },
       { key: 'phone', help: 'Telefoni.' },
       { key: 'email', width: 24, help: 'Email.' },
@@ -72,7 +73,7 @@ const IMPORTS = {
       { key: 'city', help: 'Qyteti.' },
       { key: 'billingId', help: 'ID e klientit në programin e faturimit.' },
     ],
-    sample: [{ name: 'Hotel Riviera', nipt: 'L12345678A', phone: '0691234567', city: 'Durrës' }],
+    sample: [{ name: 'Riviera Sh.p.k.', tradeName: 'Hotel Riviera', nipt: 'L12345678A', phone: '0691234567', city: 'Durrës' }],
   },
   suppliers: {
     label: 'Furnitorët',

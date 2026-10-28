@@ -17,6 +17,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
 import { addDays, date, inAll, money, moneyWithAll, round2, todayISO, toNumber } from '../../lib/format.js';
+import { clientOption } from '../../lib/clients.js';
 
 export const INVOICE_STATUS = { pending_fiscal: 'Pa numër fiskal', issued: 'E lëshuar', cancelled: 'Anuluar' };
 // Lloji i faturës manuale (fusha "type"); faturat e shitjeve krijohen nga moduli i shitjeve.
@@ -175,7 +176,7 @@ export function InvoiceForm({ record, onClose }) {
         : <p className="muted" style={{ marginTop: 0 }}>{company.fiscalEnabled ? 'Pas ruajtjes, fiskalizojeni me butonin «Fiskalizo» (POS.AL).' : 'Fatura fiskale lëshohet në programin e faturimit; këtu regjistrohet numri dhe vlera për ndjekjen e detyrimeve.'}</p>}
       <div className="form-grid">
         <Field label="Klienti" required className="span-2">
-          <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={v.clientId || ''} onChange={pickClient} disabled={!isNew} />
+          <SearchSelect options={clients.map((c) => clientOption(c))} value={v.clientId || ''} onChange={pickClient} disabled={!isNew} />
         </Field>
         {!record.saleId && (
           <Field label="Lloji">
@@ -263,7 +264,7 @@ export function PaymentForm({ record, invoices = [], onClose }) {
       footer={<><button type="button" className="btn" onClick={onClose}>Anulo</button><button type="button" className="btn primary" disabled={busy} onClick={save}>Ruaj</button></>}>
       <div className="form-grid">
         <Field label="Klienti" required className="span-2">
-          <SearchSelect options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.nipt }))} value={v.clientId || ''} onChange={(val) => set('clientId', val)} />
+          <SearchSelect options={clients.map((c) => clientOption(c))} value={v.clientId || ''} onChange={(val) => set('clientId', val)} />
         </Field>
         <Field label={`Shuma (${v.currency === 'EUR' ? '€' : 'L'})`} required><input className="num" type="number" step="any" value={v.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
         <Field label="Data"><input type="date" value={v.date} onChange={(e) => set('date', e.target.value)} /></Field>
