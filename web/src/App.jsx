@@ -45,6 +45,7 @@ const SaleDetail = page(() => import('./pages/sales/SaleDetail.jsx'));
 const Offers = page(() => import('./pages/offers/Offers.jsx'));
 const OfferEditor = page(() => import('./pages/offers/OfferEditor.jsx'));
 const PoolModels = page(() => import('./pages/offers/PoolModels.jsx'));
+const OfferCatalog = page(() => import('./pages/offers/OfferCatalog.jsx'));
 const PoolModelEditor = page(() => import('./pages/offers/PoolModelEditor.jsx'));
 const Projects = page(() => import('./pages/projects/Projects.jsx'));
 const ProjectDetail = page(() => import('./pages/projects/ProjectDetail.jsx'));
@@ -94,6 +95,7 @@ const ROUTES = [
   ['/ofertat', Offers, [C.OFFERS]],
   ['/ofertat/:id', entityPage('offers', OfferEditor), [C.OFFERS]],
   ['/modelet', PoolModels, [C.POOL_MODELS]],
+  ['/katalogu-ofertes', OfferCatalog, [C.OFFERS]],
   ['/modelet/:id', PoolModelEditor, [C.POOL_MODELS]],
   ['/projektet', Projects, [C.PROJECTS_VIEW, C.FIELD]],
   ['/projektet/:id', entityPage('projects', ProjectDetail), [C.PROJECTS_VIEW, C.FIELD]],

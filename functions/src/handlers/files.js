@@ -1,12 +1,12 @@
 // Fotot për PDF-të (oferta): shfletuesi nuk mund t'i lexojë direkt nga Storage pa CORS,
-// prandaj serveri i kthen si base64. Lejohen vetëm fotot e artikujve dhe të ofertave.
+// prandaj serveri i kthen si base64. Lejohen vetëm fotot e artikujve, ofertave dhe katalogut.
 
 import { getStorage } from 'firebase-admin/storage';
 import { onCall } from 'firebase-functions/v2/https';
 
 import { REGION, fail, userContext } from '../lib/context.js';
 
-const ALLOWED = /^(products|offers)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/;
+const ALLOWED = /^(products|offers|catalog)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/;
 const MAX_TOTAL = 8 * 1024 * 1024; // përgjigjja e funksionit duhet të mbetet nën 10 MB
 
 export const loadImages = onCall({ region: REGION, memory: '512MiB' }, async (request) => {

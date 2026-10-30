@@ -220,6 +220,12 @@ service cloud.firestore {
       allow write: if can_pool_models();
     }
 
+    // Katalogu i ofertës: artikujt bazë (dalin në çdo ofertë) dhe opsionalët, me përshkrim dhe foto.
+    match /offerCatalog/{id} {
+      allow read: if can_offers();
+      allow create, update, delete: if can_offers();
+    }
+
     match /offers/{id} {
       allow read: if can_offers();
       allow create: if can_offers() && request.resource.data.status in ['draft', 'sent'];

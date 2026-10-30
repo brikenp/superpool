@@ -58,6 +58,7 @@ export const NAV = [
     { to: '/ofertat?seksioni=pranuara', label: 'Të pranuara', icon: FileCheck, caps: [C.OFFERS], end: true },
     { to: '/ofertat?seksioni=refuzuara', label: 'Të refuzuara / skaduara', icon: FileX, caps: [C.OFFERS], end: true },
     { to: '/ofertat', label: 'Të gjitha ofertat', icon: FileText, caps: [C.OFFERS], end: true },
+    { to: '/katalogu-ofertes', label: 'Katalogu i ofertës', icon: List, caps: [C.OFFERS] },
     { to: '/modelet', label: 'Modelet e pishinave', icon: Waves, caps: [C.POOL_MODELS] },
   ] },
   { title: 'Kimikatet', items: [

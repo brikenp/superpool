@@ -36,6 +36,13 @@ service firebase.storage {
       allow delete: if allowed(['admin', 'magazine'], 'inventory_manage');
     }
 
+    // Fotot e katalogut të ofertës (artikujt bazë dhe opsionalë).
+    match /catalog/{itemId}/{fileName} {
+      allow read: if active();
+      allow create: if allowed(['admin', 'oferta', 'projekte'], 'offers') && smallFile() && request.resource.contentType.matches('image/.*');
+      allow delete: if allowed(['admin', 'oferta', 'projekte'], 'offers');
+    }
+
     // Fotot e rreshtave të ofertave (p.sh. nga importi i ofertës Excel).
     match /offers/{offerId}/{fileName} {
       allow read: if active();

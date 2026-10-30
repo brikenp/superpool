@@ -338,6 +338,13 @@ async function main() {
   await denied(mag.call('loadImages', { paths: ['backups/x.spbak'] }), 'lexim skedari jashtë fotove');
   ok('fshirja e punonjësit dhe e automjetit (refuzohet kur ka histori), pa rikrijuar nënmagazinën');
 
+  // --- Katalogu i ofertës ---
+  const cat = await addDoc(collection(admin.db, 'offerCatalog'), { title: 'FILTËR PISHINE', details: '• 650 mm', unit: 'cope', defaultQty: 1, basic: true, order: 10, images: [] });
+  assert.equal((await getDoc(doc(ofer.db, 'offerCatalog', cat.id))).data().basic, true);
+  await denied(getDoc(doc(gerti.db, 'offerCatalog', cat.id)), 'Gerti lexon katalogun e ofertës');
+  await denied(addDoc(collection(worker.db, 'offerCatalog'), { title: 'x' }), 'punonjësi shton në katalog');
+  ok('katalogu i ofertës: e lexojnë dhe e ndryshojnë vetëm ata që bëjnë oferta');
+
   // --- Gjendjet fillestare të klientëve dhe likujdimet ---
   const bimp = await admin.call('importData', { type: 'clientBalances', options: { eurRate: 100 }, rows: [
     { client: 'Hotel Riviera', amount: 250000, date: '01.01.2026' },

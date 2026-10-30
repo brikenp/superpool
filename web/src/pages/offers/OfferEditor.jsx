@@ -7,7 +7,7 @@ import { OFFER_STATUS, POOL_SECTIONS, POOL_TYPES, UNITS } from '@shared/constant
 import { unitCostIn } from '@shared/prices.js';
 
 import { EntityForm } from '../../components/EntityForm.jsx';
-import { Card, Field, Loading, PageHeader, SearchSelect, Stat, StatusBadge, useAction, useUi } from '../../components/ui.jsx';
+import { Card, Field, Loading, Modal, PageHeader, SearchSelect, Stat, StatusBadge, useAction, useUi } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { unitCostOf, useCollection, useData, useDocument } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
@@ -21,6 +21,7 @@ import { useRouteId } from '../../lib/prettyUrl.jsx';
 import { CurrencyFields } from '../../components/Currency.jsx';
 import { clientOption } from '../../lib/clients.js';
 import { OFFER_TEXT_DEFAULTS, OFFER_TEXT_KEYS, offerTextsOf } from '../../lib/offerTexts.js';
+import { basicLines, catalogLine, sortCatalog } from '../../lib/offerCatalog.js';
 
 const TEXT_FIELDS = [
   ['technicalText', 'Zgjidhja teknike (përshkrimi i punimeve)'],
@@ -43,6 +44,8 @@ export default function OfferEditor() {
   const { ask } = useUi();
   const { clients, clientsById, products, productsById, suppliersById, costsById, company } = useData();
   const models = useCollection('poolModels');
+  const catalog = useCollection('offerCatalog');
+  const [catalogPick, setCatalogPick] = useState(false);
   const { data: offer, loading } = useDocument(isNew ? null : `offers/${id}`);
   const [form, setForm] = useState(null);
   const [modelId, setModelId] = useState('');
@@ -52,8 +55,8 @@ export default function OfferEditor() {
   useEffect(() => {
     if (form) return;
     if (isNew) {
-      if (!company.loaded) return;
-      setForm({
+      if (!company.loaded || catalog.loading) return;
+      const base = {
         status: 'draft', date: todayISO(), validUntil: addDays(todayISO(), Number(company.offerValidityDays || 30)),
         clientId: params.get('klienti') || '', projectName: '', location: '',
         poolType: 'skimmer', circulation: '', length: 8, width: 4, depthMin: 1.2, depthMax: 1.6, volume: '', volumeManual: false, tankPct: '', turnoverHours: 4,
@@ -62,11 +65,13 @@ export default function OfferEditor() {
         discountPct: 0, vatPct: company.vatPct ?? 20, showLinePrices: false, notesInternal: '', lines: [],
         currency: 'ALL', exchangeRate: 1, manualSubtotal: '',
         texts: (({ payment, ...t }) => t)(offerTextsOf({}, company)),
-      });
+      };
+      // Artikujt bazë të katalogut (me përshkrim dhe foto) dalin vetë në çdo ofertë të re.
+      setForm({ ...base, lines: basicLines(catalog.data, base) });
     } else if (offer) {
       setForm({ ...offer, texts: offer.texts || (({ payment, ...t }) => t)(offerTextsOf({}, company)), lines: (offer.lines || []).map((l) => ({ ...l, key: l.key || newKey() })) });
     }
-  }, [isNew, offer, form, company, params]);
+  }, [isNew, offer, form, company, params, catalog.loading, catalog.data]);
 
   const totals = useMemo(() => (form ? offerTotals(form) : null), [form]);
   const vars = useMemo(() => (form ? offerVariables(form) : null), [form]);
@@ -279,6 +284,7 @@ export default function OfferEditor() {
           title="Materialet, pajisjet dhe shërbimet"
           actions={!locked && (
             <>
+              <button type="button" className="btn small primary" onClick={() => setCatalogPick(true)}><Plus size={15} /> Shto nga katalogu</button>
               <button type="button" className="btn small" onClick={refreshCosts}>Rifresko kostot nga magazina</button>
               <button type="button" className="btn small" onClick={() => set('lines', recalcQuantities(form.lines.map((l) => ({ ...l, qty: l.autoQty ?? l.qty })), form))}>Rikthe sasitë automatike</button>
             </>
@@ -401,6 +407,10 @@ export default function OfferEditor() {
           </div>
         </div>
       </fieldset>
+      {catalogPick && (
+        <CatalogPicker catalog={catalog.data} lines={form.lines} onClose={() => setCatalogPick(false)}
+          onAdd={(items) => { set('lines', [...form.lines, ...items.map((it) => catalogLine(it, form))]); setCatalogPick(false); }} />
+      )}
       {newClient && (
         <EntityForm title="Klient i ri" collectionName="clients" defaults={{ type: 'individual' }} fields={clientFields} transform={normalizeClient}
           onClose={() => setNewClient(false)} onSaved={(c) => set('clientId', c.id)} />
@@ -418,5 +428,37 @@ function LineImages({ line, product }) {
     <div className="row" style={{ gap: 4, marginTop: 4 }}>
       {urls.slice(0, 3).map((u) => <img key={u} src={u} alt="" style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 4, border: '1px solid var(--border)', background: '#fff' }} />)}
     </div>
+  );
+}
+
+/** Zgjedhja e artikujve nga katalogu (opsionalët së pari); ata që janë tashmë në ofertë shënohen. */
+function CatalogPicker({ catalog, lines, onClose, onAdd }) {
+  const [picked, setPicked] = useState([]);
+  const inOffer = new Set(lines.map((l) => l.catalogId).filter(Boolean));
+  const items = sortCatalog(catalog).filter((i) => i.active !== false);
+  const groups = [['Opsionalë', items.filter((i) => !i.basic)], ['Bazë', items.filter((i) => i.basic)]];
+  const toggle = (id) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  return (
+    <Modal title="Shto nga katalogu i ofertës" onClose={onClose} wide
+      footer={<><button type="button" className="btn" onClick={onClose}>Anulo</button><button type="button" className="btn primary" disabled={!picked.length} onClick={() => onAdd(items.filter((i) => picked.includes(i.id)))}>Shto {picked.length || ''} artikuj</button></>}>
+      {!items.length && <div className="alert info">Katalogu është bosh. Mbusheni te Ofertat → Katalogu i ofertës (edhe nga Excel).</div>}
+      {groups.map(([title, list]) => list.length > 0 && (
+        <div key={title} style={{ marginBottom: 12 }}>
+          <h4 style={{ margin: '4px 0 6px' }}>{title}</h4>
+          <div className="catalog-list">
+            {list.map((it) => (
+              <label key={it.id} className="catalog-item" style={{ cursor: 'pointer' }}>
+                <input type="checkbox" checked={picked.includes(it.id)} onChange={() => toggle(it.id)} />
+                <div className="catalog-photos">{(it.images || []).slice(0, 2).map((im) => <img key={im.path} src={im.url} alt="" />)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <b>{it.title}</b>{inOffer.has(it.id) && <small className="text-ok"> · në ofertë</small>}
+                  <div className="muted catalog-details">{it.details}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </Modal>
   );
 }
