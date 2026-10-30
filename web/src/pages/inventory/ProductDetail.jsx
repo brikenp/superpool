@@ -1,16 +1,17 @@
 import { collection, query, where } from 'firebase/firestore';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
 
 import { LOCATION_KINDS, MOVEMENT_KINDS, MOVEMENT_STATUS, UNITS } from '@shared/constants.js';
 import { CAPS } from '@shared/roles.js';
 import { salePriceIn } from '@shared/prices.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
-import { Card, Empty, Loading, PageHeader, Stat, StatusBadge } from '../../components/ui.jsx';
+import { Card, Empty, Loading, PageHeader, Stat, StatusBadge, useAction, useUi } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useDocument, useQuery, useData, unitCostOf } from '../../lib/data.jsx';
-import { db } from '../../lib/firebase.js';
+import { call, db } from '../../lib/firebase.js';
 import { date, money, qty } from '../../lib/format.js';
 import { ProductForm, freeQty } from './Products.jsx';
 import { ImageModal } from '../../components/ProductImage.jsx';
@@ -22,6 +23,8 @@ export default function ProductDetail() {
   const { productsById, locationsById, costsById, suppliersById, company } = useData();
   const { can } = useAuth();
   const [editing, setEditing] = useState(false);
+  const { ask } = useUi();
+  const [run, busy] = useAction();
   const product = productsById[id];
   const showCosts = can(CAPS.VIEW_COSTS);
 
@@ -29,6 +32,19 @@ export default function ProductDetail() {
   const movements = useQuery(() => query(collection(db, 'movements'), where('productIds', 'array-contains', id)), [id]);
   const prices = useQuery(() => (showCosts ? query(collection(db, 'supplierPrices'), where('productId', '==', id)) : null), [id, showCosts]);
   const fiscal = useDocument(showCosts ? `fiscalStock/${id}` : null);
+
+  const removeProduct = async () => {
+    const ok = await ask({
+      title: 'Fshi artikullin',
+      message: `Artikulli «${product.code} · ${product.name}» do të fshihet përgjithmonë, bashkë me koston, çmimet e furnitorëve dhe fotot.\n\nArtikujt me gjendje ose të përdorur në fletëhyrje, dalje, shitje, porosi, receta, modele ose oferta të hapura nuk fshihen — ata çaktivizohen.`,
+      confirmLabel: 'Fshi artikullin', danger: true,
+    });
+    if (!ok) return;
+    run(async () => {
+      await call('deleteProduct', { id });
+      navigate('/artikuj');
+    }, 'Artikulli u fshi.');
+  };
 
   if (!product) return <Loading />;
   const cost = costsById[id] || {};
@@ -48,7 +64,12 @@ export default function ProductDetail() {
         breadcrumb={<Link to="/artikuj">Artikujt</Link>}
         title={`${product.code} · ${product.name}`}
         subtitle={[product.brand, product.model, product.categoryName].filter(Boolean).join(' · ')}
-        actions={can(CAPS.INVENTORY_MANAGE) && <button type="button" className="btn" onClick={() => setEditing(true)}>Ndrysho</button>}
+        actions={can(CAPS.INVENTORY_MANAGE) && (
+          <>
+            <button type="button" className="btn" onClick={() => setEditing(true)}>Ndrysho</button>
+            <button type="button" className="btn danger" disabled={busy} onClick={removeProduct}><Trash2 size={16} /> Fshi artikullin</button>
+          </>
+        )}
       />
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
         <Stat label="Sasia fizike gjithsej" value={`${qty(product.qtyTotal)} ${unit}`} />

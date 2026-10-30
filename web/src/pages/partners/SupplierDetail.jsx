@@ -12,6 +12,7 @@ import { useData, useQuery } from '../../lib/data.jsx';
 import { call, db } from '../../lib/firebase.js';
 import { date, money, todayISO } from '../../lib/format.js';
 import { supplierFields } from './Suppliers.jsx';
+import { ContactsList } from '../../components/Contacts.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -64,6 +65,11 @@ export default function SupplierDetail() {
         )}
       />
       {supplier.notes && <div className="alert info">{supplier.notes}</div>}
+      {(supplier.contacts || []).length > 0 && (
+        <Card title="Kontaktet">
+          <ContactsList primary={{ name: supplier.contactPerson, phone: supplier.phone, email: supplier.email }} contacts={supplier.contacts} />
+        </Card>
+      )}
       <Tabs active={tab} onChange={setTab} tabs={[
         { key: 'prices', label: `Çmimet / ofertat (${prices.data.length})` },
         { key: 'orders', label: `Porositë (${orders.data.length})` },

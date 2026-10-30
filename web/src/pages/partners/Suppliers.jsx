@@ -15,6 +15,7 @@ export const supplierFields = [
   { key: 'phone', label: 'Telefoni', type: 'tel' },
   { key: 'email', label: 'Email', type: 'email' },
   { key: 'address', label: 'Adresa' },
+  { key: 'contacts', label: 'Kontakte të tjera', type: 'contacts', span: 'all', hint: 'Agjenti i shitjes, kontabiliteti, magazina…' },
   { key: 'paymentTerms', label: 'Kushtet e pagesës' },
   { key: 'notes', label: 'Shënime', type: 'textarea', span: 'all' },
   { key: 'active', label: 'Aktiv', type: 'checkbox' },
@@ -43,7 +44,7 @@ export default function Suppliers() {
         columns={[
           { key: 'name', label: 'Emri' },
           { key: 'nipt', label: 'NIPT' },
-          { key: 'contactPerson', label: 'Kontakti' },
+          { key: 'contactPerson', label: 'Kontaktet', value: (s) => [s.contactPerson, ...(s.contacts || []).map((x) => [x.name, x.phone].filter(Boolean).join(' '))].filter(Boolean).join(', ') },
           { key: 'phone', label: 'Telefoni' },
           { key: 'email', label: 'Email' },
           { key: 'products', label: 'Artikuj', type: 'number', value: (s) => products.filter((p) => p.supplierId === s.id).length },

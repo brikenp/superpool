@@ -4,15 +4,16 @@ import { useState } from 'react';
 import { db } from '../lib/firebase.js';
 import { toNumber } from '../lib/format.js';
 import { Field, Modal, SearchSelect, useAction } from './ui.jsx';
+import { ContactsEditor, cleanContacts } from './Contacts.jsx';
 
 /**
  * Formular i thjeshtë për krijim/ndryshim dokumentesh.
- * fields: [{ key, label, type: text|number|textarea|select|search|checkbox|date|email|tel, options, required, span, hint }]
+ * fields: [{ key, label, type: text|number|textarea|select|search|checkbox|date|email|tel|contacts, options, required, span, hint }]
  * transform(values) → të dhënat që ruhen (p.sh. shtim fushash të derivuara)
  */
 export function EntityForm({ title, collectionName, record, fields, onClose, onSaved, transform, defaults = {}, wide }) {
   const initial = { ...defaults, ...(record || {}) };
-  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, initial[f.key] ?? (f.type === 'checkbox' ? false : '')])));
+  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, initial[f.key] ?? (f.type === 'checkbox' ? false : f.type === 'contacts' ? [] : '')])));
   const [error, setError] = useState('');
   const [run, busy] = useAction();
   const set = (k, v) => setValues((s) => ({ ...s, [k]: v }));
@@ -27,7 +28,10 @@ export function EntityForm({ title, collectionName, record, fields, onClose, onS
     setError('');
     run(async () => {
       let data = { ...values };
-      fields.forEach((f) => { if (f.type === 'number') data[f.key] = toNumber(data[f.key]); });
+      fields.forEach((f) => {
+        if (f.type === 'number') data[f.key] = toNumber(data[f.key]);
+        if (f.type === 'contacts') data[f.key] = cleanContacts(data[f.key]);
+      });
       if (transform) data = await transform(data, record);
       data.updatedAt = serverTimestamp();
       let id = record?.id;
@@ -90,6 +94,8 @@ function Input({ f, value, onChange }) {
           {f.label}
         </label>
       );
+    case 'contacts':
+      return <ContactsEditor value={value} onChange={onChange} />;
     case 'number':
       return <input className="num" type="number" step="any" inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} />;
     default:

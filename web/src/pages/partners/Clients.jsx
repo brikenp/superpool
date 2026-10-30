@@ -22,6 +22,7 @@ export const clientFields = [
   { key: 'email', label: 'Email', type: 'email' },
   { key: 'city', label: 'Qyteti' },
   { key: 'address', label: 'Adresa', span: 2 },
+  { key: 'contacts', label: 'Kontakte të tjera', type: 'contacts', span: 'all', hint: 'Persona të tjerë te klienti (kontabiliste, administratori, mirëmbajtja…).' },
   { key: 'billingId', label: 'ID në programin e faturimit', hint: 'Për lidhjen me programin ekzistues.' },
   { key: 'notes', label: 'Shënime', type: 'textarea', span: 'all' },
 ];
@@ -54,6 +55,7 @@ export default function Clients() {
           { key: 'tradeName', label: 'Emri tregtar' },
           { key: 'nipt', label: 'NIPT' },
           { key: 'phone', label: 'Telefoni' },
+          { key: 'contacts', label: 'Kontaktet', value: (c) => [c.contactPerson, ...(c.contacts || []).map((x) => [x.name, x.phone].filter(Boolean).join(' '))].filter(Boolean).join(', ') },
           { key: 'email', label: 'Email' },
           { key: 'city', label: 'Qyteti' },
           { key: 'type', label: 'Lloji', value: (c) => (c.type === 'business' ? 'Biznes' : 'Individ') },

@@ -517,3 +517,10 @@ button.nav-group-title .chev { transition: transform 0.15s; opacity: 0.7; }
 
 /* Zona e rrezikut te Cilësimet */
 .card.danger-zone { border-color: var(--danger-border, #fecaca); }
+
+/* Kontaktet e klientit / furnitorit */
+.contacts-editor { display: grid; gap: 6px; }
+.contacts-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.3fr auto; gap: 6px; align-items: center; }
+@media (max-width: 700px) { .contacts-row { grid-template-columns: 1fr 1fr; } .contacts-row .icon-btn { justify-self: end; } }
+.contacts-list li { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.contacts-list a { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }

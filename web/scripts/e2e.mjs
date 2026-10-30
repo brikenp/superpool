@@ -306,6 +306,21 @@ async function main() {
   assert.equal((await getDoc(doc(admin.db, 'products', chlor))).data().supplierId, null);
   ok('fshirja e furnitorit: refuzohet kur ka fletëhyrje; ndryshe fshihen çmimet dhe artikujt mbeten pa furnitor');
 
+  // --- Fshirja e artikullit ---
+  await mag.call('deleteProduct', { id: pipe }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /nuk fshihet sepse ka gjendje/));
+  const tmpProd = await addDoc(collection(mag.db, 'products'), { code: 'DEL-1', name: 'Për fshirje', unit: 'cope', active: true, qtyTotal: 0, qtyMain: 0, qtyReserved: 0 });
+  await setDoc(doc(mag.db, 'productCosts', tmpProd.id), { purchasePrice: 5, avgCost: 5 });
+  await addDoc(collection(mag.db, 'supplierPrices'), { supplierId: sup.id, productId: tmpProd.id, price: 5 });
+  await denied(gerti.call('deleteProduct', { id: tmpProd.id }), 'Gerti fshin artikullin');
+  await mag.call('deleteProduct', { id: tmpProd.id });
+  assert.equal((await getDoc(doc(admin.db, 'products', tmpProd.id))).exists(), false);
+  assert.equal((await getDoc(doc(admin.db, 'productCosts', tmpProd.id))).exists(), false);
+  assert.equal((await getDocs(query(collection(admin.db, 'supplierPrices'), where('productId', '==', tmpProd.id)))).size, 0);
+  // Kontaktet e shumta te klienti
+  const cc = await addDoc(collection(admin.db, 'clients'), { name: 'Klient me kontakte', contacts: [{ name: 'Ana', role: 'Kontabiliste', phone: '069', email: 'a@x.al' }, { name: 'Beni', role: '', phone: '068', email: '' }] });
+  assert.equal((await getDoc(cc)).data().contacts.length, 2);
+  ok('fshirja e artikullit (refuzohet me gjendje; ndryshe fshihet me koston dhe çmimet) dhe kontaktet e shumta');
+
   // --- Gjendjet fillestare të klientëve dhe likujdimet ---
   const bimp = await admin.call('importData', { type: 'clientBalances', options: { eurRate: 100 }, rows: [
     { client: 'Hotel Riviera', amount: 250000, date: '01.01.2026' },

@@ -75,3 +75,52 @@ export const deleteSupplier = onCall({ region: REGION }, async (request) => {
   });
   return { ok: true, prices: prices.size, productsUnlinked: products.size };
 });
+
+/**
+ * Fshirja e një artikulli: vetëm kur nuk ka gjendje dhe nuk është përdorur askund (lëvizje, porosi të hapura,
+ * receta, modele pishinash, oferta të hapura). Përndryshe sugjerohet çaktivizimi, që ruan historikun.
+ */
+export const deleteProduct = onCall({ region: REGION, timeoutSeconds: 120 }, async (request) => {
+  const user = await userContext(request);
+  requireCap(user, CAPS.INVENTORY_MANAGE, CAPS.USERS);
+  const id = String(request.data?.id || '');
+  const ref = db.doc(`products/${id}`);
+  const snap = await ref.get();
+  if (!id || !snap.exists) fail('Artikulli nuk ekziston.', 'not-found');
+  const p = snap.data();
+  const label = `${p.code || ''} ${p.name || ''}`.trim();
+
+  const reasons = [];
+  if (Number(p.qtyTotal || 0) !== 0 || Number(p.qtyMain || 0) !== 0) reasons.push(`ka gjendje në stok (${Number(p.qtyTotal || 0)})`);
+  if (Number(p.qtyReserved || 0) !== 0) reasons.push('është i rezervuar për projekte');
+  const moves = (await db.collection('movements').where('productIds', 'array-contains', id).count().get()).data().count;
+  if (moves) reasons.push(`përdoret në ${moves} fletëhyrje/dalje/shitje`);
+  const hasLine = (d, key = 'lines') => (d.get(key) || []).some((l) => l.productId === id);
+  const orders = (await db.collection('purchaseOrders').get()).docs.filter((d) => d.get('status') !== 'cancelled' && hasLine(d));
+  if (orders.length) reasons.push(`është në ${orders.length} porosi furnitori`);
+  const recipes = (await db.collection('products').get()).docs.filter((d) => d.id !== id && hasLine(d, 'recipe'));
+  if (recipes.length) reasons.push(`është material në recetën e ${recipes.map((d) => d.get('code') || d.get('name')).slice(0, 5).join(', ')}`);
+  const models = (await db.collection('poolModels').get()).docs.filter((d) => hasLine(d, 'items'));
+  if (models.length) reasons.push(`përdoret te modelet e pishinave: ${models.map((d) => d.get('name')).slice(0, 5).join(', ')}`);
+  const offers = (await db.collection('offers').where('status', 'in', ['draft', 'sent']).get()).docs.filter((d) => hasLine(d));
+  if (offers.length) reasons.push(`është në ${offers.length} oferta të hapura`);
+  if (reasons.length) {
+    fail(`Artikulli «${label}» nuk fshihet sepse ${reasons.join('; ')}. Për ta hequr nga listat, çaktivizojeni (Ndrysho → hiqni «Aktiv»).`, 'failed-precondition');
+  }
+
+  const writer = db.bulkWriter();
+  writer.delete(db.doc(`productCosts/${id}`));
+  writer.delete(db.doc(`fiscalStock/${id}`));
+  for (const col of ['supplierPrices', 'stock']) {
+    (await db.collection(col).where('productId', '==', id).get()).forEach((d) => writer.delete(d.ref));
+  }
+  writer.delete(ref);
+  await writer.close();
+  try {
+    await getStorage().bucket().deleteFiles({ prefix: `products/${id}/` });
+  } catch (err) {
+    console.warn('Fotot e artikullit nuk u fshinë', id, err.message);
+  }
+  await audit(null, { user, action: 'delete', collection: 'products', id, label });
+  return { ok: true };
+});

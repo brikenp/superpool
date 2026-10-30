@@ -20,6 +20,7 @@ import { call, db, storage } from '../../lib/firebase.js';
 import { date, dateTime, inAll, money, moneyWithAll, offerAll } from '../../lib/format.js';
 import { InvoiceForm, PaymentForm, INVOICE_STATUS } from '../finance/Finance.jsx';
 import { clientFields, normalizeClient } from './Clients.jsx';
+import { ContactsList } from '../../components/Contacts.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
 
 export default function ClientCard() {
@@ -114,6 +115,8 @@ export default function ClientCard() {
             <dt>ID në faturim</dt><dd>{client.billingId || '—'}</dd>
           </dl>
           {client.notes && <p style={{ whiteSpace: 'pre-line' }}>{client.notes}</p>}
+          <h4 style={{ margin: '16px 0 6px' }}>Kontaktet</h4>
+          <ContactsList primary={{ name: client.contactPerson, phone: client.phone, email: client.email }} contacts={client.contacts} />
         </Card>
       )}
       {tab === 'offers' && (
