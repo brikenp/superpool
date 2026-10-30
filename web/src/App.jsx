@@ -53,6 +53,7 @@ const Reports = page(() => import('./pages/reports/Reports.jsx'));
 const Integration = page(() => import('./pages/admin/Integration.jsx'));
 const Users = page(() => import('./pages/admin/Users.jsx'));
 const Settings = page(() => import('./pages/admin/Settings.jsx'));
+const Backups = page(() => import('./pages/admin/Backups.jsx'));
 const Audit = page(() => import('./pages/admin/Audit.jsx'));
 
 function Guard({ caps, children }) {
@@ -105,6 +106,7 @@ const ROUTES = [
   ['/integrimi', Integration, [C.INTEGRATION]],
   ['/perdoruesit', Users, [C.USERS]],
   ['/cilesimet', Settings, [C.USERS]],
+  ['/kopjet-rezerve', Backups, [C.USERS]],
   ['/gjurmet', Audit, [C.AUDIT]],
 ];
 

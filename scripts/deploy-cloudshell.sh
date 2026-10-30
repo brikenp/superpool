@@ -91,7 +91,7 @@ rm -f "$LOG"
 # Funksionet onCall duhet të jenë të thirrshme nga shfletuesi (kontrolli i identitetit bëhet brenda kodit).
 # Në projektet me organizatë Google Workspace, deploy-i nuk arrin ta vendosë vetë këtë leje.
 echo "▶ Leja e thirrjes për funksionet onCall…"
-for F in $(grep -oE '^export \{[^}]+\}' functions/src/index.js | tr -d '{},' | tr ' ' '\n' | grep -vE '^(export|from|on[A-Z].*|auditWrites)?$'); do
+for F in $(grep -oE '^export \{[^}]+\}' functions/src/index.js | tr -d '{},' | tr ' ' '\n' | grep -vE '^(export|from|on[A-Z].*|auditWrites|scheduledBackup)?$'); do
   gcloud functions add-invoker-policy-binding "$F" --region=europe-west1 --member=allUsers -q >/dev/null 2>&1 \
     && echo "  OK $F" || echo "  ⚠ $F: leja nuk u vendos (kontrolloni politikën iam.allowedPolicyMemberDomains)"
 done

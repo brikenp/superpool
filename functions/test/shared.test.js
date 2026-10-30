@@ -323,3 +323,17 @@ test('ekstrakti bankar: shumat, datat, kolonat dhe sugjerimet', async () => {
   assert.deepEqual([link.kind, link.payment.id], ['link', 'p1']);
   assert.equal(suggestMatch(rows[0], { accountId: 'a', clients, payments: [{ ...pay, bankTxId: 'x' }] }).kind, 'client');
 });
+
+test('kopja rezervë: llojet e Firestore ruhen dhe rikthehen pa humbje', async () => {
+  const { Timestamp, GeoPoint } = await import('firebase-admin/firestore');
+  const { encodeValue, decodeValue } = await import('../src/lib/backupCodec.js');
+  const fakeDb = { doc: (p) => ({ path: p, isRef: true }) };
+  const src = { at: new Timestamp(1790000000, 123000000), loc: new GeoPoint(41.3, 19.8), list: [1, 'a', { n: null, ok: true }], nested: { when: new Timestamp(5, 0) } };
+  const json = JSON.parse(JSON.stringify(encodeValue(src)));
+  const back = decodeValue(json, fakeDb);
+  assert.ok(back.at instanceof Timestamp);
+  assert.deepEqual([back.at.seconds, back.at.nanoseconds], [1790000000, 123000000]);
+  assert.deepEqual([back.loc.latitude, back.loc.longitude], [41.3, 19.8]);
+  assert.deepEqual(back.list, [1, 'a', { n: null, ok: true }]);
+  assert.equal(back.nested.when.seconds, 5);
+});

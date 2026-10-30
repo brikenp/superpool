@@ -1,6 +1,6 @@
 import { collection, query, where } from 'firebase/firestore';
 import {
-  ArrowLeftRight, Banknote, BookOpen, Boxes, Landmark, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
+  ArrowLeftRight, Banknote, BookOpen, Boxes, DatabaseBackup, Landmark, Building2, ChevronDown, ClipboardCheck, ClipboardList, Factory, FileText, FlaskConical, FlaskRound,
   FileCheck, FilePen, FileSignature, FilePlus, FileX, Handshake, HardHat, History, House, List, LogOut, Menu, Moon, Package, PackageMinus, PackagePlus, Pin, Plug, Receipt,
   Scale, Search, Send, Settings, ShieldCheck, ShoppingCart, Smartphone, Sun, TrendingUp, TriangleAlert, Truck, Undo2, Wallet,
   Warehouse, Waves, Wrench,
@@ -103,6 +103,7 @@ export const NAV = [
     { to: '/integrimi', label: 'Integrimi / importi', icon: Plug, caps: [C.INTEGRATION] },
     { to: '/perdoruesit', label: 'Përdoruesit', icon: ShieldCheck, caps: [C.USERS] },
     { to: '/cilesimet', label: 'Të dhënat e kompanisë', icon: Settings, caps: [C.USERS] },
+    { to: '/kopjet-rezerve', label: 'Kopjet rezervë', icon: DatabaseBackup, caps: [C.USERS] },
     { to: '/gjurmet', label: 'Gjurmët e veprimeve', icon: History, caps: [C.AUDIT] },
   ] },
 ];

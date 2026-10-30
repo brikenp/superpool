@@ -36,6 +36,15 @@ service firebase.storage {
       allow delete: if allowed(['admin', 'magazine'], 'inventory_manage');
     }
 
+    // Kopjet rezervë: vetëm administratori i shkarkon; mund të ngarkojë një kopje (.spbak) për ta rikthyer.
+    // Krijimi, fshirja dhe rikthimi bëhen nga serveri.
+    match /backups/{allPaths=**} {
+      allow read: if isRole(['admin']);
+    }
+    match /backups/uploads/{fileName} {
+      allow create: if isRole(['admin']) && fileName.matches('.*[.]spbak') && request.resource.size < 1024 * 1024 * 1024;
+    }
+
     match /settings/{fileName} {
       allow read: if active();
       allow write: if allowed(['admin'], 'users') && smallFile();

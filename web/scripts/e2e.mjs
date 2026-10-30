@@ -628,6 +628,18 @@ async function main() {
   await denied(getDocs(collection(mag.db, 'auditLog')), 'magazinieri lexon gjurmët');
   ok(`gjurmët e veprimeve (${audit.size} regjistrime), të dukshme vetëm për administratorin`);
 
+  // --- Kopja rezervë para fshirjes ---
+  await denied(mag.call('createBackup', {}), 'magazinieri krijon kopje rezervë');
+  const beforeBk = {
+    clients: (await getDocs(collection(admin.db, 'clients'))).size,
+    invoices: (await getDocs(collection(admin.db, 'invoices'))).size,
+    movements: (await getDocs(collection(admin.db, 'movements'))).size,
+    pipeQty: (await getDoc(doc(admin.db, 'products', pipe))).data().qtyMain,
+  };
+  const bk = await admin.call('createBackup', { note: 'para testit' });
+  assert.ok(bk.docs > 100 && bk.users >= 5);
+  assert.equal(bk.counts.clients, beforeBk.clients);
+
   // --- Zona e rrezikut: fshirja e të dhënave të punës, konfigurimi mbetet ---
   await denied(mag.call('resetData', { groups: ['transactions'], confirm: 'FSHI' }), 'magazinieri fshin të dhënat');
   await denied(admin.call('resetData', { groups: ['transactions'], confirm: 'po' }), 'pa konfirmim');
@@ -643,6 +655,25 @@ async function main() {
   assert.ok((await getDoc(doc(admin.db, 'locations', vehLoc))).exists());
   assert.equal((await admin.call('allocateNumber', { prefix: 'OF' })).number.slice(-4), '0001');
   ok('zona e rrezikut: lëvizjet, dokumentet dhe klientët u fshinë; përdoruesit, cilësimet, artikujt dhe magazinat mbetën');
+
+  // --- Rikthimi nga kopja rezervë ---
+  await denied(admin.call('restoreBackup', { name: bk.name, mode: 'missing', confirm: 'po' }), 'rikthim pa konfirmim');
+  await denied(mag.call('restoreBackup', { name: bk.name, mode: 'missing', confirm: 'RIKTHE' }), 'magazinieri rikthen');
+  await denied(admin.call('restoreBackup', { name: 'backups/../x.spbak', confirm: 'RIKTHE' }), 'rrugë e pavlefshme');
+  const rs1 = await admin.call('restoreBackup', { name: bk.name, mode: 'missing', confirm: 'RIKTHE' });
+  assert.ok(rs1.docs > 0 && rs1.skipped > 0);
+  assert.equal((await getDocs(collection(admin.db, 'clients'))).size, beforeBk.clients);
+  assert.equal((await getDocs(collection(admin.db, 'invoices'))).size, beforeBk.invoices);
+  assert.equal((await getDocs(collection(admin.db, 'movements'))).size, beforeBk.movements);
+  assert.equal((await getDoc(doc(admin.db, 'products', pipe))).data().qtyMain, 0); // ekzistonte, nuk ndryshohet
+  const rs2 = await admin.call('restoreBackup', { name: bk.name, mode: 'replace', confirm: 'RIKTHE' });
+  assert.ok(rs2.deleted > 0);
+  assert.equal((await getDoc(doc(admin.db, 'products', pipe))).data().qtyMain, beforeBk.pipeQty);
+  assert.notEqual((await admin.call('allocateNumber', { prefix: 'OF' })).number.slice(-4), '0001'); // numërimi u kthye
+  assert.ok((await getDoc(doc(admin.db, 'users', users.mag))).exists());
+  const listed = await admin.call('listBackups', {});
+  assert.ok(listed.some((x) => x.name === bk.name) && listed.filter((x) => x.kind === 'safety').length === 2);
+  ok('kopja rezervë: fshirja u rikthye (vetëm çfarë mungonte, pastaj plotësisht), me kopje sigurie para çdo rikthimi');
 
   for (const s of [admin, mag, gerti, worker, ofer]) await deleteApp(s.app);
   console.log(`\nTë gjitha ${step} kontrollet kaluan.`);
