@@ -282,6 +282,18 @@ async function main() {
   assert.equal(shofer.active, false);
   ok('import nga çdo seksion (klientë nga Gerti, punonjës, automjete) sipas të drejtave');
 
+  // --- Fshirja e klientit ---
+  const golemDoc = (await getDocs(query(collection(admin.db, 'clients'), where('name', '==', 'Vila Golem')))).docs[0];
+  await admin.call('deleteClient', { id: golemDoc.id }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /nuk fshihet sepse ka .*fatura/));
+  const gNew = (await getDocs(query(collection(admin.db, 'clients'), where('name', '==', 'Klient nga Gerti')))).docs[0];
+  await addDoc(collection(admin.db, 'clients', gNew.id, 'documents'), { kind: 'note', text: 'shënim' });
+  await denied(worker.call('deleteClient', { id: gNew.id }), 'punonjësi fshin klientin');
+  await gerti.call('deleteClient', { id: gNew.id });
+  assert.equal((await getDoc(doc(admin.db, 'clients', gNew.id))).exists(), false);
+  assert.equal((await getDocs(collection(admin.db, 'clients', gNew.id, 'documents'))).size, 0);
+  assert.ok((await getDoc(doc(admin.db, 'clients', golemDoc.id))).exists());
+  ok('fshirja e klientit: refuzohet kur ka fatura/oferta; klienti pa dokumente fshihet bashkë me shënimet');
+
   // --- Gjendjet fillestare të klientëve dhe likujdimet ---
   const bimp = await admin.call('importData', { type: 'clientBalances', options: { eurRate: 100 }, rows: [
     { client: 'Hotel Riviera', amount: 250000, date: '01.01.2026' },

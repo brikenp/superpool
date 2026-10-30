@@ -1,7 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
-import { Paperclip, X, Plus } from 'lucide-react';
+import { Paperclip, X, Plus, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { OFFER_STATUS, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PROJECT_STATUS } from '@shared/constants.js';
@@ -11,12 +11,12 @@ import { DataTable } from '../../components/DataTable.jsx';
 import { PrintInvoiceButton, PrintPaymentButton, printColumn } from '../../components/PrintButton.jsx';
 import { FiscalizeButton, TaxpayerLookupButton } from '../../components/Fiscal.jsx';
 import { EntityForm } from '../../components/EntityForm.jsx';
-import { Card, Field, Loading, PageHeader, Stat, StatusBadge, Tabs, useAction } from '../../components/ui.jsx';
+import { Card, Field, Loading, PageHeader, Stat, StatusBadge, Tabs, useAction, useUi } from '../../components/ui.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
 import { ContractsCard } from '../finance/Contracts.jsx';
 import { ClientLedger } from '../finance/ClientLedger.jsx';
-import { db, storage } from '../../lib/firebase.js';
+import { call, db, storage } from '../../lib/firebase.js';
 import { date, dateTime, inAll, money, moneyWithAll, offerAll } from '../../lib/format.js';
 import { InvoiceForm, PaymentForm, INVOICE_STATUS } from '../finance/Finance.jsx';
 import { clientFields, normalizeClient } from './Clients.jsx';
@@ -25,6 +25,8 @@ import { useRouteId } from '../../lib/prettyUrl.jsx';
 export default function ClientCard() {
   const id = useRouteId();
   const navigate = useNavigate();
+  const { ask } = useUi();
+  const [runDelete, busyDelete] = useAction();
   const { clientsById } = useData();
   const { uid, can } = useAuth();
   const [tab, setTab] = useState('overview');
@@ -50,6 +52,19 @@ export default function ClientCard() {
     ? query(collection(db, 'payments'), where('clientId', '==', id))
     : query(collection(db, 'payments'), where('clientId', '==', id), where('createdBy', '==', uid))), [id, seeAllFinance, uid]);
 
+  const removeClient = async () => {
+    const ok = await ask({
+      title: 'Fshi klientin',
+      message: `Klienti «${client.name}» do të fshihet përgjithmonë, bashkë me dokumentet dhe shënimet e tij.\n\nKlientët me fatura, pagesa, oferta, projekte, shitje ose kontrata nuk fshihen.`,
+      confirmLabel: 'Fshi klientin', danger: true,
+    });
+    if (!ok) return;
+    runDelete(async () => {
+      await call('deleteClient', { id });
+      navigate('/klientet');
+    }, 'Klienti u fshi.');
+  };
+
   if (!client) return <Loading />;
 
   const activeInvoices = invoices.data.filter((i) => i.status !== 'cancelled');
@@ -72,6 +87,7 @@ export default function ClientCard() {
             {can(CAPS.CLIENTS_MANAGE, CAPS.FINANCE) && <button type="button" className="btn" onClick={() => setEditing(true)}>Ndrysho</button>}
             {seeOffers && <Link className="btn" to={`/ofertat/re?klienti=${id}`}><Plus size={16} /> Ofertë</Link>}
             {can(CAPS.CHEM_SALES) && <Link className="btn primary" to={`/kimikate/shitje-e-re?klienti=${id}`}><Plus size={16} /> Shitje</Link>}
+            {can(CAPS.CLIENTS_MANAGE, CAPS.USERS) && <button type="button" className="btn danger" disabled={busyDelete} onClick={removeClient}><Trash2 size={16} /> Fshi klientin</button>}
           </>
         )}
       />
