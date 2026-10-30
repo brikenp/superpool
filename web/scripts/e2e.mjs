@@ -639,6 +639,13 @@ async function main() {
   const bk = await admin.call('createBackup', { note: 'para testit' });
   assert.ok(bk.docs > 100 && bk.users >= 5);
   assert.equal(bk.counts.clients, beforeBk.clients);
+  await denied(mag.call('backupDownloadUrl', { name: bk.name }), 'magazinieri shkarkon kopjen');
+  const dlink = await admin.call('backupDownloadUrl', { name: bk.name });
+  const dres = await fetch(dlink.url);
+  assert.equal(dres.status, 200);
+  const dbytes = new Uint8Array(await dres.arrayBuffer());
+  assert.deepEqual([dbytes[0], dbytes[1]], [0x1f, 0x8b]); // gzip
+  assert.match(dlink.filename, /^SuperPool_.*\.spbak$/);
 
   // --- Zona e rrezikut: fshirja e të dhënave të punës, konfigurimi mbetet ---
   await denied(mag.call('resetData', { groups: ['transactions'], confirm: 'FSHI' }), 'magazinieri fshin të dhënat');

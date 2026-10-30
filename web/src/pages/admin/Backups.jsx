@@ -1,4 +1,4 @@
-import { getBlob, ref, uploadBytes } from 'firebase/storage';
+import { ref, uploadBytes } from 'firebase/storage';
 import { ArchiveRestore, DatabaseBackup, Download, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -11,7 +11,6 @@ import { dateTime } from '../../lib/format.js';
 
 const size = (b) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const when = (iso) => (iso ? dateTime(new Date(iso)) : '');
-const fileLabel = (name) => name.replace(/^backups\/(uploads\/)?/, '');
 
 /** Kopjet rezervë: krijim, shkarkim në kompjuter, ngarkim dhe rikthim. Vetëm administratori. */
 export default function Backups() {
@@ -22,6 +21,7 @@ export default function Backups() {
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState(null);
   const [result, setResult] = useState(null);
+  const [downloading, setDownloading] = useState('');
   const [run, busy] = useAction();
 
   const refresh = useCallback(() => {
@@ -40,17 +40,24 @@ export default function Backups() {
     return res;
   }, (r) => r && `Kopja u krijua: ${r.docs} dokumente, ${r.files} skedarë, ${r.users} përdorues.`);
 
-  const download = (b) => run(async () => {
-    const blob = await getBlob(ref(storage, b.name));
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `SuperPool_${fileLabel(b.name)}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  });
+  // Shkarkimi bëhet me lidhje nga serveri (jo me getBlob, që kërkon CORS në bucket dhe mbetet duke pritur).
+  const download = async (b) => {
+    setDownloading(b.name);
+    try {
+      const { url, filename } = await call('backupDownloadUrl', { name: b.name });
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      run(() => Promise.reject(err));
+    } finally {
+      setDownloading('');
+    }
+  };
 
   const upload = (file) => run(async () => {
     if (!file.name.endsWith('.spbak')) throw new Error('Zgjidhni një skedar kopjeje rezervë të SuperPool (.spbak).');
@@ -116,7 +123,7 @@ export default function Backups() {
               key: 'actions', label: '', export: false, sortable: false,
               render: (b) => (
                 <span className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn small" disabled={busy} title="Shkarko në kompjuter" onClick={() => download(b)}><Download size={14} /></button>
+                  <button type="button" className="btn small" disabled={Boolean(downloading)} title="Shkarko në kompjuter" onClick={() => download(b)}>{downloading === b.name ? '…' : <Download size={14} />}</button>
                   <button type="button" className="btn small" disabled={busy} onClick={() => setRestoring(b)}><ArchiveRestore size={14} /> Rikthe</button>
                   <button type="button" className="btn small danger" disabled={busy} title="Fshi" onClick={() => remove(b)}><Trash2 size={14} /></button>
                 </span>

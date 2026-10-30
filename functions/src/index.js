@@ -10,5 +10,5 @@ export { reserveProjectMaterials, acceptOffer } from './handlers/projects.js';
 export { bootstrap, createUser, updateUser, allocateNumber } from './handlers/admin.js';
 export { importData } from './handlers/integration.js';
 export { resetData } from './handlers/reset.js';
-export { createBackup, listBackups, deleteBackup, restoreBackup, scheduledBackup } from './handlers/backup.js';
+export { createBackup, listBackups, backupDownloadUrl, deleteBackup, restoreBackup, scheduledBackup } from './handlers/backup.js';
 export { onVehicleWritten, onProjectWritten, onEmployeeWritten, auditWrites } from './handlers/triggers.js';

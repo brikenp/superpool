@@ -12,7 +12,7 @@
 
 import { createInterface } from 'node:readline';
 import { createGunzip, createGzip } from 'node:zlib';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -189,6 +189,28 @@ export const listBackups = onCall({ region: REGION, timeoutSeconds: 300, memory:
       };
     })
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+});
+
+/**
+ * Lidhja e shkarkimit të një kopjeje. Shfletuesi e hap si lidhje të zakonshme (pa CORS në bucket),
+ * me një "token" të ri për çdo shkarkim dhe emrin e skedarit për ruajtje.
+ */
+export const backupDownloadUrl = onCall({ region: REGION }, async (request) => {
+  const user = await requireAdmin(request);
+  const name = safePath(request.data?.name);
+  const file = bucket().file(name);
+  const [exists] = await file.exists();
+  if (!exists) fail('Kopja nuk ekziston më.', 'not-found');
+  const token = randomUUID();
+  const [md] = await file.getMetadata();
+  const filename = `SuperPool_${name.replace(/^backups\/(uploads\/)?/, '')}`;
+  await file.setMetadata({
+    contentDisposition: `attachment; filename="${filename}"`,
+    metadata: { ...(md.metadata || {}), firebaseStorageDownloadTokens: token },
+  });
+  const host = process.env.FIREBASE_STORAGE_EMULATOR_HOST ? `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}` : 'https://firebasestorage.googleapis.com';
+  await audit(null, { user, action: 'read', collection: 'system', id: 'backup', label: `Shkarkim i kopjes ${name.slice(PREFIX.length)}` });
+  return { url: `${host}/v0/b/${bucket().name}/o/${encodeURIComponent(name)}?alt=media&token=${token}`, filename };
 });
 
 export const deleteBackup = onCall({ region: REGION }, async (request) => {
