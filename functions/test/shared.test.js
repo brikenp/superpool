@@ -337,3 +337,32 @@ test('kopja rezervë: llojet e Firestore ruhen dhe rikthehen pa humbje', async (
   assert.deepEqual(back.list, [1, 'a', { n: null, ok: true }]);
   assert.equal(back.nested.when.seconds, 5);
 });
+
+test('oferta Excel: qelizat, klienti, përmasat, rreshtat dhe tekstet', async () => {
+  const { parseSheetCells, parseSharedStrings, parseDrawingImages, colNumber } = await import('../src/shared/xlsxLite.js');
+  const { parseOfferSheet, splitDescription, unitOf } = await import('../src/shared/offerExcel.js');
+  assert.equal(colNumber('VXH'), 15504);
+  const shared = parseSharedStrings('<sst><si><t>Oferte per klientin: </t></si><si><r><t>ELTON </t></r><r><t>ISMAILI</t></r></si><si><t>Permasat: 8m x 4m x 1.5m</t></si><si><t>NR.</t></si><si><t>PERSHKRIMI</t></si><si><t>FOTO</t></si><si><t>NJESIA</t></si><si><t>SASIA</t></si><si><t xml:space="preserve">FILTER PISHINE ME QUARTZ\n• Diametri: 650 mm</t></si><si><t>Copë</t></si><si><t>TOTAL PA TVSH</t></si><si><t>TOTAL  TVSH</t></si><si><t>Përmet</t></si><si><t>Vëllimi = 48.00 m³</t></si><si><t>Depo =  3.00 m³</t></si><si><t>Qarkullimi = 51.00m³ / 3.00 ore = 17m³/h</t></si><si><t>SHKALLË</t></si></sst>');
+  const sheet = '<sheetData><row r="6"><c r="B6" t="s"><v>0</v></c><c r="D6" t="s"><v>2</v></c></row><row r="7"><c r="B7" t="s"><v>1</v></c><c r="D7" t="s"><v>13</v></c><c r="XFD7" t="s"><v>0</v></c></row>'
+    + '<row r="8"><c r="B8" t="s"><v>12</v></c><c r="D8" t="s"><v>14</v></c></row><row r="9"><c r="D9" t="s"><v>15</v></c></row>'
+    + '<row r="16"><c r="A16" t="s"><v>3</v></c><c r="B16" t="s"><v>4</v></c><c r="C16" t="s"><v>5</v></c><c r="D16" t="s"><v>6</v></c><c r="E16" t="s"><v>7</v></c></row>'
+    + '<row r="17"><c r="A17"><v>1</v></c><c r="B17" t="s"><v>8</v></c><c r="C17" s="3"/><c r="D17" t="s"><v>9</v></c><c r="E17"><v>1</v></c></row>'
+    + '<row r="18"><c r="A18"><v>2</v></c><c r="B18" t="s"><v>16</v></c><c r="D18" t="s"><v>9</v></c><c r="E18"><v>0</v></c></row>'
+    + '<row r="52"><c r="C52" t="s"><v>10</v></c><c r="E52"><v>6120</v></c></row><row r="53"><c r="C53" t="s"><v>11</v></c><c r="E53"><f>E52*20%</f><v>1224</v></c></row></sheetData>';
+  const cells = parseSheetCells(sheet, shared);
+  assert.equal(cells['7:2'], 'ELTON ISMAILI');
+  assert.equal(cells['53:5#f'], 'E52*20%');
+  assert.equal(Object.keys(cells).some((k) => k.endsWith(':16384')), false); // kolonat e largëta anashkalohen
+  const o = parseOfferSheet(cells);
+  assert.deepEqual(o.client, { name: 'ELTON ISMAILI', city: 'Përmet', country: '' });
+  assert.deepEqual([o.dims.length, o.dims.width, o.dims.depthMin, o.dims.volume, o.dims.tank, o.dims.turnoverHours], [8, 4, 1.5, 48, 3, 3]);
+  assert.deepEqual([o.subtotal, o.vatPct, o.photoCol], [6120, 20, 3]);
+  assert.deepEqual(o.items.map((i) => [i.row, i.title, i.unit, i.qty]), [[17, 'FILTER PISHINE ME QUARTZ', 'cope', 1], [18, 'SHKALLË', 'cope', 0]]);
+  assert.equal(o.items[0].details, '• Diametri: 650 mm');
+  assert.deepEqual(splitDescription('  IMPLANTI NË SALLËN TEKNIKE      • Furnizimi i tubave'), { title: 'IMPLANTI NË SALLËN TEKNIKE', details: '• Furnizimi i tubave' });
+  assert.deepEqual(['Komplet', 'KG', 'meter linear', 'Copë'].map(unitOf), ['set', 'kg', 'm', 'cope']);
+  const imgs = parseDrawingImages('xl/drawings/drawing1.xml',
+    '<xdr:wsDr><xdr:twoCellAnchor><xdr:from><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>16</xdr:row></xdr:from><xdr:pic><a:blip r:embed="rId1"/></xdr:pic></xdr:twoCellAnchor><xdr:twoCellAnchor><xdr:from><xdr:col>2</xdr:col><xdr:row>16</xdr:row></xdr:from><a:blip r:embed="rId2"/></xdr:twoCellAnchor></xdr:wsDr>',
+    '<Relationships><Relationship Id="rId1" Type="x/image" Target="../media/image7.jpg"/><Relationship Id="rId2" Type="x/image" Target="../media/image8.svg"/></Relationships>');
+  assert.deepEqual(imgs, [{ col: 3, row: 17, media: 'xl/media/image7.jpg' }]);
+});

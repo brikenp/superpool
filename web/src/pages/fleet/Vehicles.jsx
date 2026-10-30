@@ -15,6 +15,7 @@ import { FlowSummary } from '../inventory/LocationDetail.jsx';
 import { movementColumns } from '../inventory/Movements.jsx';
 import { StockTable } from '../inventory/Stock.jsx';
 import { ImportButton } from '../../components/ImportExcel.jsx';
+import { DeleteButton } from '../../components/DeleteButton.jsx';
 
 export default function Vehicles() {
   const { vehicles, vehiclesById, employees, employeesById } = useData();
@@ -49,7 +50,14 @@ export default function Vehicles() {
           { key: 'active', label: 'Statusi', render: (v) => (v.active === false ? <Badge>joaktiv</Badge> : <Badge tone="ok">aktiv</Badge>) },
           {
             key: 'edit', label: '', sortable: false, export: false, hidden: !canManage,
-            render: (v) => <button type="button" className="btn small" onClick={(e) => { e.stopPropagation(); setEditing(v); }}>Ndrysho</button>,
+            render: (v) => (
+              <span className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn small" onClick={(e) => { e.stopPropagation(); setEditing(v); }}>Ndrysho</button>
+                <DeleteButton fn="deleteVehicle" id={v.id} title={`Fshi automjetin ${v.plate}`} done="Automjeti u fshi."
+                  onDone={() => selectedId === v.id && setParams({})}
+                  message={`Automjeti ${v.plate} dhe nënmagazina e tij do të fshihen përgjithmonë.\n\nAutomjetet me mall brenda ose me lëvizje malli në historik nuk fshihen — ata çaktivizohen.`} />
+              </span>
+            ),
           },
         ]}
       />

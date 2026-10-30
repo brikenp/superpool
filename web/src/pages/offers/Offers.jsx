@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { OFFER_STATUS } from '@shared/constants.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
+import { OfferExcelImport } from './OfferExcelImport.jsx';
 import { Badge, PageHeader, Stat, StatusBadge } from '../../components/ui.jsx';
 import { useCollection } from '../../lib/data.jsx';
 import { date, money, offerAll } from '../../lib/format.js';
@@ -45,6 +46,7 @@ function OffersSection({ section }) {
         actions={(
           <>
             <Link className="btn" to="/modelet">Modelet e pishinave</Link>
+            <OfferExcelImport />
             <Link className="btn primary" to="/ofertat/re"><Plus size={16} /> Ofertë e re</Link>
           </>
         )}

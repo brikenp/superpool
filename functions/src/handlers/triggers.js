@@ -7,7 +7,9 @@ export const onVehicleWritten = onDocumentWritten({ document: 'vehicles/{id}', r
   const after = event.data?.after;
   const ref = db.doc(`locations/veh_${event.params.id}`);
   if (!after?.exists) {
-    await ref.set({ active: false }, { merge: true });
+    // Nënmagazina çaktivizohet nëse ekziston ende (nuk rikrijohet kur është fshirë bashkë me automjetin).
+    const loc = await ref.get();
+    if (loc.exists) await ref.update({ active: false });
     return;
   }
   await ref.set({

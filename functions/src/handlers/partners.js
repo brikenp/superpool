@@ -124,3 +124,65 @@ export const deleteProduct = onCall({ region: REGION, timeoutSeconds: 120 }, asy
   await audit(null, { user, action: 'delete', collection: 'products', id, label });
   return { ok: true };
 });
+
+/** Fshirja e punonjësit: jo kur ka llogari hyrjeje të lidhur ose dokumente/punë të regjistruara në emër të tij. */
+export const deleteEmployee = onCall({ region: REGION }, async (request) => {
+  const user = await userContext(request);
+  requireCap(user, CAPS.FLEET, CAPS.USERS);
+  const id = String(request.data?.id || '');
+  const ref = db.doc(`employees/${id}`);
+  const snap = await ref.get();
+  if (!id || !snap.exists) fail('Punonjësi nuk ekziston.', 'not-found');
+  const name = snap.get('name') || id;
+
+  const reasons = [];
+  const login = await db.collection('users').where('employeeId', '==', id).limit(1).get();
+  if (!login.empty) reasons.push(`është i lidhur me llogarinë e hyrjes «${login.docs[0].get('name') || login.docs[0].get('email')}» (hiqeni lidhjen te Përdoruesit)`);
+  const moves = (await db.collection('movements').where('employeeId', '==', id).count().get()).data().count;
+  if (moves) reasons.push(`ka ${moves} fletëdalje/dorëzime në emër të tij`);
+  const expenses = (await db.collectionGroup('expenses').where('employeeId', '==', id).count().get()).data().count;
+  if (expenses) reasons.push(`ka ${expenses} orë pune/shpenzime në projekte`);
+  if (reasons.length) {
+    fail(`Punonjësi «${name}» nuk fshihet sepse ${reasons.join('; ')}. Për ta hequr nga listat, çaktivizojeni (hiqni «Aktiv»).`, 'failed-precondition');
+  }
+
+  // Lidhjet e tjera hiqen: përgjegjësi i automjetit dhe ekipet e projekteve.
+  const writer = db.bulkWriter();
+  (await db.collection('vehicles').where('responsibleId', '==', id).get()).forEach((d) => writer.update(d.ref, { responsibleId: null, responsibleName: '' }));
+  (await db.collection('projects').where('teamEmployeeIds', 'array-contains', id).get())
+    .forEach((d) => writer.update(d.ref, { teamEmployeeIds: (d.get('teamEmployeeIds') || []).filter((x) => x !== id) }));
+  writer.delete(ref);
+  await writer.close();
+  await audit(null, { user, action: 'delete', collection: 'employees', id, label: name });
+  return { ok: true };
+});
+
+/** Fshirja e automjetit: vetëm kur nënmagazina e tij është bosh dhe nuk ka pasur lëvizje malli. */
+export const deleteVehicle = onCall({ region: REGION }, async (request) => {
+  const user = await userContext(request);
+  requireCap(user, CAPS.FLEET, CAPS.USERS);
+  const id = String(request.data?.id || '');
+  const ref = db.doc(`vehicles/${id}`);
+  const snap = await ref.get();
+  if (!id || !snap.exists) fail('Automjeti nuk ekziston.', 'not-found');
+  const plate = snap.get('plate') || id;
+  const locId = `veh_${id}`;
+
+  const reasons = [];
+  const stock = (await db.collection('stock').where('locationId', '==', locId).get()).docs.filter((d) => Number(d.get('qty') || 0) !== 0);
+  if (stock.length) reasons.push(`ka mall në automjet (${stock.length} artikuj) — ktheni mallin në magazinë`);
+  const out = (await db.collection('movements').where('sourceId', '==', locId).count().get()).data().count;
+  const inn = (await db.collection('movements').where('destId', '==', locId).count().get()).data().count;
+  if (out + inn) reasons.push(`ka ${out + inn} lëvizje malli në historik`);
+  if (reasons.length) {
+    fail(`Automjeti ${plate} nuk fshihet sepse ${reasons.join('; ')}. Për ta hequr nga listat, çaktivizojeni (hiqni «Aktiv»).`, 'failed-precondition');
+  }
+
+  const writer = db.bulkWriter();
+  (await db.collection('stock').where('locationId', '==', locId).get()).forEach((d) => writer.delete(d.ref));
+  writer.delete(db.doc(`locations/${locId}`));
+  writer.delete(ref);
+  await writer.close();
+  await audit(null, { user, action: 'delete', collection: 'vehicles', id, label: plate });
+  return { ok: true };
+});

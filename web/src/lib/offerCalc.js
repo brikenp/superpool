@@ -72,7 +72,9 @@ export function recalcQuantities(lines, offer) {
 
 export function offerTotals(offer) {
   const lines = offer.lines || [];
-  const subtotal = round2(lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.unitPrice), 0));
+  // Oferta me vlerë totale (pa çmime për rresht, si ofertat Excel): totali pa TVSH vendoset me dorë.
+  const manual = toNumber(offer.manualSubtotal);
+  const subtotal = manual > 0 ? round2(manual) : round2(lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.unitPrice), 0));
   const discount = round2(subtotal * toNumber(offer.discountPct) / 100);
   const net = round2(subtotal - discount);
   const vat = round2(net * toNumber(offer.vatPct) / 100);

@@ -36,6 +36,13 @@ service firebase.storage {
       allow delete: if allowed(['admin', 'magazine'], 'inventory_manage');
     }
 
+    // Fotot e rreshtave të ofertave (p.sh. nga importi i ofertës Excel).
+    match /offers/{offerId}/{fileName} {
+      allow read: if active();
+      allow create: if allowed(['admin', 'oferta', 'projekte'], 'offers') && smallFile() && request.resource.contentType.matches('image/.*');
+      allow delete: if allowed(['admin', 'oferta', 'projekte'], 'offers');
+    }
+
     // Kopjet rezervë: vetëm administratori i shkarkon; mund të ngarkojë një kopje (.spbak) për ta rikthyer.
     // Krijimi, fshirja dhe rikthimi bëhen nga serveri.
     match /backups/{allPaths=**} {

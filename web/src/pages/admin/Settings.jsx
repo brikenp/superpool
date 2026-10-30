@@ -6,6 +6,10 @@ import { useData } from '../../lib/data.jsx';
 import { db } from '../../lib/firebase.js';
 import { DangerZone } from './DangerZone.jsx';
 import { toNumber } from '../../lib/format.js';
+import { OFFER_TEXT_DEFAULTS, OFFER_TEXT_KEYS } from '../../lib/offerTexts.js';
+
+// Tekstet e ofertës që ruhen te company.offerTexts (kushtet e pagesës dhe banka kanë fushat e veta më sipër).
+const OFFER_KEYS = OFFER_TEXT_KEYS.filter(([k]) => !['payment', 'bank'].includes(k));
 
 const FIELDS = [
   ['name', 'Emri i kompanisë'],
@@ -28,11 +32,20 @@ export default function Settings() {
   const { company } = useData();
   const [v, setV] = useState(null);
   const [run, busy] = useAction();
-  useEffect(() => { if (company && !v) setV({ ...company }); }, [company, v]);
+  useEffect(() => {
+    if (company?.loaded && !v) {
+      setV({
+        ...company,
+        defaultPaymentTerms: company.defaultPaymentTerms || OFFER_TEXT_DEFAULTS.payment,
+        offerTexts: Object.fromEntries(OFFER_KEYS.map(([k]) => [k, company.offerTexts?.[k] ?? OFFER_TEXT_DEFAULTS[k]])),
+      });
+    }
+  }, [company, v]);
   if (!v) return null;
   const save = () => run(() => setDoc(doc(db, 'settings', 'company'), {
     ...Object.fromEntries([...FIELDS, ...TEXTS].map(([k]) => [k, v[k] || ''])),
     vatPct: toNumber(v.vatPct), offerValidityDays: toNumber(v.offerValidityDays), eurRate: toNumber(v.eurRate),
+    offerTexts: v.offerTexts,
   }, { merge: true }), 'Të dhënat u ruajtën.');
 
   return (
@@ -52,6 +65,16 @@ export default function Settings() {
       <Card title="Tekstet standarde të ofertës">
         <div className="stack">
           {TEXTS.map(([k, l]) => <Field key={k} label={l}><textarea value={v[k] || ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></Field>)}
+        </div>
+      </Card>
+      <Card title="Tekstet e ofertës për klientin (PDF)">
+        <p className="muted" style={{ marginTop: 0 }}>Vlejnë për ofertat e reja; çdo ofertë mund t'i ndryshojë veç e veç. Banka merret nga «Llogaritë bankare» më sipër.</p>
+        <div className="stack">
+          {OFFER_KEYS.map(([k, l]) => (
+            <Field key={k} label={l}>
+              <textarea rows={['terms', 'manual', 'company'].includes(k) ? 8 : 4} value={v.offerTexts?.[k] || ''} onChange={(e) => setV({ ...v, offerTexts: { ...v.offerTexts, [k]: e.target.value } })} />
+            </Field>
+          ))}
         </div>
       </Card>
       <DangerZone />

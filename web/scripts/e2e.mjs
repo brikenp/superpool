@@ -321,6 +321,23 @@ async function main() {
   assert.equal((await getDoc(cc)).data().contacts.length, 2);
   ok('fshirja e artikullit (refuzohet me gjendje; ndryshe fshihet me koston dhe çmimet) dhe kontaktet e shumta');
 
+  // --- Fshirja e punonjësit dhe e automjetit ---
+  const empTech = (await getDocs(query(collection(admin.db, 'employees'), where('name', '==', 'Teknik Import')))).docs[0];
+  const impVehDoc = (await getDocs(query(collection(admin.db, 'vehicles'), where('plate', '==', 'ZZ999ZZ')))).docs[0];
+  await denied(gerti.call('deleteEmployee', { id: empTech.id }), 'Gerti fshin punonjësin');
+  await mag.call('deleteEmployee', { id: empTech.id });
+  assert.equal((await getDoc(doc(admin.db, 'employees', empTech.id))).exists(), false);
+  assert.equal((await getDoc(doc(admin.db, 'vehicles', impVehDoc.id))).data().responsibleId, null); // u hoq si përgjegjës
+  await mag.call('deleteVehicle', { id: veh.id }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /nuk fshihet/));
+  await mag.call('deleteVehicle', { id: impVehDoc.id });
+  assert.equal((await getDoc(doc(admin.db, 'vehicles', impVehDoc.id))).exists(), false);
+  await new Promise((r) => setTimeout(r, 2500)); // shkasi i automjetit nuk e rikrijon nënmagazinën
+  assert.equal((await getDoc(doc(admin.db, 'locations', `veh_${impVehDoc.id}`))).exists(), false);
+  const empWithLogin = (await getDoc(doc(admin.db, 'users', users.worker))).data().employeeId;
+  if (empWithLogin) await mag.call('deleteEmployee', { id: empWithLogin }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /llogarinë e hyrjes/));
+  await denied(mag.call('loadImages', { paths: ['backups/x.spbak'] }), 'lexim skedari jashtë fotove');
+  ok('fshirja e punonjësit dhe e automjetit (refuzohet kur ka histori), pa rikrijuar nënmagazinën');
+
   // --- Gjendjet fillestare të klientëve dhe likujdimet ---
   const bimp = await admin.call('importData', { type: 'clientBalances', options: { eurRate: 100 }, rows: [
     { client: 'Hotel Riviera', amount: 250000, date: '01.01.2026' },

@@ -6,6 +6,7 @@ import { EntityForm } from '../../components/EntityForm.jsx';
 import { Badge, PageHeader } from '../../components/ui.jsx';
 import { useData } from '../../lib/data.jsx';
 import { ImportButton } from '../../components/ImportExcel.jsx';
+import { DeleteButton } from '../../components/DeleteButton.jsx';
 
 export default function Employees() {
   const { employees, usersById, vehicles } = useData();
@@ -34,6 +35,13 @@ export default function Employees() {
           { key: 'user', label: 'Llogaria', value: (e) => usersById[e.userId]?.email || '' },
           { key: 'hourlyCost', label: 'Kosto / orë', type: 'money' },
           { key: 'active', label: 'Statusi', render: (e) => (e.active === false ? <Badge>joaktiv</Badge> : <Badge tone="ok">aktiv</Badge>) },
+          {
+            key: 'delete', label: '', sortable: false, export: false,
+            render: (e) => (
+              <DeleteButton fn="deleteEmployee" id={e.id} title={`Fshi punonjësin ${e.name}`} done="Punonjësi u fshi."
+                message={`Punonjësi «${e.name}» do të fshihet përgjithmonë dhe hiqet nga automjetet dhe ekipet e projekteve.\n\nPunonjësit me llogari hyrjeje, fletëdalje ose orë pune nuk fshihen — ata çaktivizohen.`} />
+            ),
+          },
         ]}
       />
       {editing && (

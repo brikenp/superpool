@@ -20,6 +20,7 @@ import { productOption } from '../../components/ProductImage.jsx';
 import { useRouteId } from '../../lib/prettyUrl.jsx';
 import { CurrencyFields } from '../../components/Currency.jsx';
 import { clientOption } from '../../lib/clients.js';
+import { OFFER_TEXT_DEFAULTS, OFFER_TEXT_KEYS, offerTextsOf } from '../../lib/offerTexts.js';
 
 const TEXT_FIELDS = [
   ['technicalText', 'Zgjidhja teknike (përshkrimi i punimeve)'],
@@ -57,12 +58,13 @@ export default function OfferEditor() {
         clientId: params.get('klienti') || '', projectName: '', location: '',
         poolType: 'skimmer', circulation: '', length: 8, width: 4, depthMin: 1.2, depthMax: 1.6, volume: '', volumeManual: false, tankPct: '', turnoverHours: 4,
         technicalText: '', filtration: '', equipmentText: '', servicesText: '',
-        paymentTerms: company.defaultPaymentTerms || '', deliveryTerm: company.defaultDeliveryTerm || '', clientNotes: '',
+        paymentTerms: company.defaultPaymentTerms || OFFER_TEXT_DEFAULTS.payment, deliveryTerm: company.defaultDeliveryTerm || '', clientNotes: '',
         discountPct: 0, vatPct: company.vatPct ?? 20, showLinePrices: false, notesInternal: '', lines: [],
-        currency: 'ALL', exchangeRate: 1,
+        currency: 'ALL', exchangeRate: 1, manualSubtotal: '',
+        texts: (({ payment, ...t }) => t)(offerTextsOf({}, company)),
       });
     } else if (offer) {
-      setForm({ ...offer, lines: (offer.lines || []).map((l) => ({ ...l, key: l.key || newKey() })) });
+      setForm({ ...offer, texts: offer.texts || (({ payment, ...t }) => t)(offerTextsOf({}, company)), lines: (offer.lines || []).map((l) => ({ ...l, key: l.key || newKey() })) });
     }
   }, [isNew, offer, form, company, params]);
 
@@ -128,6 +130,7 @@ export default function OfferEditor() {
       tankVolume: round2(vars.D), totalVolume: round2(vars.VT), circulationRate: round2(vars.Q),
       length: toNumber(form.length), width: toNumber(form.width), depthMin: toNumber(form.depthMin), depthMax: toNumber(form.depthMax),
       discountPct: toNumber(form.discountPct), vatPct: toNumber(form.vatPct),
+      manualSubtotal: toNumber(form.manualSubtotal) > 0 ? toNumber(form.manualSubtotal) : '',
       currency: cur, exchangeRate: cur === 'EUR' ? rate : 1,
       lines: form.lines.map((l) => ({
         ...l, qty: toNumber(l.qty), unitCost: toNumber(l.unitCost), unitPrice: toNumber(l.unitPrice), productId: l.productId || null,
@@ -181,7 +184,7 @@ export default function OfferEditor() {
     }
   };
 
-  const pdfClient = () => run(() => clientOfferPdf({ ...form, totals }, company, clientsById[form.clientId]));
+  const pdfClient = () => run(() => clientOfferPdf({ ...form, totals, clientName: clientsById[form.clientId]?.name || form.clientName }, company, clientsById[form.clientId], { productsById }));
   const pdfInternal = () => run(() => internalEstimatePdf({ ...form, totals, clientName: clientsById[form.clientId]?.name || form.clientName }, company, { productsById, suppliersById, freeQtyOf: freeQty }));
 
   const sections = Object.keys(POOL_SECTIONS);
@@ -309,9 +312,11 @@ export default function OfferEditor() {
                             onChange={(v) => {
                               const prod = productsById[v];
                               const cost = v ? round2(costOf(v)) : 0;
-                              setLine(i, { productId: v || null, code: prod?.code || '', unit: prod?.unit || l.unit, description: prod?.name || l.description, unitCost: cost, unitPrice: l.unitPrice || priceFromCost(cost, 35) });
+                              setLine(i, { productId: v || null, code: prod?.code || '', unit: prod?.unit || l.unit, description: prod?.name || l.description, details: l.details || prod?.description || '', unitCost: cost, unitPrice: l.unitPrice || priceFromCost(cost, 35) });
                             }} />
-                          <input style={{ marginTop: 4 }} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} placeholder="Përshkrimi" />
+                          <input style={{ marginTop: 4 }} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} placeholder="Titulli (p.sh. FILTËR PISHINE ME QUARTZ)" />
+                          <textarea style={{ marginTop: 4, minHeight: 54 }} rows={2} value={l.details || ''} onChange={(e) => setLine(i, { details: e.target.value })} placeholder="Përshkrimi teknik që del në ofertë (opsional)" />
+                          <LineImages line={l} product={p} />
                           {l.formula && <small className="muted">Formula: <code>{l.formula}</code> = {qty(l.autoQty)}</small>}
                         </td>
                         <td className="r">
@@ -347,17 +352,32 @@ export default function OfferEditor() {
               {TEXT_FIELDS.map(([k, label]) => (
                 <Field key={k} label={label}><textarea value={form[k] || ''} onChange={(e) => set(k, e.target.value)} /></Field>
               ))}
+              <details>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Tekstet e PDF-së (standardi, kompania, hyrja, banka, kontaktet, termat, manuali)</summary>
+                <div className="stack" style={{ marginTop: 8 }}>
+                  {OFFER_TEXT_KEYS.filter(([k]) => k !== 'payment').map(([k, label]) => (
+                    <Field key={k} label={label}>
+                      <textarea rows={['terms', 'manual', 'company'].includes(k) ? 6 : 3} value={form.texts?.[k] ?? ''} onChange={(e) => set('texts', { ...form.texts, [k]: e.target.value })} />
+                    </Field>
+                  ))}
+                </div>
+              </details>
             </div>
           </Card>
           <div>
             <Card title="Vlera e ofertës">
               <div className="form-grid">
+                <Field label="Vlera totale pa TVSH (opsionale)" className="span-all" hint={toNumber(form.manualSubtotal) > 0 ? 'Totali i ofertës merret nga kjo vlerë; çmimet e rreshtave nuk llogariten.' : 'Plotësojeni kur oferta ka vetëm një total (pa çmime për rresht), si ofertat Excel.'}>
+                  <input className="num" type="number" step="any" value={form.manualSubtotal ?? ''} onChange={(e) => set('manualSubtotal', e.target.value)} />
+                </Field>
                 <Field label="Zbritje (%)"><input className="num" type="number" step="any" value={form.discountPct} onChange={(e) => set('discountPct', e.target.value)} /></Field>
                 <Field label="TVSH (%)"><input className="num" type="number" step="any" value={form.vatPct} onChange={(e) => set('vatPct', e.target.value)} /></Field>
                 <CurrencyFields currency={cur} rate={form.exchangeRate} amount={totals.total} disabled={locked}
                   onChange={(patch) => changeCurrency(patch.currency === 'EUR' && !(toNumber(patch.exchangeRate ?? form.exchangeRate) > 1) ? { ...patch, exchangeRate: company.eurRate || '' } : patch)} />
                 <Field className="span-all">
                   <label className="checkbox"><input type="checkbox" checked={Boolean(form.showLinePrices)} onChange={(e) => set('showLinePrices', e.target.checked)} /> Shfaq çmimet për çdo rresht në ofertën e klientit</label>
+                  <label className="checkbox"><input type="checkbox" checked={form.includeTerms !== false} onChange={(e) => set('includeTerms', e.target.checked)} /> Termat e bashkëpunimit dhe garancisë në PDF</label>
+                  <label className="checkbox"><input type="checkbox" checked={form.includeManual !== false} onChange={(e) => set('includeManual', e.target.checked)} /> Manuali i pishinës në PDF</label>
                 </Field>
               </div>
               <dl className="props" style={{ marginTop: 12 }}>
@@ -386,5 +406,17 @@ export default function OfferEditor() {
           onClose={() => setNewClient(false)} onSaved={(c) => set('clientId', c.id)} />
       )}
     </>
+  );
+}
+
+/** Fotot e rreshtit (nga importi i ofertës Excel) ose fotoja e artikullit. */
+function LineImages({ line, product }) {
+  const urls = (line.images || []).map((im) => im.url).filter(Boolean);
+  if (!urls.length && product?.thumbUrl) urls.push(product.thumbUrl);
+  if (!urls.length) return null;
+  return (
+    <div className="row" style={{ gap: 4, marginTop: 4 }}>
+      {urls.slice(0, 3).map((u) => <img key={u} src={u} alt="" style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 4, border: '1px solid var(--border)', background: '#fff' }} />)}
+    </div>
   );
 }
