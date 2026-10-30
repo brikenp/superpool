@@ -294,6 +294,18 @@ async function main() {
   assert.ok((await getDoc(doc(admin.db, 'clients', golemDoc.id))).exists());
   ok('fshirja e klientit: refuzohet kur ka fatura/oferta; klienti pa dokumente fshihet bashkë me shënimet');
 
+  // --- Fshirja e furnitorit ---
+  await admin.call('deleteSupplier', { id: sup.id }).then(() => { throw new Error('duhej refuzuar'); }, (e) => assert.match(e.message, /nuk fshihet sepse ka .*fletëhyrje/));
+  const tmpSup = await addDoc(collection(mag.db, 'suppliers'), { name: 'Furnitor Provë', active: true });
+  await addDoc(collection(mag.db, 'supplierPrices'), { supplierId: tmpSup.id, productId: pipe, price: 10 });
+  await updateDoc(doc(mag.db, 'products', chlor), { supplierId: tmpSup.id, supplierName: 'Furnitor Provë' });
+  await denied(gerti.call('deleteSupplier', { id: tmpSup.id }), 'Gerti fshin furnitorin');
+  const ds = await mag.call('deleteSupplier', { id: tmpSup.id });
+  assert.deepEqual([ds.prices, ds.productsUnlinked], [1, 1]);
+  assert.equal((await getDoc(doc(admin.db, 'suppliers', tmpSup.id))).exists(), false);
+  assert.equal((await getDoc(doc(admin.db, 'products', chlor))).data().supplierId, null);
+  ok('fshirja e furnitorit: refuzohet kur ka fletëhyrje; ndryshe fshihen çmimet dhe artikujt mbeten pa furnitor');
+
   // --- Gjendjet fillestare të klientëve dhe likujdimet ---
   const bimp = await admin.call('importData', { type: 'clientBalances', options: { eurRate: 100 }, rows: [
     { client: 'Hotel Riviera', amount: 250000, date: '01.01.2026' },

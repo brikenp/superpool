@@ -1,15 +1,15 @@
 import { collection, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { MOVEMENT_STATUS, PO_STATUS } from '@shared/constants.js';
 
 import { DataTable } from '../../components/DataTable.jsx';
 import { EntityForm } from '../../components/EntityForm.jsx';
-import { Card, Loading, PageHeader, StatusBadge, Tabs, useAction } from '../../components/ui.jsx';
+import { Card, Loading, PageHeader, StatusBadge, Tabs, useAction, useUi } from '../../components/ui.jsx';
 import { useData, useQuery } from '../../lib/data.jsx';
-import { db } from '../../lib/firebase.js';
+import { call, db } from '../../lib/firebase.js';
 import { date, money, todayISO } from '../../lib/format.js';
 import { supplierFields } from './Suppliers.jsx';
 import { productOption } from '../../components/ProductImage.jsx';
@@ -26,11 +26,25 @@ export default function SupplierDetail() {
   const [tab, setTab] = useState('prices');
   const [editing, setEditing] = useState(false);
   const [priceEdit, setPriceEdit] = useState(null);
-  const [run] = useAction();
+  const [run, busy] = useAction();
+  const { ask } = useUi();
   const supplier = suppliersById[id];
   const prices = useQuery(() => query(collection(db, 'supplierPrices'), where('supplierId', '==', id)), [id]);
   const orders = useQuery(() => query(collection(db, 'purchaseOrders'), where('supplierId', '==', id)), [id]);
   const receipts = useQuery(() => query(collection(db, 'movements'), where('supplierId', '==', id)), [id]);
+
+  const removeSupplier = async () => {
+    const ok = await ask({
+      title: 'Fshi furnitorin',
+      message: `Furnitori «${supplier.name}» do të fshihet përgjithmonë, bashkë me çmimet/ofertat e tij. Artikujt që e kanë furnitor kryesor mbeten pa furnitor.\n\nFurnitorët me fatura blerjeje, pagesa, porosi ose fletëhyrje nuk fshihen.`,
+      confirmLabel: 'Fshi furnitorin', danger: true,
+    });
+    if (!ok) return;
+    run(async () => {
+      await call('deleteSupplier', { id });
+      navigate('/furnitoret');
+    }, 'Furnitori u fshi.');
+  };
 
   if (!supplier) return <Loading />;
   const sortDate = (a, b) => (b.date || '').localeCompare(a.date || '');
@@ -45,6 +59,7 @@ export default function SupplierDetail() {
           <>
             <button type="button" className="btn" onClick={() => setEditing(true)}>Ndrysho</button>
             <Link className="btn primary" to={`/porosite?furnitori=${id}`}><Plus size={16} /> Porosi</Link>
+            {can(CAPS.SUPPLIERS, CAPS.USERS) && <button type="button" className="btn danger" disabled={busy} onClick={removeSupplier}><Trash2 size={16} /> Fshi furnitorin</button>}
           </>
         )}
       />
