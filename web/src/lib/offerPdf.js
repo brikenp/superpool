@@ -90,19 +90,40 @@ export const pdfText = (s) => String(s ?? '')
 async function loadLineImages(paths) {
   const unique = [...new Set(paths.filter(Boolean))];
   if (!unique.length) return {};
-  let res = {};
-  try {
-    res = await call('loadImages', { paths: unique });
-  } catch {
-    return {};
-  }
+  // Fotot kërkohen në grupe të vogla: një përgjigje e vetme me dhjetëra foto kalon kufirin e serverit.
+  const chunks = [];
+  for (let i = 0; i < unique.length; i += 8) chunks.push(unique.slice(i, i + 8));
+  const res = {};
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, chunks.length) }, async () => {
+    while (next < chunks.length) {
+      const chunk = chunks[next];
+      next += 1;
+      try {
+        Object.assign(res, await call('loadImages', { paths: chunk }));
+      } catch (err) {
+        console.warn('Fotot nuk u lexuan', chunk, err);
+      }
+    }
+  }));
+  // Çdo foto zvogëlohet (maks. 600 px) që PDF-ja të mbetet e lehtë edhe me shumë artikuj.
   const out = {};
   await Promise.all(Object.entries(res).map(([p, { type, data }]) => new Promise((resolve) => {
-    const url = `data:${type};base64,${data}`;
     const img = new Image();
-    img.onload = () => { out[p] = { url, w: img.width, h: img.height, format: type.includes('png') ? 'PNG' : 'JPEG' }; resolve(); };
+    img.onload = () => {
+      const scale = Math.min(1, 600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      out[p] = { url: canvas.toDataURL('image/jpeg', 0.82), w: canvas.width, h: canvas.height, format: 'JPEG' };
+      resolve();
+    };
     img.onerror = () => resolve();
-    img.src = url;
+    img.src = `data:${type};base64,${data}`;
   })));
   return out;
 }

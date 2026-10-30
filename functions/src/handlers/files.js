@@ -7,11 +7,11 @@ import { onCall } from 'firebase-functions/v2/https';
 import { REGION, fail, userContext } from '../lib/context.js';
 
 const ALLOWED = /^(products|offers|catalog)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/;
-const MAX_TOTAL = 8 * 1024 * 1024; // përgjigjja e funksionit duhet të mbetet nën 10 MB
+const MAX_TOTAL = 6 * 1024 * 1024; // përgjigjja (base64, +33%) duhet të mbetet nën 10 MB; shfletuesi kërkon me grupe
 
 export const loadImages = onCall({ region: REGION, memory: '512MiB' }, async (request) => {
   await userContext(request);
-  const paths = [...new Set((request.data?.paths || []).map(String))].slice(0, 200);
+  const paths = [...new Set((request.data?.paths || []).map(String))].slice(0, 40);
   if (paths.some((p) => !ALLOWED.test(p))) fail('Rrugë e palejuar.', 'invalid-argument');
   const bucket = getStorage().bucket();
   const out = {};
